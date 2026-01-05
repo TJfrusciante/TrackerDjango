@@ -1,0 +1,4 @@
+**/venv/
+**/TemplatesExamples/
+**/Tracker/
+*.log
