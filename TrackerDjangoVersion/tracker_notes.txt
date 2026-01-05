@@ -1,30 +1,20 @@
-Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-04)
+Diário do projeto TrackerDjangoVersion (atualizado em 2026-01-06)
 -----------------------------------------------------------------
 
-- Escopo: app Django para finanças (transações) e tarefas, UI Bootstrap 5 (tema claro/escuro), dashboards Chart.js.
+- Escopo: app Django multi-tenant para finanças (transações) e tarefas; UI Bootstrap 5 (tema claro/escuro), gráficos Chart.js.
 - Dados: importados de `Tracker/database.db` e `Python Code/Flet_projects/Executaveis Pyinstaller/Tracker exe/database.db`. Total 388 transações; intervalo 06/07/2024 a 10/11/2025.
-- Modelos: Category(name,color); Transaction(description,date,category FK,value Decimal,type income/expense,selected,workspace FK opcional); Task(title,due_date,status ongoing/done,selected,progress,workspace FK opcional); TaskStep(task FK,title,order auto,done,responsible,responsible_email); Workspace(name,slug,owner,is_active); WorkspaceMembership(workspace,user,role).
-- Funcionalidades principais:
-  - Dashboard com filtros rápidos (semana/mês/trimestre/semestre/ano/tudo) e intervalo manual; gráficos (pizza por categoria, linha saldo mensal); cards de totais; listas de últimas transações/tarefas; top receitas/despesas; mensagens auto-fecham em 2s.
-  - Listas de transações/tarefas: filtros (busca, tipo/status, categoria, período dd/mm/aaaa), paginação, export CSV, CRUD completo; tabelas com separadores.
-  - Categorias: criar/excluir (protegido se houver transações).
-  - Datas: inputs em dd/mm/aaaa; JS converte para ISO; forms aceitam dd/mm/aaaa e yyyy-mm-dd.
-  - Detalhe: transações/tarefas aceitam `?detail=1`; botões de “olho” nas listas.
-- Tarefas complexas:
-  - Etapas com responsável e email por etapa; ordem automática; toggle com cores (verde concluída, amarelo pendente); campos empilhados; botão “Adicionar etapa”.
-  - Progresso calculado a partir das etapas; status = done quando todas concluídas; se tarefa sem etapas e marcada done, progresso exibe 100%.
-- Multi-tenant / auth (novo):
-  - Autenticação: telas de login (`/login/`), cadastro (`/register/`), logout. Superuser pode usar visão global (sem workspace) ou escolher workspace.
-  - Seleção/criação de workspace: `/workspaces/select/` lista vínculos, cria workspace (slug único) e troca via slug; middleware obriga usuário comum a ter membership ativa.
-  - Membros: owners gerenciam em `/workspaces/<slug>/members/` (adicionar por email, definir role member/owner, remover). Superuser enxerga todos.
-  - Navbar mostra workspace atual e dropdown para troca (inclui “Modo global” para superuser).
-  - Painel superuser `/super/overview/` com totais globais; CRUD simples de usuários em `/super/users/`.
-- Regras de finanças: só superuser ou owners do workspace podem ver/editar finanças daquele workspace; membros/participantes continuam vendo tarefas do workspace, mas finanças ficam bloqueadas.
-- Dados e usuários de demonstração:
-  - Superuser: `TJfrusciante` (já existente; se não, criar com createsuperuser). Workspace principal slug `principal`, dono de todas as transações importadas (07/2024–11/2025) e tarefas legadas; membro `Teste123` como participant para testar que não vê finanças.
-  - Usuária `Lena` (senha `Senha123!`), workspace `Workspace Lena` slug `lena`, com transações fictícias.
-  - Usuário `Teste123` (senha `Senha123!`), workspace `Workspace Teste` slug `teste`, com transações fictícias; também membro (role member) do workspace principal para validar acesso apenas às tarefas.
-- Comandos úteis: `python manage.py runserver`; importar legado `python manage.py import_legacy --db "<caminho>/database.db"`; `python manage.py check`.
+- Modelos: Category(name,color,workspace FK uniq por workspace); Transaction(description,date,category FK,value,type income/expense,selected,workspace FK); Task(title,due_date,status,selected,progress,workspace FK); TaskStep(task FK,title,order,done,responsible,responsible_email); Workspace(name,slug,owner,is_active); WorkspaceMembership(workspace,user,role,can_edit_tasks); WorkspaceAccessRequest(workspace,user,status); UserProfile(user,avatar); Assistant.ChatMessage (chat IA).
+- Funcionalidades:
+  - Dashboard com filtros rápidos (semana/mês/trimestre/semestre/ano/tudo) e intervalo manual; gráficos por categoria e saldo mensal; cards de totais; últimas transações/tarefas; top receitas/despesas; mensagens auto-fecham em 2s.
+  - Listas de transações/tarefas: filtros (busca, tipo/status, categoria, período dd/mm/aaaa), paginação, export CSV, CRUD completo; tabelas com separadores. Categorias filtradas por workspace.
+  - Tarefas: etapas com responsável/email, ordem automática, toggles coloridos; progresso calculado; flag can_edit_tasks por membro controla edição de tarefas/etapas.
+  - Auth/multi-tenant: login `/login/`, cadastro `/register/`, logout. Seleção/criação de workspace `/workspaces/select/`. Troca via slug; superuser pode modo global. Membros gerenciados em `/workspaces/<slug>/members/` (convidar por email/username, roles member/owner, can_edit_tasks). Pedidos de acesso via `/workspaces/request/` e aprovação na tela de membros. Navbar mostra workspace atual.
+  - Painel superuser `/super/overview/` com gráficos (financeiro por workspace, saldo mensal) e totais globais; CRUD de usuários em `/super/users/`.
+- IA: app `assistant`, chat em `/ia/` com histórico; resumo local de finanças/tarefas e chamada ao OpenAI se `OPENAI_API_KEY` estiver definida (fallback para resumo local). UI do chat: bolhas alinhadas, copiar mensagem, enter envia, auto-scroll, streaming visual da última resposta e metadados mais legíveis, fonte mais forte no autor.
+- Perfil: `/perfil/` para editar dados e avatar (UserProfile); avatar no header.
+- Dados demo: superuser `TJfrusciante` (workspace `principal` com dados legados), usuária `Lena` (Senha123!, workspace `lena` com transações fictícias), usuário `Teste123` (Senha123!, workspace `teste`; membro do workspace principal para testar restrição de finanças).
+- Landing page pública em `/` (se logado redireciona para dashboard); dashboard agora em `/app/`. Nav mostra só itens para autenticados; brand leva para landing se não logado.
 - Pendências/observações:
-  - Reimportar caso chegue novo .db com datas além de 2025-11.
-  - Ajustar eventuais acentos/encoding remanescentes se notar textos quebrados.
+  - Rodar `python manage.py migrate` (cria WorkspaceAccessRequest, can_edit_tasks, UserProfile, Assistant.ChatMessage).
+  - Incrementar ainda mais a visão geral e o agente IA conforme necessário. Ajustar encoding se editar fora de UTF-8.
+- Login: mostra erro explícito para usuário/senha inválidos.
