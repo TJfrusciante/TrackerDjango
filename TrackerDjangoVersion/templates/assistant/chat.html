@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}IA | Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-9 col-lg-10">
+        <div class="glass-card p-4 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <p class="text-secondary small mb-1">Assistente</p>
+                    <h1 class="h5 fw-bold mb-0">Agente de IA</h1>
+                </div>
+                <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:dashboard' %}">Voltar</a>
+            </div>
+            <div id="chatBox" class="chat-box mb-3 p-2">
+                {% for msg in history %}
+                    <div class="d-flex {% if msg.role == 'user' %}justify-content-end{% else %}justify-content-start{% endif %} mb-3">
+                        <div class="chat-bubble position-relative {% if msg.role == 'user' %}user{% else %}assistant{% endif %}">
+                            <div class="chat-meta small mb-1 {% if msg.role == 'user' %}text-light{% else %}text-secondary{% endif %}">
+                                {{ msg.created_at|date:"d/m/Y H:i" }} · {{ msg.role|capfirst }}
+                            </div>
+                            <div class="chat-text">{{ msg.content|linebreaksbr }}</div>
+                            <button type="button" class="btn btn-sm btn-outline-light copy-btn" title="Copiar" data-content="{{ msg.content|escape }}">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-secondary mb-0">Sem mensagens. Envie algo para começar.</p>
+                {% endfor %}
+            </div>
+            <form method="post" id="chatForm">
+                {% csrf_token %}
+                <div class="mb-2">
+                    <label class="form-label">Mensagem</label>
+                    <textarea name="message" class="form-control" rows="3" placeholder="Ex.: Qual o saldo deste workspace?" autocomplete="off" autofocus></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit">Enviar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+    .chat-box {
+        max-height: 65vh;
+        overflow-y: auto;
+        background: rgba(15, 23, 42, 0.35);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+    }
+    [data-bs-theme="light"] .chat-box {
+        background: #f8fafc;
+    }
+    .chat-bubble {
+        max-width: 78%;
+        padding: 12px 42px 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+    }
+    .chat-bubble.assistant {
+        background: rgba(148, 163, 184, 0.18);
+        color: var(--body-color);
+    }
+    [data-bs-theme="light"] .chat-bubble.assistant {
+        background: #e2e8f0;
+        border-color: #cbd5e1;
+    }
+    .chat-bubble.user {
+        background: linear-gradient(135deg, #2563eb, #22c55e);
+        color: #fff;
+        border-color: rgba(255,255,255,0.25);
+        box-shadow: 0 10px 30px rgba(37,99,235,0.25);
+    }
+    .chat-bubble .copy-btn {
+        position: absolute;
+        right: 8px;
+        top: 8px;
+        border-radius: 10px;
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+    .chat-bubble.user .copy-btn {
+        border-color: rgba(255,255,255,0.7);
+        color: #fff;
+    }
+    .chat-bubble.user .chat-meta { color: #e2e8f0 !important; opacity: 0.95; }
+    .chat-text p { margin-bottom: 0.25rem; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const chatBox = document.getElementById('chatBox');
+    if (chatBox) {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const text = btn.dataset.content || '';
+            navigator.clipboard.writeText(text.replace(/\\n/g, '\n'));
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+            setTimeout(() => { btn.innerHTML = original; }, 1200);
+        });
+    });
+
+    const chatForm = document.getElementById('chatForm');
+    if (chatForm) {
+        const textarea = chatForm.querySelector('textarea[name="message"]');
+        textarea.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' && !ev.shiftKey) {
+                ev.preventDefault();
+                chatForm.submit();
+            }
+        });
+    }
+
+    // anima o texto da última resposta do assistente para dar sensaÇõo de streaming
+    const assistantTexts = document.querySelectorAll('.chat-bubble.assistant .chat-text');
+    if (assistantTexts.length) {
+        const last = assistantTexts[assistantTexts.length - 1];
+        const raw = last.textContent || '';
+        last.innerHTML = '';
+        let i = 0;
+        const type = () => {
+            if (i >= raw.length) return;
+            const ch = raw[i];
+            last.innerHTML += ch === '\\n' ? '<br>' : ch;
+            i += 1;
+            setTimeout(type, 12);
+        };
+        type();
+    }
+</script>
+{% endblock %}
+{% endblock %}

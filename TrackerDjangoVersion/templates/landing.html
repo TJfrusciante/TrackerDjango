@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tracker | Finanças e tarefas em um só lugar{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lp-hero {
+        padding: 4rem 0 3rem;
+    }
+    .lp-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .5rem 1rem;
+        border-radius: 999px;
+        background: rgba(94, 234, 212, 0.12);
+        color: var(--primary-soft);
+        font-weight: 700;
+        letter-spacing: .3px;
+    }
+    .lp-muted { color: var(--muted); }
+    .lp-hero-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+    .lp-stat {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: .75rem .9rem;
+    }
+    .lp-number {
+        font-weight: 800;
+        font-size: 1.25rem;
+    }
+    .lp-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.25rem;
+        height: 100%;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.16);
+    }
+    .lp-icon {
+        width: 42px; height: 42px;
+        display: grid; place-items: center;
+        border-radius: 12px;
+        background: rgba(94, 234, 212, 0.12);
+        color: var(--primary-soft);
+        margin-bottom: .75rem;
+    }
+    .lp-section { background: rgba(255,255,255,0.02); border: 1px solid transparent; }
+    .plan-card {
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(15,23,42,0.75));
+        padding: 1.5rem;
+        height: 100%;
+    }
+    [data-bs-theme="light"] .plan-card {
+        background: #fff;
+    }
+    .section-title { font-weight: 800; letter-spacing: -0.5px; }
+    .lp-step { border-left: 3px solid var(--primary-color); padding-left: 1rem; }
+    .faq-item { border-bottom: 1px solid var(--border); padding: .8rem 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="lp-hero">
+    <div class="container">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-6">
+                <div class="lp-pill mb-3">Finanças + Tarefas + IA</div>
+                <h1 class="fw-bold mb-3">Controle financeiro e to-do list modernos, multi-tenant.</h1>
+                <p class="lead lp-muted mb-4">Workspaces com permissões, dashboards em tempo real e um agente de IA que responde sobre seu período, categorias e tarefas.</p>
+                <div class="d-flex flex-wrap gap-3">
+                    <a class="btn btn-primary btn-lg" href="{% url 'tracker:register' %}">Criar conta</a>
+                    <a class="btn btn-outline-light btn-lg" href="{% url 'tracker:login' %}">Já tenho acesso</a>
+                </div>
+                <p class="lp-muted mt-3 small">Somente o dono do workspace paga; até 3 participantes incluídos.</p>
+            </div>
+            <div class="col-lg-6">
+                <div class="lp-hero-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <p class="lp-muted mb-1 small">Painel em tempo real</p>
+                            <h5 class="mb-0">Saldo, categorias e tarefas</h5>
+                        </div>
+                        <span class="badge bg-warning text-dark">Preview</span>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Saldo (30d)</div>
+                                <div class="lp-number">R$ 12.430</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Tarefas feitas</div>
+                                <div class="lp-number">42/50</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Top categoria</div>
+                                <div class="lp-number">Moradia</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">IA consultas</div>
+                                <div class="lp-number">120/mês</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row g-3 text-center">
+            <div class="col-6 col-lg-3">
+                <div class="lp-card">
+                    <div class="lp-muted small">Workspaces ativos</div>
+                    <div class="lp-number">+35</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="lp-card">
+                    <div class="lp-muted small">Transações migradas</div>
+                    <div class="lp-number">+380</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="lp-card">
+                    <div class="lp-muted small">Tarefas/etapas</div>
+                    <div class="lp-number">+210</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="lp-card">
+                    <div class="lp-muted small">Resposta média</div>
+                    <div class="lp-number">IA em segundos</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5 lp-section">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+            <h2 class="section-title mb-2">Benefícios</h2>
+            <p class="lp-muted mb-0">Dashboards, IA, exportações e controle de equipe.</p>
+        </div>
+        <div class="row g-4">
+            {% for card in feature_cards %}
+            <div class="col-md-4">
+                <div class="lp-card h-100">
+                    <div class="lp-icon"><i class="{{ card.icon }}"></i></div>
+                    <h5 class="mb-1">{{ card.title }}</h5>
+                    <p class="lp-muted mb-0">{{ card.description }}</p>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="lp-card h-100 text-center">
+                    <p class="lp-muted mb-0">Recursos chegando em breve.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4 align-items-start">
+            <div class="col-lg-6">
+                <h2 class="section-title mb-3">Planos</h2>
+                <p class="lp-muted mb-4">O dono paga o workspace; até 3 participantes inclusos. IA com contexto do seu ambiente.</p>
+                <div class="row g-3">
+                    {% for plan in pricing_plans %}
+                    <div class="col-md-6">
+                        <div class="plan-card h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">{{ plan.name }}</h5>
+                                <span class="badge bg-primary-subtle text-primary">{{ plan.badge }}</span>
+                            </div>
+                            <p class="lp-muted small mb-2">{{ plan.subtitle }}</p>
+                            <h3 class="fw-bold mb-3">R$ {{ plan.price }}/mês</h3>
+                            <ul class="lp-muted small ps-3 mb-3">
+                                {% for f in plan.features %}
+                                <li class="mb-1">{{ f }}</li>
+                                {% endfor %}
+                            </ul>
+                            <a class="btn btn-primary w-100" href="{% url 'tracker:register' %}">Assinar</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <h2 class="section-title mb-3">Como funciona</h2>
+                <div class="vstack gap-3">
+                    {% for step in steps %}
+                    <div class="lp-card lp-step">
+                        <h6 class="mb-1">{{ forloop.counter }}. {{ step.title }}</h6>
+                        <p class="lp-muted mb-0">{{ step.text }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5 lp-section">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <h2 class="section-title mb-3">Perguntas frequentes</h2>
+                <div class="lp-card">
+                    {% for item in faq_items %}
+                    <div class="faq-item">
+                        <h6 class="mb-1">{{ item.question }}</h6>
+                        <p class="lp-muted mb-0">{{ item.answer }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="lp-card h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <p class="lp-muted small mb-1">Pronto para começar?</p>
+                        <h3 class="fw-bold mb-2">Migre seus dados e convide sua equipe agora.</h3>
+                        <p class="lp-muted">Entradas, saídas, categorias coloridas, subtarefas com responsáveis e IA conectada ao seu workspace.</p>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-primary" href="{% url 'tracker:register' %}">Criar conta</a>
+                        <a class="btn btn-outline-light" href="{% url 'tracker:login' %}">Entrar</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
