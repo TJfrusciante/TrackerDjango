@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}{{ object|default:"Novo usuário" }} | Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4">
+            <h1 class="h5 fw-bold mb-3">{{ object|default:"Novo usuário" }}</h1>
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Voltar</a>
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

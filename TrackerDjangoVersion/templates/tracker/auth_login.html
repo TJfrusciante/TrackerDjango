@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Entrar | Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-5">
+        <div class="glass-card p-4">
+            <h1 class="h4 fw-bold mb-3">Entrar</h1>
+            <p class="text-secondary small mb-4">Acesse para visualizar seus workspaces e dashboards.</p>
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger py-2 small mb-3">
+                    {{ form.non_field_errors|striptags }}
+                </div>
+            {% endif %}
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <div class="d-grid">
+                    <button class="btn btn-primary" type="submit">Entrar</button>
+                </div>
+            </form>
+            <p class="small mt-3 mb-0 text-secondary">Não tem conta? <a href="{% url 'tracker:register' %}">Crie uma agora</a>.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

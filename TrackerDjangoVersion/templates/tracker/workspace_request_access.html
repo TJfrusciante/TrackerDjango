@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Pedir acesso | Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4">
+            <h1 class="h5 fw-bold mb-3">Pedir acesso a um workspace</h1>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Slug do workspace</label>
+                    {{ form.slug }}
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-light" href="{% url 'tracker:dashboard' %}">Cancelar</a>
+                    <button class="btn btn-primary" type="submit">Enviar pedido</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

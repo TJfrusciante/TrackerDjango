@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil | Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4">
+            <h1 class="h5 fw-bold mb-3">Editar perfil</h1>
+            <form method="post" enctype="multipart/form-data" class="row g-3">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label class="form-label">Avatar</label>
+                    {% if user_avatar_url %}
+                        <div class="mb-2">
+                            <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb" style="width:64px;height:64px;">
+                        </div>
+                    {% endif %}
+                    {{ avatar_form.avatar }}
+                </div>
+                {% for field in form %}
+                    <div class="col-md-6">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <div class="col-12 d-flex gap-2">
+                    <a class="btn btn-outline-light" href="{% url 'tracker:dashboard' %}">Voltar</a>
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

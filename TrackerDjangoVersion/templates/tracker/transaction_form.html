@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transação | Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="glass-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <p class="text-secondary small mb-1">Finanças</p>
+                    <h1 class="h4 fw-bold mb-0">{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transação</h1>
+                </div>
+                <a href="{% url 'tracker:transactions_list' %}" class="btn btn-outline-light">
+                    <i class="fa-solid fa-arrow-left me-2"></i>Voltar
+                </a>
+            </div>
+
+            {% if form.errors %}
+                <div class="alert alert-danger">Confira os campos destacados.</div>
+            {% endif %}
+
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label class="form-label">Descrição</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.description }}</p>
+                    {% else %}
+                        {{ form.description }}{{ form.description.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Data</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.date|date:"d/m/Y" }}</p>
+                    {% else %}
+                        {{ form.date }}{{ form.date.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Categoria</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.category }}</p>
+                    {% else %}
+                        {{ form.category }}{{ form.category.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Tipo</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.get_type_display }}</p>
+                    {% else %}
+                        {{ form.type }}{{ form.type.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Valor</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">R$ {{ form.instance.value|floatformat:2 }}</p>
+                    {% else %}
+                        {{ form.value }}{{ form.value.errors }}
+                    {% endif %}
+                </div>
+                {% if not is_detail %}
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a class="btn btn-outline-light" href="{% url 'tracker:transactions_list' %}">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

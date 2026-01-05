@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Criar conta | Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6 col-xl-5">
+        <div class="glass-card p-4">
+            <h1 class="h4 fw-bold mb-3">Criar conta</h1>
+            <p class="text-secondary small mb-4">Cadastre-se e já crie seu primeiro workspace.</p>
+            <form method="post" novalidate enctype="multipart/form-data">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <div class="d-grid">
+                    <button class="btn btn-primary" type="submit">Criar conta</button>
+                </div>
+            </form>
+            <p class="small mt-3 mb-0 text-secondary">Já tem conta? <a href="{% url 'tracker:login' %}">Entre aqui</a>.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

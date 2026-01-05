@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Usuários | Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <p class="text-secondary small mb-1">Admin</p>
+        <h1 class="h4 fw-bold mb-0">Usuários</h1>
+    </div>
+    <a class="btn btn-primary" href="{% url 'tracker:user_admin_create' %}"><i class="fa-solid fa-plus me-1"></i>Novo usuário</a>
+ </div>
+
+<div class="glass-card p-4">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0 table-hover">
+            <thead>
+                <tr class="text-secondary">
+                    <th>Username</th>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>Último login</th>
+                    <th>Workspaces</th>
+                    <th>Superuser</th>
+                    <th>Ativo</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                    <tr class="bg-dark bg-opacity-10">
+                        <td>{{ u.username }}</td>
+                        <td>{{ u.get_full_name|default:"-" }}</td>
+                        <td>{{ u.email }}</td>
+                        <td class="small text-secondary">{% if u.last_login_ts %}{{ u.last_login_ts|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                        <td>{{ u.workspace_count }}</td>
+                        <td>{% if u.is_superuser %}<span class="badge bg-primary">Sim</span>{% else %}<span class="badge bg-secondary-subtle text-secondary">Não</span>{% endif %}</td>
+                        <td>
+                            <span class="badge {% if u.is_active %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                                {% if u.is_active %}Ativo{% else %}Inativo{% endif %}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_edit' u.id %}">Editar</a>
+                                <a class="btn btn-outline-info" href="{% url 'tracker:superuser_overview' %}?user={{ u.id }}">Stats</a>
+                                <a class="btn btn-outline-secondary" href="mailto:{{ u.email }}">Contato</a>
+                                <form method="post" action="{% url 'tracker:user_admin_delete' u.id %}" onsubmit="return confirm('Remover este usuário?');">
+                                    {% csrf_token %}
+                                    <button class="btn btn-outline-danger" type="submit">Excluir</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="text-secondary">Nenhum usuário.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

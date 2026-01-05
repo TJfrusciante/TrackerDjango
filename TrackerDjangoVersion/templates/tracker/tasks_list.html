@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Tarefas | Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    #task-table tbody tr {
+        border-bottom: 1px solid var(--border, #e2e8f0);
+    }
+    #task-table tbody tr:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+        <p class="text-secondary small mb-1">Produtividade</p>
+        <h1 class="h4 fw-bold mb-0">Tarefas</h1>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" href="{% url 'tracker:task_create' %}">
+            <i class="fa-solid fa-plus me-2"></i>Nova tarefa
+        </a>
+    </div>
+</div>
+
+<form id="taskFilters" method="get" class="glass-card p-3 mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">Buscar</label>
+            <input type="text" name="q" value="{{ filters.q }}" placeholder="Título" class="form-control">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-select">
+                <option value="">Todos</option>
+                <option value="ongoing" {% if filters.status == 'ongoing' %}selected{% endif %}>Em andamento</option>
+                <option value="done" {% if filters.status == 'done' %}selected{% endif %}>Finalizada</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">De</label>
+            <input id="taskStartDisplay" type="text" name="start_display" inputmode="numeric" class="form-control" value="{{ filters_display.start }}" placeholder="dd/mm/aaaa">
+            <input id="taskStartHidden" type="hidden" name="start" value="{{ filters.start }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Até</label>
+            <input id="taskEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
+            <input id="taskEndHidden" type="hidden" name="end" value="{{ filters.end }}">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button class="btn btn-primary w-100" type="submit">Filtrar</button>
+        </div>
+        <div class="col-12 d-flex justify-content-between mt-2">
+            <div class="small text-secondary">
+                {{ tasks_total }} resultado(s)
+            </div>
+            <a href="{% url 'tracker:tasks_list' %}" class="btn btn-sm btn-outline-light">Limpar filtros</a>
+        </div>
+    </div>
+</form>
+<script>
+    (function() {
+        const form = document.getElementById('taskFilters');
+        if (!form) return;
+        const startDisplay = document.getElementById('taskStartDisplay');
+        const endDisplay = document.getElementById('taskEndDisplay');
+        const startHidden = document.getElementById('taskStartHidden');
+        const endHidden = document.getElementById('taskEndHidden');
+        const toIso = (val) => {
+            const parts = (val || '').split('/');
+            if (parts.length !== 3) return '';
+            const [d, m, y] = parts;
+            if (!d || !m || !y) return '';
+            return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        };
+        form.addEventListener('submit', (e) => {
+            const isoStart = toIso(startDisplay.value.trim());
+            const isoEnd = toIso(endDisplay.value.trim());
+            if ((startDisplay.value && !isoStart) || (endDisplay.value && !isoEnd)) {
+                e.preventDefault();
+                alert('Use o formato dd/mm/aaaa nos filtros de data.');
+                return;
+            }
+            startHidden.value = isoStart;
+            endHidden.value = isoEnd;
+        });
+    })();
+</script>
+
+<form method="get" class="mb-3">
+    {% for key, value in filters.items %}
+        {% if value %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endif %}
+    {% endfor %}
+    <button class="btn btn-sm btn-outline-light" type="submit" name="export" value="csv">
+        <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
+    </button>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Em andamento</p>
+            <h4 class="text-warning mb-0">{{ open_count }}</h4>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Concluidas</p>
+            <h4 class="text-success mb-0">{{ done_count }}</h4>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card p-4">
+    <div class="table-responsive">
+        <table id="task-table" class="table table-borderless table-striped align-middle mb-0">
+            <thead>
+                <tr class="text-secondary">
+                    <th>Tarefa</th>
+                    <th>Prazo</th>
+                    <th>Status</th>
+                    <th>Progresso</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks_page %}
+                    <tr>
+                        <td class="fw-semibold">{{ task.title }}</td>
+                        <td class="text-secondary">{{ task.due_date|date:"d/m/Y" }}</td>
+                        <td>
+                            <span class="badge {% if task.status == 'done' %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %} px-3">
+                                {{ task.get_status_display }}
+                            </span>
+                        </td>
+                        <td style="min-width: 160px;">
+                            {% with pct=task.progress|floatformat:0 %}
+                                {% if task.progress == 0 and task.status == 'done' and not task.steps.all %}
+                                    {% with pct='100' %}
+                                    <div class="progress" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                                        <div class="progress-bar bg-success" style="width: 100%;">100%</div>
+                                    </div>
+                                    {% endwith %}
+                                {% else %}
+                                    <div class="progress" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+                                        <div class="progress-bar {% if task.progress >= 100 %}bg-success{% else %}bg-info{% endif %}" style="width: {{ pct }}%;">
+                                            {{ pct }}%
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2">
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:task_update' task.id %}?detail=1">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:task_update' task.id %}">
+                                    <i class="fa-solid fa-pen"></i>
+                                </a>
+                                <form method="post" action="{% url 'tracker:task_delete' task.id %}" onsubmit="return confirm('Excluir esta tarefa?');">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-secondary">Nenhuma tarefa registrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if tasks_page.has_other_pages %}
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="small text-secondary">
+            Pagina {{ tasks_page.number }} de {{ tasks_page.paginator.num_pages }}
+        </div>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                {% if tasks_page.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ tasks_page.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Anterior</a></li>
+                {% endif %}
+                {% for num in tasks_page.paginator.page_range %}
+                    {% if num == tasks_page.number %}
+                        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num >= tasks_page.number|add:"-2" and num <= tasks_page.number|add:"2" %}
+                        <li class="page-item"><a class="page-link" href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">{{ num }}</a></li>
+                    {% endif %}
+                {% endfor %}
+                {% if tasks_page.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ tasks_page.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Proxima</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
