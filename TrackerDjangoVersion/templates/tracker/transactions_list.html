@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Transações | Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    #tx-table tbody tr {
+        border-bottom: 1px solid var(--border, #e2e8f0);
+    }
+    #tx-table tbody tr:last-child {
+        border-bottom: none;
+    }
+    .due-warning {
+        background: rgba(245, 158, 11, 0.08);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+        <p class="text-secondary small mb-1">Finanças</p>
+        <h1 class="h4 fw-bold mb-0">Transações</h1>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" href="{% url 'tracker:transaction_create' %}" data-bs-toggle="tooltip" title="Criar nova transação">
+            <i class="fa-solid fa-plus me-2"></i>Nova transação
+        </a>
+        <a class="btn btn-outline-light" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" title="Gerenciar categorias">
+            <i class="fa-solid fa-tags me-2"></i>Categorias
+        </a>
+        <a class="btn btn-success" href="{% url 'tracker:transaction_import' %}" data-bs-toggle="tooltip" title="Importar extrato CSV e sugerir categorias">
+            <i class="fa-solid fa-file-import me-2"></i>Importar CSV
+        </a>
+        <a class="btn btn-warning" href="{% url 'tracker:transaction_import_pdf' %}" data-bs-toggle="tooltip" title="Importar extrato PDF e sugerir categorias">
+            <i class="fa-solid fa-file-pdf me-2"></i>Importar PDF
+        </a>
+    </div>
+</div>
+
+<form id="txFilters" method="get" class="glass-card p-3 mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">Buscar</label>
+            <input aria-label="Buscar transação" type="text" name="q" value="{{ filters.q }}" placeholder="Descrição ou categoria" class="form-control">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Tipo</label>
+            <select name="type" class="form-select" aria-label="Filtrar por tipo">
+                <option value="">Todas</option>
+                <option value="income" {% if filters.type == 'income' %}selected{% endif %}>Entrada</option>
+                <option value="expense" {% if filters.type == 'expense' %}selected{% endif %}>Saida</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Categoria</label>
+            <select name="category" class="form-select" aria-label="Filtrar por categoria">
+                <option value="">Todas</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if filters.category|stringformat:'s' == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">De</label>
+            <input aria-label="Data inicial" id="txStartDisplay" type="text" name="start_display" inputmode="numeric" class="form-control" value="{{ filters_display.start }}" placeholder="dd/mm/aaaa">
+            <input id="txStartHidden" type="hidden" name="start" value="{{ filters.start }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Até</label>
+            <input aria-label="Data final" id="txEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
+            <input id="txEndHidden" type="hidden" name="end" value="{{ filters.end }}">
+        </div>
+        <div class="col-md-1 d-flex gap-2">
+            <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transação">Filtrar</button>
+        </div>
+        <div class="col-12 d-flex justify-content-between mt-2">
+            <div class="small text-secondary">
+                {{ transactions_total }} resultado(s)
+            </div>
+            <a href="{% url 'tracker:transactions_list' %}" class="btn btn-sm btn-outline-light">Limpar filtros</a>
+        </div>
+    </div>
+</form>
+<script>
+    (function() {
+        const form = document.getElementById('txFilters');
+        if (!form) return;
+        const startDisplay = document.getElementById('txStartDisplay');
+        const endDisplay = document.getElementById('txEndDisplay');
+        const startHidden = document.getElementById('txStartHidden');
+        const endHidden = document.getElementById('txEndHidden');
+        const toIso = (val) => {
+            const parts = (val || '').split('/');
+            if (parts.length !== 3) return '';
+            const [d, m, y] = parts;
+            if (!d || !m || !y) return '';
+            return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        };
+        form.addEventListener('submit', (e) => {
+            const isoStart = toIso(startDisplay.value.trim());
+            const isoEnd = toIso(endDisplay.value.trim());
+            if ((startDisplay.value && !isoStart) || (endDisplay.value && !isoEnd)) {
+                e.preventDefault();
+                alert('Use o formato dd/mm/aaaa nos filtros de data.');
+                return;
+            }
+            startHidden.value = isoStart;
+            endHidden.value = isoEnd;
+        });
+    })();
+</script>
+
+<form method="get" class="mb-3">
+    {% for key, value in filters.items %}
+        {% if value %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endif %}
+    {% endfor %}
+    <button class="btn btn-sm btn-outline-light" type="submit" name="export" value="csv" data-bs-toggle="tooltip" title="Exportar transações em CSV">
+        <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
+    </button>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="glass-card p-3">
+            <p class="text-secondary small mb-1">Entradas</p>
+            <h4 class="text-success mb-0">R$ {{ income_total|floatformat:2 }}</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card p-3">
+            <p class="text-secondary small mb-1">Saidas</p>
+            <h4 class="text-danger mb-0">R$ {{ expense_total|floatformat:2 }}</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card p-3">
+            <p class="text-secondary small mb-1">Saldo</p>
+            <h4 class="{% if balance_total >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">R$ {{ balance_total|floatformat:2 }}</h4>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card p-4">
+    <div class="table-responsive">
+        <table id="tx-table" class="table table-borderless table-striped align-middle mb-0">
+            <thead>
+                <tr class="text-secondary">
+                    <th>Descrição</th>
+                    <th>Categoria</th>
+                    <th>Data</th>
+                    <th class="text-end">Valor</th>
+                    <th class="text-center">Tipo</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions_page %}
+                    <tr class="{% if tx.selected %}due-warning{% endif %}">
+                        <td class="fw-semibold">{{ tx.description }}</td>
+                        <td><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
+                        <td class="text-secondary">{{ tx.date|date:"d/m/Y" }}</td>
+                        <td class="text-end {% if tx.type == 'income' %}text-success{% else %}text-danger{% endif %}">R$ {{ tx.value|floatformat:2 }}</td>
+                        <td class="text-center">
+                            <span class="badge {% if tx.type == 'income' %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %} px-3">
+                                {{ tx.get_type_display }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2">
+                                <form method="post" action="{% url 'tracker:transaction_toggle_type' tx.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-info" type="submit" aria-label="Alternar tipo" data-bs-toggle="tooltip" title="Converter entrada/saída">
+                                        <i class="fa-solid fa-arrows-rotate"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'tracker:transaction_toggle_selected' tx.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm {% if tx.selected %}btn-warning{% else %}btn-outline-warning{% endif %}" type="submit" aria-label="Destacar transação" data-bs-toggle="tooltip" title="Marcar como destaque">
+                                        <i class="fa-solid fa-star"></i>
+                                    </button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:transaction_update' tx.id %}?detail=1" aria-label="Detalhes" data-bs-toggle="tooltip" title="Ver detalhes da transação">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:transaction_update' tx.id %}" aria-label="Editar" data-bs-toggle="tooltip" title="Editar transação">
+                                    <i class="fa-solid fa-pen"></i>
+                                </a>
+                                <form method="post" action="{% url 'tracker:transaction_delete' tx.id %}" onsubmit="return confirm('Excluir esta transação?');">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Excluir" data-bs-toggle="tooltip" title="Excluir transação">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-secondary">Nenhuma transação registrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if transactions_page.has_other_pages %}
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="small text-secondary">
+            Pagina {{ transactions_page.number }} de {{ transactions_page.paginator.num_pages }}
+        </div>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                {% if transactions_page.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ transactions_page.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Anterior</a></li>
+                {% endif %}
+                {% for num in transactions_page.paginator.page_range %}
+                    {% if num == transactions_page.number %}
+                        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num >= transactions_page.number|add:"-2" and num <= transactions_page.number|add:"2" %}
+                        <li class="page-item"><a class="page-link" href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">{{ num }}</a></li>
+                    {% endif %}
+                {% endfor %}
+                {% if transactions_page.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ transactions_page.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Proxima</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

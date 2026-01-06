@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Membros | Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+        <p class="text-secondary small text-uppercase mb-1">Colaboracao</p>
+        <h1 class="h4 fw-bold mb-0">Membros de {{ workspace.name }}</h1>
+        <p class="text-secondary mb-0">Acesso e papeis sao isolados por workspace. Ajuste permissoes rapidamente.</p>
+    </div>
+    <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
+</div>
+
+<div class="row gy-4">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge text-bg-dark">Membros</span>
+                    <span class="text-secondary small">{{ memberships|length }} ativos</span>
+                </div>
+                <span class="badge text-bg-secondary">Pendentes: {{ pending_requests|length }}</span>
+            </div>
+            {% if memberships %}
+            <div class="list-group">
+                {% for member in memberships %}
+                    <div class="list-group-item d-flex justify-content-between align-items-start py-3">
+                        <div>
+                            <div class="fw-semibold">{{ member.user.get_full_name|default:member.user.username }}</div>
+                            <div class="small text-secondary">{{ member.user.email|default:"sem email" }}</div>
+                            <div class="small text-secondary">Papel: {{ member.role }} • Edita tarefas: {{ member.can_edit_tasks|yesno:"Sim,Nao" }}</div>
+                        </div>
+                        {% if user.is_superuser or member.user_id != user.id %}
+                        <div class="d-flex flex-column gap-2 align-items-end">
+                            <form method="post" action="{% url 'tracker:workspace_member_update' workspace.slug member.id %}">
+                                {% csrf_token %}
+                                <div class="input-group input-group-sm">
+                                    <select name="role" class="form-select form-select-sm">
+                                        <option value="member" {% if member.role == 'member' %}selected{% endif %}>Membro</option>
+                                        <option value="owner" {% if member.role == 'owner' %}selected{% endif %}>Owner</option>
+                                    </select>
+                                    <button class="btn btn-outline-light" type="submit">Salvar</button>
+                                </div>
+                                <div class="form-check form-switch small mt-2">
+                                    <input class="form-check-input" type="checkbox" name="can_edit_tasks" id="edit_{{ member.id }}" {% if member.can_edit_tasks %}checked{% endif %}>
+                                    <label class="form-check-label" for="edit_{{ member.id }}">Pode editar tarefas</label>
+                                </div>
+                            </form>
+                            <form method="post" action="{% url 'tracker:workspace_member_remove' workspace.slug member.id %}" onsubmit="return confirm('Remover membro?');">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            {% else %}
+                <div class="alert alert-info small mb-0">Nenhum membro por aqui. Convide alguem ao lado.</div>
+            {% endif %}
+            <div class="mt-3 text-secondary small">Dica: papeis controlam financas/tarefas; apenas owners e superusers podem remover.</div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h3 class="h6 fw-bold mb-0">Adicionar membro</h3>
+                <span class="badge text-bg-success">Convite rapido</span>
+            </div>
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="invite_email">
+                <div class="col-12">
+                    <label class="form-label">Nome</label>
+                    {{ invite_form.name }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Email</label>
+                    {{ invite_form.email }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Papel</label>
+                    {{ invite_form.role }}
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary" type="submit">Convidar/adicionar</button>
+                </div>
+            </form>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h3 class="h6 fw-bold mb-0">Adicionar por username</h3>
+                <span class="badge text-bg-secondary">Para usuarios existentes</span>
+            </div>
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="invite_username">
+                <div class="col-12">
+                    <label class="form-label">Username</label>
+                    {{ invite_username_form.username }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Papel</label>
+                    {{ invite_username_form.role }}
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-outline-light" type="submit">Adicionar</button>
+                </div>
+            </form>
+            <div class="text-secondary small mt-3">Os convites sao auditados por workspace; notificamos os admins quando ha pedidos pendentes.</div>
+        </div>
+    </div>
+    <div class="col-lg-12">
+        <div class="glass-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h3 class="h6 fw-bold mb-0">Pedidos de acesso pendentes</h3>
+                <span class="badge text-bg-warning">{{ pending_requests|length }} aguardando</span>
+            </div>
+            {% if pending_requests %}
+                <div class="list-group">
+                    {% for req in pending_requests %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">{{ req.user.username }}</div>
+                                <div class="small text-secondary">{{ req.user.email }}</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a class="btn btn-sm btn-success" href="{% url 'tracker:workspace_request_action' workspace.slug req.id 'approve' %}">Aprovar</a>
+                                <a class="btn btn-sm btn-outline-danger" href="{% url 'tracker:workspace_request_action' workspace.slug req.id 'reject' %}">Rejeitar</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-secondary mb-0">Nenhum pedido pendente.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

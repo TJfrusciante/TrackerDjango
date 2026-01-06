@@ -1,0 +1,33 @@
+Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-06)
+-----------------------------------------------------------------
+
+- Escopo: app Django multi-tenant para finanças (transacoes) e tarefas; UI Bootstrap 5 com tema claro/escuro; graficos Chart.js.
+- Dados demo: 388 transacoes importadas de bases SQLite antigas; intervalo 06/07/2024 a 10/11/2025. Workspaces exemplo: principal (owner TJfrusciante), lena (Senha123!), teste (Senha123!).
+
+Modelos e infra
+- Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar), Assistant.ChatMessage.
+- Indexes adicionados em workspace/type/date/status/category para consultas mais rapidas (migration 0010_auto_indexes).
+- Requisitos: requirements.txt/requirements-dev.txt criados (inclui pdfminer.six, PyPDF2, pytest, ruff). Makefile com alvos run/lint/test/import-demo. README atualizado com setup, env vars e limites de import PDF/CSV.
+
+Funcionalidades principais
+- Dashboard `/app/`: filtros rapidos (semana/mes/trimestre/semestre/ano/tudo) e intervalo manual; graficos por categoria e saldo mensal; cards de totais; ultimas transacoes/tarefas; top receitas/despesas.
+- Transacoes/tarefas: filtros (busca, tipo/status, categoria, periodo dd/mm/aaaa), paginacao, export CSV, CRUD completo, toggles de selecao/tipo/status.
+- Tarefas: etapas com responsavel/email, ordenacao automatica, progresso calculado; can_edit_tasks por membro controla quem edita.
+- Auth/multi-tenant: login `/login/`, cadastro `/register/`, logout. Selecao/criacao de workspace `/workspaces/select/`; troca via slug; pedidos de acesso em `/workspaces/request/`; membros e roles em `/workspaces/<slug>/members/`. Navbar mostra workspace atual.
+- Admin: painel superuser `/super/overview/` com graficos globais; lista de usuarios em `/super/users/` com CRUD.
+
+IA e chat
+- App `assistant`: chat em `/ia/` com historico; resumo local de finanças/tarefas e chamada OpenAI se OPENAI_API_KEY definido; fallback local sempre ativo. Novo embed em iframe com botao flutuante (icone robo) em todas as paginas; painel abre/fecha e ocupa totalmente o container.
+- Importacao: CSV/PDF com preview editavel. Sugestoes de categoria por IA ou heuristica retornam motivo (sem sufixo no nome) e indicacao visual. Barra de progresso fake ate 90% + final; alerta de uso de IA fica visivel por 5s. Checkboxes coloridos para destacar (amarelo) e remover (vermelho). Preview com mais espaco por linha.
+
+Front/UX recentes
+- Login e registro redesenhados com hero, beneficios (IA, isolamento, onboarding), CTA rapido.
+- Selecao de workspace com dicas de isolamento/roles; pedido de acesso com passo a passo; membros com contadores e cards mais claros.
+- Categorias com contexto, dica de cores e cards com data; lista de usuarios admin com cabeçalho mais informativo; painel superuser com texto sem mojibake.
+- Favicon adicionado em `static/img/favicon.svg`; base tem botao flutuante do agente e navegacao topo/fundo.
+
+Pendencias e riscos
+- Tests: ainda faltam suites para import CSV/PDF, IA de categorizacao, permissao de workspace, embed do chat e views sensiveis.
+- Rodar `python manage.py migrate` para aplicar indexes (0010) e garantir criacao de tabelas do assistant/workspace requests.
+- IA em services.py ainda sem backoff/httpx; considerar trocar urllib por httpx com timeout e retry.
+- Import PDF depende de texto extraivel; PDFs escaneados precisam de OCR externo antes do upload.

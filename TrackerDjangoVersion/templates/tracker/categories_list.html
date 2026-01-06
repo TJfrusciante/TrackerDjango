@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Categorias | Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+        <p class="text-secondary small text-uppercase mb-1">Financas</p>
+        <h1 class="h4 fw-bold mb-0">Categorias</h1>
+        <p class="text-secondary mb-0">Use cores para facilitar o scan. A IA sugere, mas voce pode ajustar e reaplicar.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-light" href="{% url 'tracker:transactions_list' %}">
+            <i class="fa-solid fa-coins me-2"></i>Voltar para transacoes
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0">Nova categoria</h6>
+                <span class="badge text-bg-success">Organize os imports</span>
+            </div>
+            {% if form.errors %}
+                <div class="alert alert-danger">Verifique os campos.</div>
+            {% endif %}
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label class="form-label">Nome</label>
+                    {{ form.name }}
+                    {{ form.name.errors }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Cor (hex, opcional)</label>
+                    {{ form.color }}
+                    {{ form.color.errors }}
+                    <div class="form-text">Ex: #22c55e. Usada nos cards, graficos e tabelas.</div>
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                </div>
+            </form>
+            <div class="text-secondary small mt-3">
+                Dica: categorias sem cor sao exibidas com estilo neutro; voce pode unificar descricoes iguais via importacao.
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="row g-3">
+            {% for category in categories %}
+                <div class="col-md-6">
+                    <div class="glass-card p-3 h-100">
+                        <div class="d-flex align-items-start justify-content-between mb-2">
+                            <div>
+                                <div class="fw-bold">{{ category.name }}</div>
+                                <div class="small text-secondary">{{ category.total_transactions }} transacoes vinculadas</div>
+                            </div>
+                            {% if category.color %}
+                                <span class="badge border" style="background: {{ category.color }};">&nbsp;</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary">sem cor</span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <p class="mb-0 text-secondary small">Criada em {{ category.created_at|date:"d/m/Y" }}</p>
+                            <form method="post" action="{% url 'tracker:category_delete' category.id %}" onsubmit="return confirm('Excluir esta categoria?');">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-outline-danger" type="submit" {% if category.total_transactions > 0 %}disabled{% endif %}>
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <div class="glass-card p-4 text-secondary">Nenhuma categoria cadastrada.</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

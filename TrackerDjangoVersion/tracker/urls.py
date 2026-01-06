@@ -1,0 +1,48 @@
+from django.urls import path
+
+from . import views
+from . import views_pdf
+
+app_name = 'tracker'
+
+urlpatterns = [
+    path('', views.home, name='home'),
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+    path('register/', views.register_view, name='register'),
+    path('perfil/', views.profile_edit, name='profile_edit'),
+    path('workspaces/request/', views.workspace_request_access, name='workspace_request_access'),
+    path('workspaces/select/', views.workspace_select, name='workspace_select'),
+    path('workspaces/<slug:slug>/switch/', views.workspace_switch, name='workspace_switch'),
+    path('workspaces/members/', views.workspace_members, name='workspace_members_current'),
+    path('workspaces/<slug:slug>/members/', views.workspace_members, name='workspace_members'),
+    path('workspaces/<slug:slug>/members/<int:member_id>/remove/', views.workspace_member_remove, name='workspace_member_remove'),
+    path('workspaces/<slug:slug>/members/<int:member_id>/update/', views.workspace_member_update, name='workspace_member_update'),
+    path('workspaces/<slug:slug>/requests/<int:req_id>/<str:decision>/', views.workspace_request_action, name='workspace_request_action'),
+    path('super/overview/', views.superuser_overview, name='superuser_overview'),
+    path('super/users/', views.user_admin_list, name='user_admin_list'),
+    path('super/users/novo/', views.user_admin_form, name='user_admin_create'),
+    path('super/users/<int:pk>/', views.user_admin_form, name='user_admin_edit'),
+    path('super/users/<int:pk>/excluir/', views.user_admin_delete, name='user_admin_delete'),
+    path('app/', views.dashboard, name='dashboard'),
+    path('api/chart-data/', views.chart_data, name='chart_data'),
+    path('transacoes/', views.transactions_list, name='transactions_list'),
+    path('transacoes/nova/', views.transaction_create, name='transaction_create'),
+    path('transacoes/<int:pk>/editar/', views.transaction_update, name='transaction_update'),
+    path('transacoes/<int:pk>/excluir/', views.transaction_delete, name='transaction_delete'),
+    path('transacoes/<int:pk>/selecionar/', views.transaction_toggle_selected, name='transaction_toggle_selected'),
+    path('transacoes/<int:pk>/tipo/', views.transaction_toggle_type, name='transaction_toggle_type'),
+    path('transacoes/importar/', views.transaction_import, name='transaction_import'),
+    path('transacoes/importar-pdf/', views_pdf.transaction_import_pdf, name='transaction_import_pdf'),
+    path('tarefas/', views.tasks_list, name='tasks_list'),
+    path('tarefas/nova/', views.task_create, name='task_create'),
+    path('tarefas/<int:pk>/editar/', views.task_update, name='task_update'),
+    path('tarefas/<int:pk>/excluir/', views.task_delete, name='task_delete'),
+    path('tarefas/<int:pk>/etapas/nova/', views.task_step_add, name='task_step_add'),
+    path('tarefas/<int:pk>/etapas/<int:step_id>/toggle/', views.task_step_toggle, name='task_step_toggle'),
+    path('tarefas/<int:pk>/etapas/<int:step_id>/excluir/', views.task_step_delete, name='task_step_delete'),
+    path('tarefas/<int:pk>/status-toggle/', views.task_toggle_status, name='task_toggle_status'),
+    path('tarefas/<int:pk>/selecionar/', views.task_toggle_selected, name='task_toggle_selected'),
+    path('categorias/', views.categories_list, name='categories_list'),
+    path('categorias/<int:pk>/excluir/', views.category_delete, name='category_delete'),
+]

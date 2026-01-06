@@ -1,0 +1,4 @@
+django==5.2.6
+pdfminer.six==20240706
+PyPDF2==3.0.1
+python-dotenv==1.0.1

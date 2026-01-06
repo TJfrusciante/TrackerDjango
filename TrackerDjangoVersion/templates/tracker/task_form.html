@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} tarefa | Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .step-row { border-bottom: 1px solid var(--border, #e2e8f0); padding: 0.35rem 0; }
+    .step-row:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="glass-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <p class="text-secondary small mb-1">Produtividade</p>
+                    <h1 class="h4 fw-bold mb-0">{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} tarefa</h1>
+                </div>
+                <a href="{% url 'tracker:tasks_list' %}" class="btn btn-outline-light">
+                    <i class="fa-solid fa-arrow-left me-2"></i>Voltar
+                </a>
+            </div>
+
+            {% if form.errors %}
+                <div class="alert alert-danger">Confira os campos destacados.</div>
+            {% endif %}
+
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label class="form-label">Título</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.title }}</p>
+                    {% else %}
+                        {{ form.title }}{{ form.title.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Prazo</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.due_date|date:"d/m/Y" }}</p>
+                    {% else %}
+                        {{ form.due_date }}{{ form.due_date.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Status</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.get_status_display }}</p>
+                    {% else %}
+                        {{ form.status }}{{ form.status.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Progresso</label>
+                    <div class="progress" role="progressbar" aria-valuenow="{{ form.instance.progress|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar {% if form.instance.progress >= 100 %}bg-success{% else %}bg-info{% endif %}" style="width: {{ form.instance.progress|floatformat:0 }}%;">
+                            {{ form.instance.progress|floatformat:0 }}%
+                        </div>
+                    </div>
+                </div>
+                {% if not is_detail %}
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a class="btn btn-outline-light" href="{% url 'tracker:tasks_list' %}">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if is_edit or is_detail %}
+<div class="row justify-content-center mt-3">
+    <div class="col-lg-8">
+        <div class="glass-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Etapas</h5>
+            </div>
+            {% if not is_detail %}
+                <form method="post" action="{% url 'tracker:task_step_add' object.id %}" class="row gy-3 w-100 bg-dark bg-opacity-10 p-3 rounded text-center">
+                    {% csrf_token %}
+                    <div class="col-12 text-secondary small text-uppercase fw-semibold">Nova etapa</div>
+                    <div class="col-12">
+                        {{ step_form.title }}
+                    </div>
+                    <div class="col-12">
+                        {{ step_form.responsible }}
+                    </div>
+                    <div class="col-12">
+                        {{ step_form.responsible_email }}
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button class="btn btn-primary w-100" type="submit" title="Adicionar nova etapa"><i class="fa-solid fa-plus me-1"></i>Adicionar etapa</button>
+                    </div>
+                </form>
+            {% endif %}
+            {% if steps %}
+                <div class="list-group list-group-flush mt-3">
+                {% for step in steps %}
+                    <div class="list-group-item bg-transparent step-row">
+                        <div class="d-flex align-items-start justify-content-between">
+                            <div class="d-flex align-items-start gap-2">
+                                {% if not is_detail %}
+                                    <a class="btn btn-sm {% if step.done %}btn-success{% else %}btn-warning{% endif %}" href="{% url 'tracker:task_step_toggle' object.id step.id %}">
+                                        <i class="fa-solid {% if step.done %}fa-check-square{% else %}fa-square{% endif %}"></i>
+                                    </a>
+                                {% else %}
+                                    <span class="badge {% if step.done %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}">{{ step.done|yesno:"Feita,Pendente" }}</span>
+                                {% endif %}
+                                <div>
+                                    <div class="fw-semibold">{{ step.title }}</div>
+                                    <div class="text-secondary small">Etapa {{ step.order }}</div>
+                                    <div class="text-secondary small">
+                                        {% if step.responsible %}Responsável: {{ step.responsible }}{% endif %}
+                                        {% if step.responsible_email %}<br>Email: {{ step.responsible_email }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% if not is_detail %}
+                            <form method="post" action="{% url 'tracker:task_step_delete' object.id step.id %}" onsubmit="return confirm('Excluir esta etapa?');">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-secondary mb-0 mt-3">Nenhuma etapa cadastrada.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

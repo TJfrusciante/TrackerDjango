@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Criar conta | Tracker{% endblock %}
+
+{% block content %}
+<div class="row g-4 align-items-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <p class="text-secondary small text-uppercase mb-1">Comece em minutos</p>
+            <h1 class="fw-bold h3 mb-2">Crie sua conta e seu primeiro workspace</h1>
+            <p class="text-secondary mb-3">Convide o time, isole dados por workspace e use a IA para classificar transações e tarefas.</p>
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <div class="p-3 rounded-3 border border-dark-subtle h-100">
+                        <div class="fw-bold">Onboarding guiado</div>
+                        <div class="text-secondary small">Geramos o slug automaticamente e você pode ajustar antes de convidar pessoas.</div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 rounded-3 border border-dark-subtle h-100">
+                        <div class="fw-bold">Segurança e acesso</div>
+                        <div class="text-secondary small">Permissões por workspace; staff só vê o que pertence ao espaço atual.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-3 mt-3">
+                <div>
+                    <div class="fw-bold">IA ativa</div>
+                    <div class="text-secondary small">Sugere categorias, explica decisões e registra motivos.</div>
+                </div>
+                <div>
+                    <div class="fw-bold">Importe rápido</div>
+                    <div class="text-secondary small">CSV ou PDF com progresso visível e preview editável.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h5 fw-bold mb-0">Criar conta</h2>
+                <a class="small" href="{% url 'tracker:login' %}">Já tem login? Entrar</a>
+            </div>
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger py-2 small mb-3">
+                    {{ form.non_field_errors|striptags }}
+                </div>
+            {% endif %}
+            <form method="post" novalidate enctype="multipart/form-data" class="row g-3">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="col-12">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary" type="submit">Criar e acessar</button>
+                </div>
+            </form>
+            <p class="small mt-3 mb-0 text-secondary">Ao criar, um workspace padrão será gerado para você começar com dados isolados.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

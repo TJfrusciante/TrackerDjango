@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="pt-br" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Tracker{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header class="sticky-top">
+        <nav class="navbar navbar-expand-lg">
+            <div class="container py-2">
+                {% with request.resolver_match.url_name as url_name %}
+                <a class="navbar-brand brand-mark" href="{% if user.is_authenticated %}{% url 'tracker:dashboard' %}{% else %}{% url 'tracker:home' %}{% endif %}">
+                    <i class="fa-solid fa-chart-line text-warning"></i>
+                    <span>Tracker</span>Django
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-label="Alternar navegação">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav mx-auto gap-lg-2">
+                        {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if url_name == 'dashboard' %}active{% endif %}" href="{% url 'tracker:dashboard' %}" title="Ir para o dashboard">
+                                <i class="fa-solid fa-gauge-high me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/transacoes' in request.path %}active{% endif %}" href="{% url 'tracker:transactions_list' %}" title="Ver e gerenciar transações">
+                                <i class="fa-solid fa-coins me-1"></i>Transações
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/tarefas' in request.path %}active{% endif %}" href="{% url 'tracker:tasks_list' %}" title="Ver e gerenciar tarefas">
+                                <i class="fa-solid fa-list-check me-1"></i>Tarefas
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/categorias' in request.path %}active{% endif %}" href="{% url 'tracker:categories_list' %}" title="Configurar categorias">
+                                <i class="fa-solid fa-tags me-1"></i>Categorias
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/ia' in request.path %}active{% endif %}" href="{% url 'assistant:chat' %}" title="Abrir assistente de IA">
+                                <i class="fa-solid fa-robot me-1"></i>IA
+                            </a>
+                        </li>
+                        {% if user.is_superuser %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/super/' in request.path %}active{% endif %}" href="{% url 'tracker:superuser_overview' %}" title="Visão geral de superusuário">
+                                <i class="fa-solid fa-shield-halved me-1"></i>Visão geral
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% endif %}
+                    </ul>
+                    <div class="d-flex align-items-center gap-2">
+                        {% if user.is_authenticated %}
+                            <div class="dropdown">
+                                <button class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+                                    {% if current_workspace %}
+                                        <i class="fa-solid fa-briefcase me-1"></i>{{ current_workspace.name }}
+                                    {% else %}
+                                        <i class="fa-solid fa-earth-americas me-1"></i>Modo global
+                                    {% endif %}
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    {% if user.is_superuser %}
+                                        <li><a class="dropdown-item" href="{% url 'tracker:workspace_switch' 'global' %}">Modo global</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                    {% endif %}
+                                    {% for ws in available_workspaces %}
+                                        <li>
+                                            <a class="dropdown-item {% if current_workspace and current_workspace.id == ws.id %}active{% endif %}" href="{% url 'tracker:workspace_switch' ws.slug %}">
+                                                {{ ws.name }}
+                                            </a>
+                                        </li>
+                                    {% empty %}
+                                        <li><span class="dropdown-item small text-secondary">Nenhum workspace</span></li>
+                                    {% endfor %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'tracker:workspace_select' %}">Selecionar / criar workspace</a></li>
+                                    {% if current_workspace %}
+                                        <li><a class="dropdown-item" href="{% url 'tracker:workspace_members' current_workspace.slug %}">Membros</a></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown">
+                                    {% if user_avatar_url %}
+                                        <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb">
+                                    {% else %}
+                                        <span class="avatar-thumb d-inline-flex align-items-center justify-content-center bg-secondary text-white">{{ user.username|first|upper }}</span>
+                                    {% endif %}
+                                    <span>{{ user.username }}</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="{% url 'tracker:profile_edit' %}">Perfil</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'tracker:workspace_request_access' %}">Pedir acesso</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'tracker:logout' %}">Sair</a></li>
+                                </ul>
+                            </div>
+                        {% else %}
+                            <a class="btn btn-outline-light" href="{% url 'tracker:login' %}">Entrar</a>
+                            <a class="btn btn-primary" href="{% url 'tracker:register' %}">Criar conta</a>
+                        {% endif %}
+                        <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema">
+                            <i class="fa-solid fa-sun"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        {% endwith %}
+    </header>
+
+    <main class="py-4 main-shell">
+        <div class="container">
+            {% if messages %}
+                <div class="mb-3">
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <button id="scrollTopBtn" class="nav-fab nav-top" type="button" aria-label="Ir para o topo">
+        <i class="fa-solid fa-arrow-up"></i>
+    </button>
+    <button id="scrollBottomBtn" class="nav-fab nav-bottom" type="button" aria-label="Ir para o final">
+        <i class="fa-solid fa-arrow-down"></i>
+    </button>
+    <button id="agentFab" class="agent-fab" type="button" aria-label="Abrir assistente">
+        <i class="fa-solid fa-robot"></i>
+    </button>
+    <div id="agentPanel" class="agent-panel">
+        <iframe src="{% url 'assistant:chat_embed' %}" title="Assistente" loading="lazy" referrerpolicy="same-origin"></iframe>
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="row gy-3">
+                <div class="col-md-6">
+                    <h5 class="fw-bold text-white mb-2"><i class="fa-solid fa-bolt me-2 text-warning"></i>Tracker Django</h5>
+                    <p class="mb-0">Controle de tarefas e finanças com visual moderno e pronto para dispositivos móveis.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="d-flex justify-content-md-end gap-3">
+                        <a href="#" class="small">Suporte</a>
+                        <a href="#" class="small">Política de privacidade</a>
+                        <a href="#" class="small">Termos</a>
+                    </div>
+                    <div class="small text-secondary mt-2">&copy; {% now "Y" %} Tracker.</div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/theme.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
