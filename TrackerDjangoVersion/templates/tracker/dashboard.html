@@ -103,18 +103,27 @@
             <form id="rangeForm" method="get" class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
                 <div>
                     <h5 class="mb-0">Distribuição por categoria</h5>
-                    <span class="text-secondary small">Entradas - saídas</span>
+                    <span class="text-secondary small">Entradas - saídas (filtrável)</span>
                     {% if not period_has_data %}
                         <div class="text-warning small mt-1">Sem dados neste periodo.</div>
                     {% endif %}
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                    <input id="rangeStartDisplay" type="text" inputmode="numeric" class="form-control" value="{{ start_date|date:'d/m/Y' }}" placeholder="dd/mm/aaaa">
-                    <input id="rangeEndDisplay" type="text" inputmode="numeric" class="form-control" value="{{ end_date|date:'d/m/Y' }}" placeholder="dd/mm/aaaa">
+                    <input id="rangeStartDisplay" type="text" inputmode="numeric" class="form-control" value="{{ start_date|date:'d/m/Y' }}" placeholder="dd/mm/aaaa" aria-label="Data inicial">
+                    <input id="rangeEndDisplay" type="text" inputmode="numeric" class="form-control" value="{{ end_date|date:'d/m/Y' }}" placeholder="dd/mm/aaaa" aria-label="Data final">
                     <input id="rangeStart" name="start" type="hidden" value="{{ start_date|date:'Y-m-d' }}">
                     <input id="rangeEnd" name="end" type="hidden" value="{{ end_date|date:'Y-m-d' }}">
                     <input type="hidden" name="period" value="">
-                    <button class="btn btn-outline-light" id="applyRange" type="submit">
+                    <select id="typeFilter" class="form-select" aria-label="Filtrar por tipo">
+                        <option value="">Entradas e saídas</option>
+                        <option value="income">Só entradas</option>
+                        <option value="expense">Só saídas</option>
+                    </select>
+                    <div class="form-check align-self-center">
+                        <input class="form-check-input" type="checkbox" id="selectedOnly" aria-label="Somente destacados">
+                        <label class="form-check-label small text-secondary" for="selectedOnly">Destacados</label>
+                    </div>
+                    <button class="btn btn-outline-light" id="applyRange" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de período e tipo">
                         <i class="fa-solid fa-filter me-1"></i>Aplicar
                     </button>
                 </div>
@@ -142,6 +151,10 @@
                 <h5 class="mb-0">Entradas vs Saídas</h5>
             </div>
             <canvas id="typeChart" height="220"></canvas>
+            <div class="mt-3">
+                <h6 class="small text-secondary mb-1">Status das tarefas</h6>
+                <canvas id="tasksChart" height="180"></canvas>
+            </div>
         </div>
     </div>
 
@@ -209,11 +222,35 @@
         <div class="glass-card p-4 h-100">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
                 <div>
-            <h5 class="mb-0">Saldo mensal</h5>
-            <span class="text-secondary small">Linha temporal (positivo/negativo)</span>
-        </div>
+                    <h5 class="mb-0">Saldo mensal</h5>
+                    <span class="text-secondary small">Linha temporal (positivo/negativo)</span>
+                </div>
             </div>
-            <canvas id="monthlyChart" height="260"></canvas>
+            <canvas id="monthlyChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
+                <div>
+                    <h5 class="mb-0">Evolução diária</h5>
+                    <span class="text-secondary small">Saldo líquido por dia no período</span>
+                </div>
+            </div>
+            <canvas id="dailyChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
+                <div>
+                    <h5 class="mb-0">Saldo acumulado</h5>
+                    <span class="text-secondary small">Somatório progressivo no período</span>
+                </div>
+            </div>
+            <canvas id="runningChart" height="220"></canvas>
         </div>
     </div>
 
@@ -262,10 +299,14 @@
     const ctx = document.getElementById('categoryChart');
     const typeCtx = document.getElementById('typeChart');
     const monthlyCtx = document.getElementById('monthlyChart');
+    const dailyCtx = document.getElementById('dailyChart');
+    const runningCtx = document.getElementById('runningChart');
     const startHidden = document.getElementById('rangeStart');
     const endHidden = document.getElementById('rangeEnd');
     const startDisplay = document.getElementById('rangeStartDisplay');
     const endDisplay = document.getElementById('rangeEndDisplay');
+    const typeFilter = document.getElementById('typeFilter');
+    const selectedOnly = document.getElementById('selectedOnly');
     const emptyMsg = document.getElementById('chartEmpty');
     const incomeEl = document.getElementById('incomeValue');
     const expenseEl = document.getElementById('expenseValue');
@@ -273,9 +314,13 @@
     const applyBtn = document.getElementById('applyRange');
     const chartUrl = "{% url 'tracker:chart_data' %}";
     const period = "{{ period }}";
+    const tasksData = { open: {{ tasks_open }}, done: {{ tasks_done }} };
     let chartInstance;
     let typeChartInstance;
     let monthlyChartInstance;
+    let dailyChartInstance;
+    let runningChartInstance;
+    let tasksChartInstance;
 
     function formatMoney(value) {
         return `R$ ${Number(value || 0).toFixed(2)}`;
@@ -343,6 +388,34 @@
         });
     }
 
+    function renderTasksChart(open, done) {
+        if (!typeCtx) return;
+        const canvas = document.getElementById('tasksChart');
+        if (!canvas) return;
+        const data = [open, done];
+        if (tasksChartInstance) {
+            tasksChartInstance.data.datasets[0].data = data;
+            tasksChartInstance.update();
+            return;
+        }
+        tasksChartInstance = new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+                labels: ['Em andamento', 'Concluídas'],
+                datasets: [{
+                    data,
+                    backgroundColor: ['#f59e0b', '#10b981'],
+                    borderColor: ['#f59e0b', '#10b981'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                plugins: { legend: { position: 'bottom' }},
+                cutout: '65%'
+            }
+        });
+    }
+
     function renderMonthly(labels, values) {
         if (!monthlyCtx) return;
         if (monthlyChartInstance) {
@@ -376,11 +449,72 @@
         });
     }
 
+    function renderDaily(labels, values) {
+        if (!dailyCtx) return;
+        if (dailyChartInstance) {
+            dailyChartInstance.data.labels = labels;
+            dailyChartInstance.data.datasets[0].data = values;
+            dailyChartInstance.update();
+            return;
+        }
+        dailyChartInstance = new Chart(dailyCtx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Saldo diário',
+                    data: values,
+                    backgroundColor: values.map(v => v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)'),
+                    borderColor: values.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+                    borderWidth: 1.5,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false }},
+                scales: { x: { grid: { display: false }}, y: { grid: { color: 'rgba(226,232,240,0.1)' } } }
+            }
+        });
+    }
+
+    function renderRunning(labels, values) {
+        if (!runningCtx) return;
+        if (runningChartInstance) {
+            runningChartInstance.data.labels = labels;
+            runningChartInstance.data.datasets[0].data = values;
+            runningChartInstance.update();
+            return;
+        }
+        runningChartInstance = new Chart(runningCtx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Saldo acumulado',
+                    data: values,
+                    tension: 0.35,
+                    borderWidth: 3,
+                    fill: false,
+                    borderColor: '#3b82f6',
+                    pointBackgroundColor: '#3b82f6',
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false }},
+                scales: { x: { grid: { display: false }}, y: { grid: { color: 'rgba(226,232,240,0.1)' } } }
+            }
+        });
+    }
+
     async function loadChart() {
         const params = new URLSearchParams();
         if (startHidden.value) params.append('start', startHidden.value);
         if (endHidden.value) params.append('end', endHidden.value);
         if (period) params.append('period', period);
+        if (typeFilter && typeFilter.value) params.append('type', typeFilter.value);
+        if (selectedOnly && selectedOnly.checked) params.append('selected_only', '1');
 
         const res = await fetch(`${chartUrl}?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) return;
@@ -389,6 +523,8 @@
         renderChart(data.labels || [], data.values || [], data.colors || []);
         renderTypeChart(data.income_total || 0, data.expense_total || 0);
         renderMonthly(data.monthly_labels || [], data.monthly_values || []);
+        renderDaily(data.daily_labels || [], data.daily_values || []);
+        renderRunning(data.running_labels || [], data.running_values || []);
         incomeEl.textContent = formatMoney(data.income_total);
         expenseEl.textContent = formatMoney(data.expense_total);
         balanceEl.textContent = formatMoney(data.balance_total);
@@ -399,6 +535,8 @@
             const isEmpty = !data.labels || data.labels.length === 0;
             emptyMsg.classList.toggle('d-none', !isEmpty);
         }
+
+        renderTasksChart(tasksData.open, tasksData.done);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -424,9 +562,17 @@
                 endHidden.value = isoEnd;
             });
         }
-        if (applyBtn) {
-            applyBtn.addEventListener('click', () => {});
-        }
+        [applyBtn, typeFilter, selectedOnly].forEach(el => {
+            if (!el) return;
+            el.addEventListener(el === applyBtn ? 'click' : 'change', (ev) => {
+                if (el !== applyBtn) ev.preventDefault();
+                const isoStart = toIso(startDisplay.value.trim());
+                const isoEnd = toIso(endDisplay.value.trim());
+                if (isoStart) startHidden.value = isoStart;
+                if (isoEnd) endHidden.value = isoEnd;
+                loadChart();
+            });
+        });
     });
 </script>
 {% endblock %}

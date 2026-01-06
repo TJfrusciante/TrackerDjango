@@ -10,8 +10,9 @@
                 <div>
                     <p class="text-secondary small mb-1">Assistente</p>
                     <h1 class="h5 fw-bold mb-0">Agente de IA</h1>
+                    <p class="text-secondary small mb-0">Contexto: {{ current_workspace.name|default:"Global" }}</p>
                 </div>
-                <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:dashboard' %}">Voltar</a>
+                <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:dashboard' %}" data-bs-toggle="tooltip" title="Voltar para o dashboard">Voltar</a>
             </div>
             <div id="chatBox" class="chat-box mb-3 p-2">
                 {% for msg in history %}
@@ -21,7 +22,7 @@
                                 {{ msg.created_at|date:"d/m/Y H:i" }} · {{ msg.role|capfirst }}
                             </div>
                             <div class="chat-text">{{ msg.content|linebreaksbr }}</div>
-                            <button type="button" class="btn btn-sm btn-outline-light copy-btn" title="Copiar" data-content="{{ msg.content|escape }}">
+                            <button type="button" class="btn btn-sm btn-outline-light copy-btn" title="Copiar" aria-label="Copiar mensagem" data-content="{{ msg.content|escape }}">
                                 <i class="fa-solid fa-copy"></i>
                             </button>
                         </div>
@@ -34,10 +35,16 @@
                 {% csrf_token %}
                 <div class="mb-2">
                     <label class="form-label">Mensagem</label>
-                    <textarea name="message" class="form-control" rows="3" placeholder="Ex.: Qual o saldo deste workspace?" autocomplete="off" autofocus></textarea>
+                    <textarea name="message" class="form-control" rows="3" placeholder="Ex.: Qual o saldo deste workspace?" autocomplete="off" autofocus aria-label="Mensagem para o assistente"></textarea>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" value="on" id="localOnly" name="local_only" {% if local_only_default %}checked{% endif %}>
+                    <label class="form-check-label" for="localOnly">
+                        Usar apenas resumo local (sem chamar modelo externo)
+                    </label>
                 </div>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-primary" type="submit">Enviar</button>
+                    <button class="btn btn-primary" type="submit" data-bs-toggle="tooltip" title="Enviar mensagem para o assistente">Enviar</button>
                 </div>
             </form>
         </div>

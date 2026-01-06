@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from . import views_pdf
 
 app_name = 'tracker'
 
@@ -29,6 +30,10 @@ urlpatterns = [
     path('transacoes/nova/', views.transaction_create, name='transaction_create'),
     path('transacoes/<int:pk>/editar/', views.transaction_update, name='transaction_update'),
     path('transacoes/<int:pk>/excluir/', views.transaction_delete, name='transaction_delete'),
+    path('transacoes/<int:pk>/selecionar/', views.transaction_toggle_selected, name='transaction_toggle_selected'),
+    path('transacoes/<int:pk>/tipo/', views.transaction_toggle_type, name='transaction_toggle_type'),
+    path('transacoes/importar/', views.transaction_import, name='transaction_import'),
+    path('transacoes/importar-pdf/', views_pdf.transaction_import_pdf, name='transaction_import_pdf'),
     path('tarefas/', views.tasks_list, name='tasks_list'),
     path('tarefas/nova/', views.task_create, name='task_create'),
     path('tarefas/<int:pk>/editar/', views.task_update, name='task_update'),
@@ -36,6 +41,8 @@ urlpatterns = [
     path('tarefas/<int:pk>/etapas/nova/', views.task_step_add, name='task_step_add'),
     path('tarefas/<int:pk>/etapas/<int:step_id>/toggle/', views.task_step_toggle, name='task_step_toggle'),
     path('tarefas/<int:pk>/etapas/<int:step_id>/excluir/', views.task_step_delete, name='task_step_delete'),
+    path('tarefas/<int:pk>/status-toggle/', views.task_toggle_status, name='task_toggle_status'),
+    path('tarefas/<int:pk>/selecionar/', views.task_toggle_selected, name='task_toggle_selected'),
     path('categorias/', views.categories_list, name='categories_list'),
     path('categorias/<int:pk>/excluir/', views.category_delete, name='category_delete'),
 ]

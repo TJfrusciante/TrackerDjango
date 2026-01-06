@@ -10,6 +10,9 @@
     #tx-table tbody tr:last-child {
         border-bottom: none;
     }
+    .due-warning {
+        background: rgba(245, 158, 11, 0.08);
+    }
 </style>
 {% endblock %}
 
@@ -20,11 +23,17 @@
         <h1 class="h4 fw-bold mb-0">Transações</h1>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-primary" href="{% url 'tracker:transaction_create' %}">
+        <a class="btn btn-primary" href="{% url 'tracker:transaction_create' %}" data-bs-toggle="tooltip" title="Criar nova transação">
             <i class="fa-solid fa-plus me-2"></i>Nova transação
         </a>
-        <a class="btn btn-outline-light" href="{% url 'tracker:categories_list' %}">
+        <a class="btn btn-outline-light" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" title="Gerenciar categorias">
             <i class="fa-solid fa-tags me-2"></i>Categorias
+        </a>
+        <a class="btn btn-success" href="{% url 'tracker:transaction_import' %}" data-bs-toggle="tooltip" title="Importar extrato CSV e sugerir categorias">
+            <i class="fa-solid fa-file-import me-2"></i>Importar CSV
+        </a>
+        <a class="btn btn-warning" href="{% url 'tracker:transaction_import_pdf' %}" data-bs-toggle="tooltip" title="Importar extrato PDF e sugerir categorias">
+            <i class="fa-solid fa-file-pdf me-2"></i>Importar PDF
         </a>
     </div>
 </div>
@@ -33,11 +42,11 @@
     <div class="row g-3 align-items-end">
         <div class="col-md-3">
             <label class="form-label">Buscar</label>
-            <input type="text" name="q" value="{{ filters.q }}" placeholder="Descrição ou categoria" class="form-control">
+            <input aria-label="Buscar transação" type="text" name="q" value="{{ filters.q }}" placeholder="Descrição ou categoria" class="form-control">
         </div>
         <div class="col-md-2">
             <label class="form-label">Tipo</label>
-            <select name="type" class="form-select">
+            <select name="type" class="form-select" aria-label="Filtrar por tipo">
                 <option value="">Todas</option>
                 <option value="income" {% if filters.type == 'income' %}selected{% endif %}>Entrada</option>
                 <option value="expense" {% if filters.type == 'expense' %}selected{% endif %}>Saida</option>
@@ -45,7 +54,7 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">Categoria</label>
-            <select name="category" class="form-select">
+            <select name="category" class="form-select" aria-label="Filtrar por categoria">
                 <option value="">Todas</option>
                 {% for cat in categories %}
                     <option value="{{ cat.id }}" {% if filters.category|stringformat:'s' == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
@@ -54,16 +63,16 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">De</label>
-            <input id="txStartDisplay" type="text" name="start_display" inputmode="numeric" class="form-control" value="{{ filters_display.start }}" placeholder="dd/mm/aaaa">
+            <input aria-label="Data inicial" id="txStartDisplay" type="text" name="start_display" inputmode="numeric" class="form-control" value="{{ filters_display.start }}" placeholder="dd/mm/aaaa">
             <input id="txStartHidden" type="hidden" name="start" value="{{ filters.start }}">
         </div>
         <div class="col-md-2">
             <label class="form-label">Até</label>
-            <input id="txEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
+            <input aria-label="Data final" id="txEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
             <input id="txEndHidden" type="hidden" name="end" value="{{ filters.end }}">
         </div>
         <div class="col-md-1 d-flex gap-2">
-            <button class="btn btn-primary w-100" type="submit">Filtrar</button>
+            <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transação">Filtrar</button>
         </div>
         <div class="col-12 d-flex justify-content-between mt-2">
             <div class="small text-secondary">
@@ -108,7 +117,7 @@
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endif %}
     {% endfor %}
-    <button class="btn btn-sm btn-outline-light" type="submit" name="export" value="csv">
+    <button class="btn btn-sm btn-outline-light" type="submit" name="export" value="csv" data-bs-toggle="tooltip" title="Exportar transações em CSV">
         <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
     </button>
 </form>
@@ -149,7 +158,7 @@
             </thead>
             <tbody>
                 {% for tx in transactions_page %}
-                    <tr>
+                    <tr class="{% if tx.selected %}due-warning{% endif %}">
                         <td class="fw-semibold">{{ tx.description }}</td>
                         <td><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
                         <td class="text-secondary">{{ tx.date|date:"d/m/Y" }}</td>
@@ -161,15 +170,27 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex justify-content-end gap-2">
-                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:transaction_update' tx.id %}?detail=1">
+                                <form method="post" action="{% url 'tracker:transaction_toggle_type' tx.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-info" type="submit" aria-label="Alternar tipo" data-bs-toggle="tooltip" title="Converter entrada/saída">
+                                        <i class="fa-solid fa-arrows-rotate"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'tracker:transaction_toggle_selected' tx.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm {% if tx.selected %}btn-warning{% else %}btn-outline-warning{% endif %}" type="submit" aria-label="Destacar transação" data-bs-toggle="tooltip" title="Marcar como destaque">
+                                        <i class="fa-solid fa-star"></i>
+                                    </button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:transaction_update' tx.id %}?detail=1" aria-label="Detalhes" data-bs-toggle="tooltip" title="Ver detalhes da transação">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
-                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:transaction_update' tx.id %}">
+                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:transaction_update' tx.id %}" aria-label="Editar" data-bs-toggle="tooltip" title="Editar transação">
                                     <i class="fa-solid fa-pen"></i>
                                 </a>
                                 <form method="post" action="{% url 'tracker:transaction_delete' tx.id %}" onsubmit="return confirm('Excluir esta transação?');">
                                     {% csrf_token %}
-                                    <button class="btn btn-sm btn-outline-danger" type="submit">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Excluir" data-bs-toggle="tooltip" title="Excluir transação">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
                                 </form>

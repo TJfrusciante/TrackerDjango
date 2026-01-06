@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Importar extrato | Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+        <p class="text-secondary small mb-1">Automatize lançamentos</p>
+        <h1 class="h4 fw-bold mb-0">Importar extrato</h1>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-light" href="{% url 'tracker:transactions_list' %}" data-bs-toggle="tooltip" title="Voltar para transações">
+            <i class="fa-solid fa-arrow-left me-2"></i>Voltar
+        </a>
+    </div>
+</div>
+
+<div class="glass-card p-4 mb-4">
+    <h5 class="mb-3">1. Envie o arquivo {% if mode == 'pdf' %}(PDF){% else %}(CSV ou PDF){% endif %}</h5>
+    <p class="text-secondary small">
+        {% if mode == 'pdf' %}
+            Leitura de PDF funciona melhor com extratos simples (texto, colunas Data / Descrição / Valor). Se não reconhecer as linhas, converta para CSV/Excel (PicPay costuma trazer datas, descrição e valores na mesma linha).
+        {% else %}
+            Colunas recomendadas (CSV): descrição, data (aaaa-mm-dd ou dd/mm/aaaa), valor (positivo/negativo), tipo (income/expense opcional), categoria (opcional). PDFs simples também são aceitos.
+        {% endif %}
+    </p>
+    {% if parse_error %}
+        <div class="alert alert-warning small py-2 mb-3">{{ parse_error }}</div>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload">
+        <div class="row g-3 align-items-end">
+            <div class="col-lg-6">
+                {{ upload_form.file }}
+                {% if upload_form.file.errors %}
+                    <div class="text-danger small">{{ upload_form.file.errors|striptags }}</div>
+                {% endif %}
+            </div>
+            <div class="col-lg-3">
+                <button id="processBtn" class="btn btn-primary" type="submit" data-bs-toggle="tooltip" title="Ler arquivo e sugerir categorias">
+                    <i class="fa-solid fa-upload me-2"></i>Processar
+                </button>
+                <div class="progress mt-2 d-none" id="processProgress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 10%">Processando IA...</div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% if preview_rows %}
+<div class="glass-card p-4">
+    <h5 class="mb-3">2. Revise e confirme</h5>
+    {% if ai_used %}
+        <div class="alert alert-info small py-2 mb-3" data-autoclose="5000">
+            Categorias sugeridas com auxílio de IA. Pode levar alguns segundos; ajuste qualquer item antes de confirmar.
+        </div>
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm">
+        <div class="table-responsive">
+            <table class="table table-borderless align-middle">
+                <thead>
+                    <tr class="text-secondary">
+                        <th>Descrição</th>
+                        <th>Data</th>
+                        <th>Valor</th>
+                        <th>Tipo</th>
+                        <th>Categoria sugerida</th>
+                        <th class="text-center">Destacar</th>
+                        <th class="text-center">Remover</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview_rows %}
+                    <tr class="import-row">
+                        <td>
+                            <input type="text" class="form-control" name="description" value="{{ row.description }}">
+                        </td>
+                        <td>
+                            <input type="date" class="form-control" name="date" value="{{ row.date }}">
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" class="form-control" name="value" value="{{ row.value }}">
+                        </td>
+                        <td>
+                            <select class="form-select" name="type">
+                                <option value="income" {% if row.type == 'income' %}selected{% endif %}>Entrada</option>
+                                <option value="expense" {% if row.type == 'expense' %}selected{% endif %}>Saída</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select class="form-select" name="category">
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {% if row.category == cat.id %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <div class="small text-secondary">
+                                Sugerido: {% if row.category_source == 'ai' %}IA{% else %}Heurística{% endif %} - {{ row.category_reason }}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <input class="form-check-input mark-star" type="checkbox" name="selected" value="{{ forloop.counter0 }}" data-bs-toggle="tooltip" title="Destacar">
+                        </td>
+                        <td class="text-center">
+                            <input class="form-check-input mark-remove" type="checkbox" name="skip" value="{{ forloop.counter0 }}" data-bs-toggle="tooltip" title="Remover">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button class="btn btn-primary" type="submit" data-bs-toggle="tooltip" title="Inserir todas as transações revisadas">
+                <i class="fa-solid fa-check me-2"></i>Confirmar importação
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const processBtn = document.getElementById('processBtn');
+    const uploadForm = processBtn ? processBtn.closest('form') : null;
+    const progressBar = document.getElementById('processProgress');
+    const progressInner = progressBar ? progressBar.querySelector('.progress-bar') : null;
+    let progressTimer = null;
+
+    async function submitUpload(ev) {
+        ev.preventDefault();
+        if (!uploadForm || !processBtn) return;
+        const actionUrl = uploadForm.getAttribute('action') || window.location.pathname;
+        processBtn.disabled = true;
+        processBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando IA...';
+        if (progressBar && progressInner) {
+            progressBar.classList.remove('d-none');
+            let val = 10;
+            progressInner.style.width = val + '%';
+            progressInner.textContent = 'Processando IA... ' + val + '%';
+            progressTimer = setInterval(() => {
+                if (val < 90) {
+                    val += 5;
+                    progressInner.style.width = val + '%';
+                    progressInner.textContent = 'Processando IA... ' + val + '%';
+                }
+            }, 400);
+        }
+        try {
+            const fd = new FormData(uploadForm);
+            const resp = await fetch(actionUrl, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'fetch' },
+            });
+            const html = await resp.text();
+            if (progressInner) {
+                progressInner.style.width = '100%';
+                progressInner.textContent = 'Quase lá...';
+            }
+            document.open();
+            document.write(html);
+            document.close();
+        } catch (err) {
+            alert('Erro ao processar. Tente novamente.');
+            processBtn.disabled = false;
+            processBtn.innerHTML = '<i class="fa-solid fa-upload me-2"></i>Processar';
+            if (progressBar) progressBar.classList.add('d-none');
+        } finally {
+            if (progressTimer) clearInterval(progressTimer);
+        }
+    }
+
+        if (uploadForm && processBtn) {
+            uploadForm.addEventListener('submit', submitUpload);
+        }
+
+        // se o usuário clicar no botão "Processar" mas não selecionar arquivo, impedir loop de progresso
+        if (processBtn) {
+            processBtn.addEventListener('click', () => {
+                if (!uploadForm.querySelector('input[type=\"file\"]').value) {
+                    processBtn.disabled = false;
+                    if (progressBar) progressBar.classList.add('d-none');
+                    if (progressTimer) clearInterval(progressTimer);
+                }
+            });
+        }
+</script>
+{% endblock %}

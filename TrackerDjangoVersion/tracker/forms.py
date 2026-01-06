@@ -77,8 +77,8 @@ class WorkspaceForm(forms.ModelForm):
         model = Workspace
         fields = ['name', 'slug']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome do workspace'}),
-            'slug': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'slug-para-url'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome do workspace', 'aria-label': 'Nome do workspace'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'slug-para-url', 'aria-label': 'Slug do workspace'}),
         }
 
     def clean_slug(self):
@@ -96,7 +96,7 @@ class WorkspaceSlugForm(forms.Form):
     workspace_slug = forms.SlugField(
         label="Slug do workspace",
         required=True,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex.: minha-equipe'}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex.: minha-equipe', 'aria-label': 'Slug do workspace'}),
     )
 
 
@@ -107,6 +107,19 @@ class WorkspaceMemberInviteForm(forms.Form):
         choices=(('member', 'Membro'), ('owner', 'Owner')),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+
+class StatementUploadForm(forms.Form):
+    file = forms.FileField(
+        label="Arquivo de extrato (CSV ou PDF)",
+        help_text="Use CSV (descrição, data, valor, tipo opcional, categoria opcional) ou PDF simples do extrato.",
+    )
+
+    def clean_file(self):
+        f = self.cleaned_data['file']
+        if f.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("Arquivo acima de 5MB.")
+        return f
 
 
 class SignupForm(UserCreationForm):
@@ -129,6 +142,7 @@ class SignupForm(UserCreationForm):
                 field.widget.attrs.setdefault('class', 'form-select')
             else:
                 field.widget.attrs.setdefault('class', 'form-control')
+            field.widget.attrs.setdefault('aria-label', field.label)
         self.fields['email'].required = True
 
     def save(self, commit=True):
@@ -148,6 +162,7 @@ class LoginForm(AuthenticationForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-control')
+            field.widget.attrs.setdefault('aria-label', field.label)
 
 
 class UserAdminForm(forms.ModelForm):

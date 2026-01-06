@@ -1,12 +1,17 @@
 import datetime
+import logging
+import os
 
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.db.models import Sum, Case, When, DecimalField, F
 from django.shortcuts import render
 
 from tracker.models import Transaction, Task, WorkspaceMembership
 from .models import ChatMessage
 from .services import llm_reply
+
+logger = logging.getLogger(__name__)
 
 
 def _finance_queryset(request, workspace):
@@ -59,21 +64,25 @@ def _summarize(workspace, request):
     return "\n".join(summary_lines)
 
 
-def _assistant_reply(message, workspace, request):
+def _assistant_reply(message, workspace, request, local_only: bool = False):
     """
     Usa LLM se configurado; fallback para resumo baseado em regras.
     """
     summary = _summarize(workspace, request)
     today = datetime.date.today().strftime("%d/%m/%Y")
+    ws_name = workspace.name if workspace else "global"
+    context_line = f"workspace={ws_name}; usuario={'superuser' if request.user.is_superuser else request.user.username}"
 
     system_prompt = (
         "Você é o assistente financeiro do Tracker. Responda em português de forma curta. "
-        "Use apenas os dados fornecidos no resumo. Se algo não estiver no resumo, diga que não sabe."
+        "Use apenas os dados fornecidos no resumo. Se algo não estiver no resumo, diga que não sabe. "
+        f"Contexto de workspace: {context_line}."
     )
     user_prompt = f"Data atual: {today}. Resumo disponível:\n{summary}\nPergunta: {message}"
-    llm_answer = llm_reply(system_prompt, user_prompt)
+    llm_answer = None if local_only else llm_reply(system_prompt, user_prompt)
     if llm_answer:
         return llm_answer
+    logger.info("LLM fallback usado (local_only=%s)", local_only)
     # fallback
     return f"Não consegui consultar o modelo agora. Aqui vai um resumo rápido:\n{summary}"
 
@@ -88,10 +97,32 @@ def chat(request):
 
     if request.method == 'POST':
         content = (request.POST.get('message') or '').strip()
+        local_only = request.POST.get('local_only') == 'on' or not os.getenv("OPENAI_API_KEY")
         if content:
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
-            reply = _assistant_reply(content, workspace, request)
+            reply = _assistant_reply(content, workspace, request, local_only=local_only)
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
         history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:30][::-1]
 
-    return render(request, 'assistant/chat.html', {'history': history})
+    return render(request, 'assistant/chat.html', {
+        'history': history,
+        'local_only_default': not os.getenv("OPENAI_API_KEY"),
+    })
+
+
+@login_required
+@xframe_options_exempt
+def chat_embed(request):
+    workspace = getattr(request, "workspace", None)
+    history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:20][::-1]
+
+    if request.method == 'POST':
+        content = (request.POST.get('message') or '').strip()
+        local_only = True  # embed: mantém rápido
+        if content:
+            ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
+            reply = _assistant_reply(content, workspace, request, local_only=local_only)
+            ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
+        history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:20][::-1]
+
+    return render(request, 'assistant/embed.html', {'history': history})

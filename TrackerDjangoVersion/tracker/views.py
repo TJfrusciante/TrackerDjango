@@ -1,5 +1,8 @@
 import csv
 import datetime
+import io
+import os
+import re
 from decimal import Decimal
 
 from django.contrib import messages
@@ -13,6 +16,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.cache import cache_control
 
 from .forms import (
     CategoryForm,
@@ -29,8 +33,10 @@ from .forms import (
     ProfileAvatarForm,
     InviteByUsernameForm,
     AccessRequestForm,
+    StatementUploadForm,
 )
 from .models import Category, Task, TaskStep, Transaction, Workspace, WorkspaceMembership, WorkspaceAccessRequest, UserProfile
+from assistant.services import llm_reply
 
 User = get_user_model()
 
@@ -329,6 +335,7 @@ def transactions_list(request):
         'balance_total': income_total - expense_total,
         'categories': Category.objects.filter(workspace=workspace) if workspace else Category.objects.all(),
         'query_string': query_string,
+        'today': timezone.now().date(),
         'filters': {
             'q': search,
             'type': tx_type,
@@ -404,6 +411,415 @@ def transaction_delete(request, pk):
     return redirect('tracker:transactions_list')
 
 
+@login_required
+def transaction_toggle_selected(request, pk):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Você não pode editar finanças deste workspace.')
+        return redirect('tracker:dashboard')
+
+    qs = Transaction.objects.all()
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    tx = get_object_or_404(qs, pk=pk)
+    if request.method == 'POST':
+        tx.selected = not tx.selected
+        tx.save(update_fields=['selected', 'updated_at'])
+    return redirect('tracker:transactions_list')
+
+
+@login_required
+def transaction_toggle_type(request, pk):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Você não pode editar finanças deste workspace.')
+        return redirect('tracker:dashboard')
+
+    qs = Transaction.objects.all()
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    tx = get_object_or_404(qs, pk=pk)
+    if request.method == 'POST':
+        tx.type = 'expense' if tx.type == 'income' else 'income'
+        tx.save(update_fields=['type', 'updated_at'])
+    return redirect('tracker:transactions_list')
+
+
+def _parse_statement_rows(text: str, categories_qs):
+    sample = text[:2048]
+    try:
+        sniffed = csv.Sniffer().sniff(sample, delimiters=',;')
+        delimiter = sniffed.delimiter
+    except Exception:
+        delimiter = ','
+
+    lines = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+    if not lines:
+        return []
+
+    header = [c.strip().lower() for c in lines[0]]
+    has_keywords = any(k in header for k in ('description', 'descrição', 'valor', 'value', 'data', 'date'))
+
+    # Se tiver header, usa DictReader normalmente
+    if has_keywords:
+        key_map = {
+            'descricao': 'description', 'descrição': 'description', 'description': 'description',
+            'data': 'date', 'date': 'date',
+            'valor': 'value', 'value': 'value',
+            'tipo': 'type', 'type': 'type',
+            'categoria': 'category', 'category': 'category',
+        }
+        reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+        mapped_rows = []
+        for row in reader:
+            mapped = {}
+            for key, val in row.items():
+                if key is None:
+                    continue
+                norm = key.strip().lower()
+                target = key_map.get(norm, norm)
+                mapped[target] = val
+            mapped_rows.append(mapped)
+        return mapped_rows
+
+    # Sem header: assume colunas [datahora, descrição, valor, tipo?, categoria?]
+    data_rows = []
+    for row in lines:
+        if len(row) < 2:
+            continue
+        raw_date = (row[0] or '').strip()
+        desc = (row[1] or '').strip()
+        val = row[2] if len(row) > 2 else ''
+        t_type = row[3] if len(row) > 3 else ''
+        cat = row[4] if len(row) > 4 else ''
+        # tenta separar data de hora
+        date_part = raw_date
+        for fmt in ('%d/%m/%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S', '%d/%m/%Y'):
+            try:
+                dt = datetime.datetime.strptime(raw_date, fmt)
+                date_part = dt.date().isoformat()
+                break
+            except Exception:
+                continue
+        data_rows.append({
+            'date': date_part,
+            'description': desc,
+            'value': val,
+            'type': t_type,
+            'category': cat,
+        })
+    return data_rows
+
+
+def _parse_pdf_statement(file_bytes: bytes):
+    """
+    Parser específico para extrato PicPay (data em uma linha, hora/descrição/valor na linha seguinte).
+    """
+    text = ""
+    try:
+        from pdfminer.high_level import extract_text  # type: ignore
+        text = extract_text(io.BytesIO(file_bytes)) or ""
+    except Exception:
+        text = ""
+
+    if not text.strip():
+        try:
+            from PyPDF2 import PdfReader  # type: ignore
+            reader = PdfReader(io.BytesIO(file_bytes))
+            text = "\n".join([page.extract_text() or "" for page in reader.pages])
+        except Exception as exc:
+            return [], f"Não foi possível ler o PDF: {exc}"
+
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    date_only = re.compile(r'^\d{2}/\d{2}/\d{4}$')
+    time_desc_val = re.compile(r'^(?P<time>\d{2}:\d{2}:\d{2})\s+(?P<desc>.+?)\s+(?P<value>-?\s*R?\$?\s*[\d\.\s]*[,\.\,]\d{2})', re.IGNORECASE)
+    rows = []
+    pending_date = None
+
+    for line in lines:
+        if date_only.match(line):
+            pending_date = line
+            continue
+
+        m = time_desc_val.search(line)
+        if m and pending_date:
+            desc = (m.group('desc') or '').strip()
+            value_raw = m.group('value') or ''
+            desc = desc.replace('- -', '').strip()
+            value_clean = value_raw
+            for rep in ['R$', 'r$', ' ']:
+                value_clean = value_clean.replace(rep, '')
+            value_clean = value_clean.replace('.', '')
+            value_clean = value_clean.replace(',', '.')
+            negative = '-' in value_raw or (value_clean.startswith('(') and value_clean.endswith(')'))
+            value_clean = value_clean.strip('()').replace('-', '')
+            rows.append({
+                'description': desc or f"Movimentação {pending_date}",
+                'date': pending_date,
+                'value': f"-{value_clean}" if negative else value_clean,
+                'type': '',
+                'category': '',
+            })
+            pending_date = None
+            continue
+
+        # fallback para linha com data e valor juntos
+        full = re.search(r'(?P<date>\d{2}/\d{2}/\d{4}).+?(?P<value>-?\s*R?\$?\s*[\d\.\s]*[,\.\,]\d{2})', line)
+        if full:
+            date_raw = full.group('date')
+            value_raw = full.group('value')
+            desc_part = line.replace(date_raw, '').replace(value_raw, '').strip()
+            value_clean = value_raw
+            for rep in ['R$', 'r$', ' ']:
+                value_clean = value_clean.replace(rep, '')
+            value_clean = value_clean.replace('.', '')
+            value_clean = value_clean.replace(',', '.')
+            negative = '-' in value_raw or (value_clean.startswith('(') and value_clean.endswith(')'))
+            value_clean = value_clean.strip('()').replace('-', '')
+            rows.append({
+                'description': desc_part or f"Movimentação {date_raw}",
+                'date': date_raw,
+                'value': f"-{value_clean}" if negative else value_clean,
+                'type': '',
+                'category': '',
+            })
+            pending_date = None
+
+    if not rows:
+        return [], "Nenhuma linha reconhecida no PDF (pode ser PDF de imagem). Converta para CSV/Excel para garantir."
+    return rows, None
+
+
+def _build_preview(rows, categories):
+    preview = []
+    ai_used = False
+    for row in rows:
+        desc = (row.get('description') or '').strip()
+        raw_value = str(row.get('value') or '').strip()
+        # extrai a última ocorrência numérica (suporta R$, separador , ou .)
+        num_candidates = re.findall(r'[-+]?\d[\d\.\s]*[,\.\,]\d{1,2}', raw_value)
+        if num_candidates:
+            raw_value = num_candidates[-1]
+        raw_value = raw_value.replace('R$', '').replace('$', '')
+        raw_value = raw_value.replace(' ', '')
+        if raw_value.count(',') == 1 and raw_value.count('.') > 1:
+            raw_value = raw_value.replace('.', '')
+        raw_value = raw_value.replace(',', '.')
+        raw_date = (row.get('date') or '').strip()
+        raw_type = (row.get('type') or '').lower()
+        cat_hint = row.get('category') or ''
+        if not desc or not raw_value:
+            continue
+        try:
+            value_dec = Decimal(raw_value)
+        except Exception:
+            continue
+        # tipo: entrada se valor >=0 ou se texto indicar
+        tx_type = 'income'
+        if raw_type in ('expense', 'saida', 'saída', 'despesa'):
+            tx_type = 'expense'
+        elif raw_type in ('income', 'entrada', 'receita'):
+            tx_type = 'income'
+        elif value_dec < 0:
+            tx_type = 'expense'
+            value_dec = abs(value_dec)
+
+        # data
+        date_obj = None
+        for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y'):
+            try:
+                date_obj = datetime.datetime.strptime(raw_date, fmt).date()
+                break
+            except Exception:
+                continue
+        if date_obj is None:
+            date_obj = timezone.now().date()
+
+        category, source, reason = _suggest_category_for_desc(desc, cat_hint, categories)
+        if source == 'ai':
+            ai_used = True
+        preview.append({
+            'description': desc,
+            'date': date_obj.strftime('%Y-%m-%d'),
+            'value': f"{value_dec:.2f}",
+            'type': tx_type,
+            'category': category.id if category else '',
+            'category_name': category.name if category else 'Sem categoria',
+            'category_source': source,
+            'category_reason': reason,
+        })
+    return preview, ai_used
+
+
+def _match_category(name_hint: str, description: str, categories):
+    hint = (name_hint or '').strip().lower()
+    desc = (description or '').lower()
+    if not categories:
+        return None
+    # match por nome exato
+    for cat in categories:
+        if hint and cat.name.lower() == hint:
+            return cat
+    # match por substring da descrição
+    for cat in categories:
+        if cat.name.lower() in desc:
+            return cat
+    # fallback para primeira
+    return categories[0]
+
+
+def _suggest_category_for_desc(desc: str, cat_hint: str, categories):
+    """
+    Sugere categoria com heurística + IA (se OPENAI_API_KEY estiver configurada).
+    Retorna (categoria, fonte, motivo) onde fonte é 'ai' ou 'heuristic'.
+    """
+    if not categories:
+        return None, 'heuristic', 'Sem categorias disponíveis'
+    # heurística por hint
+    hint = (cat_hint or '').strip().lower()
+    if hint:
+        for cat in categories:
+            cname = cat.name.lower()
+            if hint == cname or hint in cname:
+                return cat, 'heuristic', 'Correspondência pelo nome informado'
+
+    # heurística por substring no texto
+    desc_lower = (desc or '').lower()
+    for cat in categories:
+        if cat.name.lower() in desc_lower:
+            return cat, 'heuristic', 'Nome da categoria presente na descrição'
+
+    # heurística por interseção de tokens
+    tokens = set(re.findall(r'\w+', desc_lower))
+    best = None
+    best_score = 0
+    for cat in categories:
+        c_tokens = set(re.findall(r'\w+', cat.name.lower()))
+        score = len(tokens & c_tokens)
+        if score > best_score:
+            best_score = score
+            best = cat
+    if best:
+        return best, 'heuristic', 'Maior interseção de palavras com a categoria'
+
+    # IA opcional
+    if os.getenv("OPENAI_API_KEY"):
+        names = [cat.name for cat in categories]
+        sys_prompt = (
+            "Você é um classificador de categorias. Escolha uma das categorias existentes para a descrição fornecida. "
+            "Responda no formato 'CATEGORIA|motivo breve'. Use apenas uma das categorias listadas. "
+            "Se não souber, responda 'Sem categoria|motivo'."
+        )
+        user_prompt = f"Categorias: {', '.join(names)}. Descrição: {desc}"
+        ai_choice = llm_reply(sys_prompt, user_prompt)
+        if ai_choice:
+            parts = ai_choice.split('|', 1)
+            choice_raw = parts[0].strip().lower()
+            reason = parts[1].strip() if len(parts) > 1 else 'Sugestão via IA'
+            for cat in categories:
+                if cat.name.lower() == choice_raw:
+                    return cat, 'ai', reason
+                if choice_raw in cat.name.lower():
+                    return cat, 'ai', reason
+
+    return categories[0], 'heuristic', 'Categoria padrão'
+
+
+@login_required
+@login_required
+def transaction_import(request):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Você não pode importar finanças neste workspace.')
+        return redirect('tracker:dashboard')
+
+    categories = list(Category.objects.filter(workspace=workspace) if workspace else Category.objects.all())
+    if not categories:
+        default_cat, _ = Category.objects.get_or_create(name='Sem categoria', workspace=workspace)
+        categories = [default_cat]
+    upload_form = StatementUploadForm()
+    preview_rows = []
+    parse_error = None
+    ai_used = False
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        if action == 'confirm':
+            desc_list = request.POST.getlist('description')
+            date_list = request.POST.getlist('date')
+            value_list = request.POST.getlist('value')
+            type_list = request.POST.getlist('type')
+            category_list = request.POST.getlist('category')
+            selected_list = request.POST.getlist('selected')
+            skip_list = set(request.POST.getlist('skip'))
+
+            to_create = []
+            for idx, desc in enumerate(desc_list):
+                if str(idx) in skip_list:
+                    continue
+                desc = (desc or '').strip()
+                if not desc:
+                    continue
+                try:
+                    date_obj = datetime.date.fromisoformat(date_list[idx])
+                except Exception:
+                    continue
+                try:
+                    value_dec = Decimal(str(value_list[idx]).replace(',', '.'))
+                except Exception:
+                    continue
+                tx_type = 'income' if type_list[idx] == 'income' else 'expense'
+                try:
+                    cat_id = int(category_list[idx])
+                    category = next((c for c in categories if c.id == cat_id), None)
+                except Exception:
+                    category = categories[0] if categories else None
+                selected = str(idx) in selected_list
+                to_create.append(Transaction(
+                    description=desc,
+                    date=date_obj,
+                    value=value_dec,
+                    type=tx_type,
+                    category=category,
+                    workspace=workspace,
+                    selected=selected,
+                ))
+            if to_create:
+                Transaction.objects.bulk_create(to_create, batch_size=500)
+                messages.success(request, f'{len(to_create)} transações importadas com sucesso.')
+            else:
+                messages.warning(request, 'Nenhuma transação válida para importar.')
+            return redirect('tracker:transactions_list')
+
+        upload_form = StatementUploadForm(request.POST, request.FILES)
+        if upload_form.is_valid():
+            up_file = upload_form.cleaned_data['file']
+            name = (up_file.name or '').lower()
+            file_bytes = up_file.read()
+            rows = []
+            if name.endswith('.pdf'):
+                rows, parse_error = _parse_pdf_statement(file_bytes)
+            else:
+                raw = file_bytes.decode('utf-8-sig', errors='ignore')
+                rows = _parse_statement_rows(raw, categories)
+            preview_rows, ai_used = _build_preview(rows, categories)
+            if not preview_rows:
+                messages.warning(request, 'Nenhuma linha válida encontrada no arquivo.')
+
+    return render(request, 'tracker/transactions_import.html', {
+        'upload_form': upload_form,
+        'preview_rows': preview_rows,
+        'categories': categories,
+        'parse_error': parse_error,
+        'mode': 'csv',
+        'ai_used': ai_used,
+    })
+
+
 # -------- Tasks --------
 
 @login_required
@@ -435,6 +851,9 @@ def tasks_list(request):
     query_params.pop('page', None)
     query_string = query_params.urlencode()
 
+    today = timezone.now().date()
+    soon_threshold = today + datetime.timedelta(days=3)
+
     def fmt(val):
         try:
             return datetime.date.fromisoformat(val).strftime('%d/%m/%Y')
@@ -446,6 +865,8 @@ def tasks_list(request):
         'tasks_total': paginator.count,
         'open_count': tasks_qs.filter(status='ongoing').count(),
         'done_count': tasks_qs.filter(status='done').count(),
+        'today': today,
+        'soon_threshold': soon_threshold,
         'query_string': query_string,
         'filters': {
             'status': status,
@@ -607,6 +1028,65 @@ def task_delete(request, pk):
     return redirect('tracker:tasks_list')
 
 
+@login_required
+def task_toggle_status(request, pk):
+    workspace = getattr(request, "workspace", None)
+    qs = Task.objects.prefetch_related('steps')
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    task = get_object_or_404(qs, pk=pk)
+
+    if workspace and not request.user.is_superuser:
+        membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
+        if membership and not membership.can_edit_tasks:
+            messages.error(request, 'Você não pode editar tarefas neste workspace.')
+            return redirect('tracker:tasks_list')
+
+    if request.method == 'POST':
+        mark_done = task.status != 'done'
+        if mark_done:
+            if task.steps.exists():
+                task.steps.update(done=True)
+                _update_task_progress(task)
+            else:
+                task.status = 'done'
+                task.progress = 100
+                task.save(update_fields=['status', 'progress', 'updated_at'])
+        else:
+            if task.steps.exists():
+                task.steps.update(done=False)
+                _update_task_progress(task)
+            else:
+                task.status = 'ongoing'
+                task.progress = 0
+                task.save(update_fields=['status', 'progress', 'updated_at'])
+    return redirect('tracker:tasks_list')
+
+
+@login_required
+def task_toggle_selected(request, pk):
+    workspace = getattr(request, "workspace", None)
+    qs = Task.objects.all()
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    task = get_object_or_404(qs, pk=pk)
+
+    if workspace and not request.user.is_superuser:
+        membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
+        if membership and not membership.can_edit_tasks:
+            messages.error(request, 'Você não pode editar tarefas neste workspace.')
+            return redirect('tracker:tasks_list')
+
+    if request.method == 'POST':
+        task.selected = not task.selected
+        task.save(update_fields=['selected', 'updated_at'])
+    return redirect('tracker:tasks_list')
+
+
 # -------- Categories --------
 
 @login_required
@@ -644,11 +1124,14 @@ def category_delete(request, pk):
 # -------- Chart API --------
 
 @login_required
+@cache_control(private=True, max_age=30)
 def chart_data(request):
     today = timezone.now().date()
     start_param = request.GET.get('start')
     end_param = request.GET.get('end')
     period = request.GET.get('period') or ''
+    type_filter = request.GET.get('type') or ''
+    selected_only = request.GET.get('selected_only') == '1'
     workspace = getattr(request, "workspace", None)
 
     def parse_date(val, fallback):
@@ -696,6 +1179,10 @@ def chart_data(request):
 
     qs_all = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user) if can_finance else Transaction.objects.none()
     qs = qs_all.filter(date__gte=start_date, date__lte=end_date)
+    if type_filter in ('income', 'expense'):
+        qs = qs.filter(type=type_filter)
+    if selected_only:
+        qs = qs.filter(selected=True)
 
     income_total = qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
     expense_total = qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
@@ -756,6 +1243,31 @@ def chart_data(request):
         .order_by('-total')[:5]
     )
 
+    daily = (
+        qs.values('date')
+        .annotate(
+            net=Sum(
+                Case(
+                    When(type='income', then=F('value')),
+                    When(type='expense', then=F('value') * -1),
+                    default=0,
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            )
+        )
+        .order_by('date')
+    )
+    daily_labels = [item['date'].strftime('%d/%m') for item in daily]
+    daily_values = [float(item['net'] or 0) for item in daily]
+
+    running_labels = []
+    running_values = []
+    running_total = 0
+    for item in daily:
+        running_total += float(item['net'] or 0)
+        running_labels.append(item['date'].strftime('%d/%m'))
+        running_values.append(running_total)
+
     return JsonResponse({
         'labels': labels,
         'values': values,
@@ -769,6 +1281,10 @@ def chart_data(request):
         'monthly_values': monthly_values,
         'top_income': [{'label': item['category__name'], 'total': float(item['total'] or 0)} for item in top_income],
         'top_expense': [{'label': item['category__name'], 'total': float(item['total'] or 0)} for item in top_expense],
+        'daily_labels': daily_labels,
+        'daily_values': daily_values,
+        'running_labels': running_labels,
+        'running_values': running_values,
     })
 
 

@@ -3,11 +3,34 @@
 {% block title %}Entrar | Tracker{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-5">
+<div class="row g-4 align-items-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <p class="text-secondary small text-uppercase mb-1">Bem-vindo de volta</p>
+            <h1 class="fw-bold h3 mb-2">Entre para acessar seus workspaces</h1>
+            <p class="text-secondary mb-3">Dashboards de finanças, tarefas e IA. Se ainda não tem conta, crie em segundos.</p>
+            <div class="d-flex flex-wrap gap-3">
+                <div>
+                    <div class="fw-bold">3x</div>
+                    <div class="text-secondary small">Mais rápido para lançar transações</div>
+                </div>
+                <div>
+                    <div class="fw-bold">IA</div>
+                    <div class="text-secondary small">Sugere categorias e responde no chat</div>
+                </div>
+                <div>
+                    <div class="fw-bold">Multi-tenant</div>
+                    <div class="text-secondary small">Workspaces isolados com membros e permissões</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
         <div class="glass-card p-4">
-            <h1 class="h4 fw-bold mb-3">Entrar</h1>
-            <p class="text-secondary small mb-4">Acesse para visualizar seus workspaces e dashboards.</p>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h5 fw-bold mb-0">Entrar</h2>
+                <a class="small" href="{% url 'tracker:register' %}">Criar conta</a>
+            </div>
             {% if form.non_field_errors %}
                 <div class="alert alert-danger py-2 small mb-3">
                     {{ form.non_field_errors|striptags }}
@@ -28,7 +51,7 @@
                     <button class="btn btn-primary" type="submit">Entrar</button>
                 </div>
             </form>
-            <p class="small mt-3 mb-0 text-secondary">Não tem conta? <a href="{% url 'tracker:register' %}">Crie uma agora</a>.</p>
+            <p class="small mt-3 mb-0 text-secondary">Esqueceu a senha? <a href="#">Recuperar acesso</a></p>
         </div>
     </div>
 </div>

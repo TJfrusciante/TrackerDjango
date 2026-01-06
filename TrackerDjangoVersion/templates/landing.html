@@ -4,70 +4,7 @@
 {% block title %}Tracker | Finanças e tarefas em um só lugar{% endblock %}
 
 {% block extra_css %}
-<style>
-    .lp-hero {
-        padding: 4rem 0 3rem;
-    }
-    .lp-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: .5rem;
-        padding: .5rem 1rem;
-        border-radius: 999px;
-        background: rgba(94, 234, 212, 0.12);
-        color: var(--primary-soft);
-        font-weight: 700;
-        letter-spacing: .3px;
-    }
-    .lp-muted { color: var(--muted); }
-    .lp-hero-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 1.5rem;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-    }
-    .lp-stat {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: .75rem .9rem;
-    }
-    .lp-number {
-        font-weight: 800;
-        font-size: 1.25rem;
-    }
-    .lp-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 1.25rem;
-        height: 100%;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.16);
-    }
-    .lp-icon {
-        width: 42px; height: 42px;
-        display: grid; place-items: center;
-        border-radius: 12px;
-        background: rgba(94, 234, 212, 0.12);
-        color: var(--primary-soft);
-        margin-bottom: .75rem;
-    }
-    .lp-section { background: rgba(255,255,255,0.02); border: 1px solid transparent; }
-    .plan-card {
-        border-radius: 16px;
-        border: 1px solid var(--border);
-        background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(15,23,42,0.75));
-        padding: 1.5rem;
-        height: 100%;
-    }
-    [data-bs-theme="light"] .plan-card {
-        background: #fff;
-    }
-    .section-title { font-weight: 800; letter-spacing: -0.5px; }
-    .lp-step { border-left: 3px solid var(--primary-color); padding-left: 1rem; }
-    .faq-item { border-bottom: 1px solid var(--border); padding: .8rem 0; }
-</style>
+<link rel="stylesheet" href="{% static 'css/landing.css' %}">
 {% endblock %}
 
 {% block content %}

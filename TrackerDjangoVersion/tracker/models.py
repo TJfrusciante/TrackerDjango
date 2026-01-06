@@ -13,6 +13,7 @@ class Category(models.Model):
     class Meta:
         ordering = ['name']
         unique_together = ('workspace', 'name')
+        indexes = [models.Index(fields=['workspace', 'name'])]
 
     def __str__(self):
         return self.name
@@ -37,6 +38,10 @@ class Task(models.Model):
 
     class Meta:
         ordering = ['-due_date', '-created_at']
+        indexes = [
+            models.Index(fields=['workspace', 'status']),
+            models.Index(fields=['workspace', 'due_date']),
+        ]
 
     def __str__(self):
         return self.title
@@ -60,6 +65,11 @@ class Transaction(models.Model):
 
     class Meta:
         ordering = ['-date', '-created_at']
+        indexes = [
+            models.Index(fields=['workspace', 'date']),
+            models.Index(fields=['workspace', 'type']),
+            models.Index(fields=['category', 'date']),
+        ]
 
     def __str__(self):
         return f'{self.description} ({self.date})'
@@ -109,6 +119,7 @@ class WorkspaceMembership(models.Model):
 
     class Meta:
         unique_together = ('user', 'workspace')
+        indexes = [models.Index(fields=['workspace', 'user'])]
 
     def __str__(self):
         return f'{self.user} @ {self.workspace} ({self.role})'

@@ -10,6 +10,12 @@
     #task-table tbody tr:last-child {
         border-bottom: none;
     }
+    .due-warning {
+        background: rgba(255, 193, 7, 0.08);
+    }
+    .due-overdue {
+        background: rgba(239, 68, 68, 0.12);
+    }
 </style>
 {% endblock %}
 
@@ -20,7 +26,7 @@
         <h1 class="h4 fw-bold mb-0">Tarefas</h1>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-primary" href="{% url 'tracker:task_create' %}">
+        <a class="btn btn-primary" href="{% url 'tracker:task_create' %}" data-bs-toggle="tooltip" title="Criar nova tarefa">
             <i class="fa-solid fa-plus me-2"></i>Nova tarefa
         </a>
     </div>
@@ -30,11 +36,11 @@
     <div class="row g-3 align-items-end">
         <div class="col-md-3">
             <label class="form-label">Buscar</label>
-            <input type="text" name="q" value="{{ filters.q }}" placeholder="Título" class="form-control">
+            <input aria-label="Buscar tarefa" type="text" name="q" value="{{ filters.q }}" placeholder="Título" class="form-control">
         </div>
         <div class="col-md-2">
             <label class="form-label">Status</label>
-            <select name="status" class="form-select">
+            <select name="status" class="form-select" aria-label="Filtrar por status">
                 <option value="">Todos</option>
                 <option value="ongoing" {% if filters.status == 'ongoing' %}selected{% endif %}>Em andamento</option>
                 <option value="done" {% if filters.status == 'done' %}selected{% endif %}>Finalizada</option>
@@ -42,16 +48,16 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">De</label>
-            <input id="taskStartDisplay" type="text" name="start_display" inputmode="numeric" class="form-control" value="{{ filters_display.start }}" placeholder="dd/mm/aaaa">
+            <input aria-label="Data inicial" id="taskStartDisplay" type="text" name="start_display" inputmode="numeric" class="form-control" value="{{ filters_display.start }}" placeholder="dd/mm/aaaa">
             <input id="taskStartHidden" type="hidden" name="start" value="{{ filters.start }}">
         </div>
         <div class="col-md-2">
             <label class="form-label">Até</label>
-            <input id="taskEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
+            <input aria-label="Data final" id="taskEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
             <input id="taskEndHidden" type="hidden" name="end" value="{{ filters.end }}">
         </div>
         <div class="col-md-2 d-flex gap-2">
-            <button class="btn btn-primary w-100" type="submit">Filtrar</button>
+            <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de tarefa">Filtrar</button>
         </div>
         <div class="col-12 d-flex justify-content-between mt-2">
             <div class="small text-secondary">
@@ -96,7 +102,7 @@
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endif %}
     {% endfor %}
-    <button class="btn btn-sm btn-outline-light" type="submit" name="export" value="csv">
+    <button class="btn btn-sm btn-outline-light" type="submit" name="export" value="csv" data-bs-toggle="tooltip" title="Exportar tarefas em CSV">
         <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
     </button>
 </form>
@@ -130,9 +136,18 @@
             </thead>
             <tbody>
                 {% for task in tasks_page %}
-                    <tr>
+                    <tr class="{% if task.due_date < today %}due-overdue{% elif task.due_date <= soon_threshold %}due-warning{% endif %}">
                         <td class="fw-semibold">{{ task.title }}</td>
-                        <td class="text-secondary">{{ task.due_date|date:"d/m/Y" }}</td>
+                        <td class="text-secondary">
+                            {{ task.due_date|date:"d/m/Y" }}
+                            {% if task.due_date < today %}
+                                <span class="badge bg-danger-subtle text-danger ms-1">Atrasada</span>
+                            {% elif task.due_date == today %}
+                                <span class="badge bg-warning-subtle text-warning ms-1">Hoje</span>
+                            {% elif task.due_date <= soon_threshold %}
+                                <span class="badge bg-warning-subtle text-warning ms-1">Em breve</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <span class="badge {% if task.status == 'done' %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %} px-3">
                                 {{ task.get_status_display }}
@@ -157,15 +172,27 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex justify-content-end gap-2">
-                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:task_update' task.id %}?detail=1">
+                                <form method="post" action="{% url 'tracker:task_toggle_status' task.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm {% if task.status == 'done' %}btn-success{% else %}btn-outline-success{% endif %}" type="submit" aria-label="Alternar status" data-bs-toggle="tooltip" title="Concluir/reabrir tarefa">
+                                        {% if task.status == 'done' %}<i class="fa-solid fa-rotate-left"></i>{% else %}<i class="fa-solid fa-check"></i>{% endif %}
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'tracker:task_toggle_selected' task.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm {% if task.selected %}btn-warning{% else %}btn-outline-warning{% endif %}" type="submit" aria-label="Destacar tarefa" data-bs-toggle="tooltip" title="Marcar como destaque">
+                                        <i class="fa-solid fa-star"></i>
+                                    </button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:task_update' task.id %}?detail=1" aria-label="Detalhes" data-bs-toggle="tooltip" title="Ver detalhes da tarefa">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
-                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:task_update' task.id %}">
+                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:task_update' task.id %}" aria-label="Editar" data-bs-toggle="tooltip" title="Editar tarefa">
                                     <i class="fa-solid fa-pen"></i>
                                 </a>
                                 <form method="post" action="{% url 'tracker:task_delete' task.id %}" onsubmit="return confirm('Excluir esta tarefa?');">
                                     {% csrf_token %}
-                                    <button class="btn btn-sm btn-outline-danger" type="submit">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Excluir" data-bs-toggle="tooltip" title="Excluir tarefa">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
                                 </form>
@@ -174,7 +201,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="4" class="text-secondary">Nenhuma tarefa registrada.</td>
+                        <td colspan="5" class="text-secondary">Nenhuma tarefa registrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>
