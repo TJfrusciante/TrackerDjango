@@ -38,24 +38,15 @@ class WorkspaceMiddleware(MiddlewareMixin):
 
         # Superuser pode operar globalmente ou "impersonar" um workspace via slug
         if request.user.is_superuser:
+            if request.session.get("workspace_global"):
+                return None
             slug = request.GET.get("workspace") or request.session.get("workspace_slug")
             if slug:
                 ws = Workspace.objects.filter(slug=slug, is_active=True).first()
                 if ws:
                     request.workspace = ws
                     request.session["workspace_slug"] = ws.slug
-            else:
-                # superuser: se tiver membership, usa a primeira como default para nao cair em visao global sempre
-                membership = (
-                    WorkspaceMembership.objects.select_related("workspace")
-                    .filter(user=request.user, workspace__is_active=True)
-                    .order_by("id")
-                    .first()
-                )
-                if membership:
-                    request.workspace = membership.workspace
-                    request.workspace_role = membership.role
-                    request.session["workspace_slug"] = membership.workspace.slug
+                    request.session["workspace_global"] = False
             return None
 
         memberships = (

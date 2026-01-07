@@ -43,14 +43,14 @@ class TransactionForm(BaseStyledForm):
 class TaskForm(BaseStyledForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['due_date'].input_formats = ['%d/%m/%Y', '%Y-%m-%d']
-        self.fields['due_date'].widget.format = '%d/%m/%Y'
+        self.fields['due_date'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
+        self.fields['due_date'].widget.format = '%Y-%m-%d'
 
     class Meta:
         model = Task
         fields = ['title', 'due_date', 'status']
         widgets = {
-            'due_date': forms.DateInput(format='%d/%m/%Y', attrs={'type': 'text', 'class': 'form-control', 'placeholder': 'dd/mm/aaaa', 'inputmode': 'numeric'}),
+            'due_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
         }
 
 

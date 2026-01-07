@@ -952,7 +952,7 @@ def tasks_list(request):
 @login_required
 def task_create(request):
     workspace = getattr(request, "workspace", None)
-    # membros sem permissão de edição não podem criar tarefas
+    # Membros sem permissao de edicao nao podem criar tarefas
     if workspace and not request.user.is_superuser:
         membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
         if membership and not membership.can_edit_tasks:
@@ -965,6 +965,25 @@ def task_create(request):
         if workspace:
             obj.workspace = workspace
         obj.save()
+        step_titles = request.POST.getlist('step_title')
+        step_responsibles = request.POST.getlist('step_responsible')
+        step_emails = request.POST.getlist('step_responsible_email')
+        order = 1
+        for idx, title in enumerate(step_titles):
+            step_title = (title or '').strip()
+            if not step_title:
+                continue
+            step = TaskStep(
+                task=obj,
+                title=step_title,
+                order=order,
+                responsible=(step_responsibles[idx].strip() if idx < len(step_responsibles) and step_responsibles[idx] else ''),
+                responsible_email=(step_emails[idx].strip() if idx < len(step_emails) and step_emails[idx] else ''),
+            )
+            step.save()
+            order += 1
+        if order > 1:
+            _update_task_progress(obj)
         messages.success(request, 'Tarefa criada com sucesso.')
         return redirect('tracker:tasks_list')
     return render(request, 'tracker/task_form.html', {'form': form, 'step_form': step_form, 'is_edit': False, 'steps': []})
@@ -1469,6 +1488,7 @@ def workspace_select(request):
                 workspace.save()
                 WorkspaceMembership.objects.create(workspace=workspace, user=request.user, role='owner')
                 request.session['workspace_slug'] = workspace.slug
+                request.session['workspace_global'] = False
                 messages.success(request, 'Workspace criado e selecionado.')
                 return redirect('tracker:dashboard')
         elif action == 'switch':
@@ -1485,6 +1505,7 @@ def workspace_select(request):
                     ).first()
                 if workspace:
                     request.session['workspace_slug'] = workspace.slug
+                    request.session['workspace_global'] = False
                     messages.success(request, f'Workspace {workspace.name} selecionado.')
                     return redirect(request.GET.get('next') or 'tracker:dashboard')
                 messages.error(request, 'Workspace n\u00e3o encontrado ou sem permiss\u00e3o.')
@@ -1509,6 +1530,7 @@ def workspace_switch(request, slug):
     if slug == 'global':
         if request.user.is_superuser:
             request.session.pop('workspace_slug', None)
+            request.session['workspace_global'] = True
             messages.success(request, 'Vis\u00e3o global ativada.')
         else:
             messages.error(request, 'Apenas superusu\u00e1rios podem usar a vis\u00e3o global.')
@@ -1522,6 +1544,7 @@ def workspace_switch(request, slug):
         messages.error(request, 'Workspace n\u00e3o encontrado ou sem permiss\u00e3o.')
         return redirect('tracker:workspace_select')
     request.session['workspace_slug'] = workspace.slug
+    request.session['workspace_global'] = False
     messages.success(request, f'Usando workspace {workspace.name}.')
     return redirect(request.GET.get('next') or 'tracker:dashboard')
 
@@ -1603,6 +1626,27 @@ def workspace_members(request, slug=None):
             'pending_requests': pending_requests,
         },
     )
+
+
+@login_required
+def workspace_delete(request, slug):
+    workspace = Workspace.objects.filter(slug=slug).first()
+    if not workspace:
+        messages.error(request, 'Workspace não encontrado.')
+        return redirect('tracker:workspace_select')
+    if not (request.user.is_superuser or workspace.owner_id == request.user.id):
+        messages.error(request, 'Apenas o owner pode excluir este workspace.')
+        return redirect('tracker:workspace_members', slug=workspace.slug)
+    if request.method != 'POST':
+        messages.error(request, 'Requisição inválida.')
+        return redirect('tracker:workspace_members', slug=workspace.slug)
+    workspace_name = workspace.name
+    workspace.delete()
+    request.session.pop('workspace_slug', None)
+    if request.user.is_superuser:
+        request.session['workspace_global'] = True
+    messages.success(request, f'Workspace {workspace_name} excluído.')
+    return redirect('tracker:workspace_select')
 
 
 @login_required

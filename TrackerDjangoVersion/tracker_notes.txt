@@ -32,8 +32,10 @@ Front/UX recentes
 - Ajuda: layout ajustado para evitar blocos esticados; imagens com altura controlada e alinhamento ao topo.
 - Ajuda: midias abaixo do texto, sem distorcer (object-fit: contain, max 410px).
 - Tarefas: prazo agora mostra "Concluida no prazo" para tarefas finalizadas, sem marcar como atrasada.
+- Tarefas: criacao permite etapas iniciais; prazo usa input type=date (abre calendario nativo).
 - Header: navegacao com icones e tooltips; textos ocultos no desktop e exibidos no mobile; icone de visao geral trocado por olho.
 - Estaticos: removido WhiteNoise no projeto local; dev usa staticfiles do Django e producao segue Nginx + collectstatic.
+- Workspaces: botao "Modo global" na tela de selecao para superuser; exclusao de workspace habilitada no card de membros (POST).
 
 Aprovacao e convidados
 - Superuser: controle de plano e pagamento confirmado no /super/users; campos no perfil incluem plano, pagamento_confirmado e observacoes.

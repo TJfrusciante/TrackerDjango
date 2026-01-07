@@ -9,7 +9,15 @@
         <h1 class="h4 fw-bold mb-0">Membros de {{ workspace.name }}</h1>
         <p class="text-secondary mb-0">Acesso e pap&eacute;is s&atilde;o isolados por workspace. Ajuste permiss&otilde;es rapidamente.</p>
     </div>
-    <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
+        {% if user.is_superuser or workspace.owner_id == user.id %}
+            <form method="post" action="{% url 'tracker:workspace_delete' workspace.slug %}" onsubmit="return confirm('Excluir este workspace? Esta ação remove transações e tarefas associadas.');">
+                {% csrf_token %}
+                <button class="btn btn-outline-danger btn-sm" type="submit">Excluir workspace</button>
+            </form>
+        {% endif %}
+    </div>
 </div>
 
 <div class="row gy-4">

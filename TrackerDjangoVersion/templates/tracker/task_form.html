@@ -53,6 +53,32 @@
                         {{ form.status }}{{ form.status.errors }}
                     {% endif %}
                 </div>
+                {% if not is_detail and not is_edit %}
+                <div class="col-12">
+                    <label class="form-label">Etapas iniciais</label>
+                    <div id="stepContainer" class="d-grid gap-2">
+                        <div class="step-entry p-3 bg-dark bg-opacity-10 rounded">
+                            <div class="row g-2">
+                                <div class="col-12">
+                                    <input class="form-control form-control-lg" name="step_title" type="text" placeholder="Descrição da etapa" aria-label="Descrição da etapa">
+                                </div>
+                                <div class="col-12">
+                                    <input class="form-control form-control-lg" name="step_responsible" type="text" placeholder="Responsável da etapa" aria-label="Responsável da etapa">
+                                </div>
+                                <div class="col-12">
+                                    <input class="form-control form-control-lg" name="step_responsible_email" type="email" placeholder="E-mail do responsável" aria-label="E-mail do responsável">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-2">
+                        <button class="btn btn-outline-light btn-sm" id="addStepRow" type="button">
+                            <i class="fa-solid fa-plus me-1"></i>Adicionar etapa
+                        </button>
+                    </div>
+                    <div class="form-text text-secondary">As etapas são ordenadas automaticamente conforme a criação.</div>
+                </div>
+                {% endif %}
                 <div class="col-12">
                     <label class="form-label">Progresso</label>
                     <div class="progress" role="progressbar" aria-valuenow="{{ form.instance.progress|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100">
@@ -135,5 +161,23 @@
         </div>
     </div>
 </div>
+{% endif %}
+{% if not is_detail and not is_edit %}
+<script>
+    (function() {
+        const container = document.getElementById('stepContainer');
+        const addBtn = document.getElementById('addStepRow');
+        if (!container || !addBtn) return;
+        addBtn.addEventListener('click', () => {
+            const template = container.querySelector('.step-entry');
+            if (!template) return;
+            const clone = template.cloneNode(true);
+            clone.querySelectorAll('input').forEach(input => {
+                input.value = '';
+            });
+            container.appendChild(clone);
+        });
+    })();
+</script>
 {% endif %}
 {% endblock %}

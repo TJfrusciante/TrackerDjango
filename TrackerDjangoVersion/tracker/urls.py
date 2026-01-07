@@ -18,6 +18,7 @@ urlpatterns = [
     path('workspaces/<slug:slug>/switch/', views.workspace_switch, name='workspace_switch'),
     path('workspaces/members/', views.workspace_members, name='workspace_members_current'),
     path('workspaces/<slug:slug>/members/', views.workspace_members, name='workspace_members'),
+    path('workspaces/<slug:slug>/excluir/', views.workspace_delete, name='workspace_delete'),
     path('workspaces/<slug:slug>/members/<int:member_id>/remove/', views.workspace_member_remove, name='workspace_member_remove'),
     path('workspaces/<slug:slug>/members/<int:member_id>/update/', views.workspace_member_update, name='workspace_member_update'),
     path('workspaces/<slug:slug>/requests/<int:req_id>/<str:decision>/', views.workspace_request_action, name='workspace_request_action'),

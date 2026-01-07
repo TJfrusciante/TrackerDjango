@@ -9,7 +9,14 @@
         <h1 class="h4 fw-bold mb-0">Escolha ou crie um workspace</h1>
         <p class="text-secondary mb-0">Dados, permiss&otilde;es e IA s&atilde;o isolados por workspace. Roles diferentes controlam quem v&ecirc; o qu&ecirc;.</p>
     </div>
-    <a class="btn btn-outline-light" href="{% url 'tracker:dashboard' %}" data-bs-toggle="tooltip" title="Voltar para o dashboard">Voltar</a>
+    <div class="d-flex gap-2 flex-wrap">
+        {% if user.is_superuser %}
+        <a class="btn btn-outline-light" href="{% url 'tracker:workspace_switch' 'global' %}" data-bs-toggle="tooltip" title="Voltar para a visão global">
+            <i class="fa-solid fa-earth-americas me-1"></i>Modo global
+        </a>
+        {% endif %}
+        <a class="btn btn-outline-light" href="{% url 'tracker:dashboard' %}" data-bs-toggle="tooltip" title="Voltar para o dashboard">Voltar</a>
+    </div>
 </div>
 
 <div class="row gy-4">
