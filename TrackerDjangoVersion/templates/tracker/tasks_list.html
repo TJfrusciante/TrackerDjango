@@ -136,16 +136,20 @@
             </thead>
             <tbody>
                 {% for task in tasks_page %}
-                    <tr class="{% if task.due_date < today %}due-overdue{% elif task.due_date <= soon_threshold %}due-warning{% endif %}">
+                    <tr class="{% if task.status != 'done' and task.due_date < today %}due-overdue{% elif task.status != 'done' and task.due_date <= soon_threshold %}due-warning{% endif %}">
                         <td class="fw-semibold">{{ task.title }}</td>
                         <td class="text-secondary">
                             {{ task.due_date|date:"d/m/Y" }}
-                            {% if task.due_date < today %}
-                                <span class="badge bg-danger-subtle text-danger ms-1">Atrasada</span>
-                            {% elif task.due_date == today %}
-                                <span class="badge bg-warning-subtle text-warning ms-1">Hoje</span>
-                            {% elif task.due_date <= soon_threshold %}
-                                <span class="badge bg-warning-subtle text-warning ms-1">Em breve</span>
+                            {% if task.status == 'done' %}
+                                <span class="badge bg-success-subtle text-success ms-1">Concluída no prazo</span>
+                            {% else %}
+                                {% if task.due_date < today %}
+                                    <span class="badge bg-danger-subtle text-danger ms-1">Atrasada</span>
+                                {% elif task.due_date == today %}
+                                    <span class="badge bg-warning-subtle text-warning ms-1">Hoje</span>
+                                {% elif task.due_date <= soon_threshold %}
+                                    <span class="badge bg-warning-subtle text-warning ms-1">Em breve</span>
+                                {% endif %}
                             {% endif %}
                         </td>
                         <td>

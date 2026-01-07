@@ -29,6 +29,8 @@ Front/UX recentes
 - Ajuda: pagina /help com cards, GIFs ilustrativos, imagens e versao compacta para mobile (chips de navegacao).
 - Ajuda: layout ajustado para evitar blocos esticados; imagens com altura controlada e alinhamento ao topo.
 - Ajuda: midias abaixo do texto, sem distorcer (object-fit: contain, max 410px).
+- Tarefas: prazo agora mostra "Concluída no prazo" para tarefas finalizadas, sem marcar como atrasada.
+- Header: navegação com ícones e tooltips; textos ocultos no desktop e exibidos no mobile; ícone de visão geral trocado por olho.
 
 Pendencias e riscos
 - Tests: ainda faltam suites para import CSV/PDF, IA de categorizacao, permissao de workspace, embed do chat e views sensiveis.

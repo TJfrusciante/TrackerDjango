@@ -1,3 +1,7 @@
 **/venv/
 **/TemplatesExamples/
 *.log
+*.env
+.env
+.env.local
+secrets.json

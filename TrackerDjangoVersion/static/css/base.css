@@ -63,13 +63,30 @@ body {
     color: var(--muted);
     font-weight: 600;
     border-radius: 10px;
-    padding-inline: .9rem;
+    padding: .95rem 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .85rem;
 }
 
 .nav-link.active,
 .nav-link:hover {
     color: var(--primary-soft);
     background: rgba(94, 234, 212, 0.12);
+}
+
+.nav-label {
+    display: none;
+}
+
+@media (max-width: 991.98px) {
+    .nav-link {
+        justify-content: flex-start;
+    }
+    .nav-label {
+        display: inline;
+    }
 }
 
 .theme-toggle {
@@ -212,4 +229,7 @@ body {
     padding-top: 10px;
     padding-bottom: 10px;
     vertical-align: top;
+}
+.nav-link i {
+    font-size: 1.35rem;
 }

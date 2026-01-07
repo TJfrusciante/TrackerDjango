@@ -10,25 +10,56 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+from json import load
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# ------------------------------------------------------------------------------
+# Helpers (env)
+# ------------------------------------------------------------------------------
+
+def env(name: str, default=None):
+    return os.environ.get(name, default)
+
+def env_bool(name: str, default: bool = False) -> bool:
+    v = os.environ.get(name)
+    if v is None:
+        return default
+    return v.strip().lower() in ("1", "true", "yes", "on")
+
+def env_list(name: str, default=None):
+    v = os.environ.get(name)
+    if v is None:
+        return default if default is not None else []
+    return [x.strip() for x in v.split(",") if x.strip()]
+
+
+# ------------------------------------------------------------------------------
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# ------------------------------------------------------------------------------
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-bid-hs116imyj**!a*j!p3k4w4&q3!)p--_58ot!r!i-d39@z+'
+# Em produção: export DJANGO_SECRET_KEY="..."
+SECRET_KEY = env("DJANGO_SECRET_KEY_TRACKER", "django-insecure-dev-only-change-me")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Em produção: export DJANGO_DEBUG=0
+DEBUG = env_bool("DJANGO_DEBUG", default=True)
 
-ALLOWED_HOSTS = []
+# Em produção: export DJANGO_ALLOWED_HOSTS="3.88.41.192,meudominio.com"
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhost", "3.88.41.192"])
 
 
+# ------------------------------------------------------------------------------
 # Application definition
+# ------------------------------------------------------------------------------
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -73,64 +104,100 @@ TEMPLATES = [
 WSGI_APPLICATION = 'TrackerDjangoVersion.wsgi.application'
 
 
+# ------------------------------------------------------------------------------
 # Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+# ------------------------------------------------------------------------------
 
+# Em produção: use variáveis de ambiente (mais seguro)
+# Ex:
+# DB_NAME=tracker
+# DB_USER=postgres
+# DB_PASSWORD=...
+# DB_HOST=127.0.0.1
+# DB_PORT=5432
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'tracker',
-        'USER': 'postgres',
-        'PASSWORD': 'Zorosanji123@',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': env('DB_NAME_TRACKER', 'tracker'),
+        'USER': env('DB_USER_TRACKER', 'postgres'),
+        'PASSWORD': env('DB_PASSWORD_TRACKER', ''),
+        'HOST': env('DB_HOST_TRACKER', 'localhost'),
+        'PORT': env('DB_PORT_TRACKER', '5432'),
     }
 }
 
 
+# ------------------------------------------------------------------------------
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
+# ------------------------------------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 
+# ------------------------------------------------------------------------------
 # Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
+# ------------------------------------------------------------------------------
 
 LANGUAGE_CODE = 'pt-br'
-
 TIME_ZONE = 'America/Sao_Paulo'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
+# ------------------------------------------------------------------------------
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
+# ------------------------------------------------------------------------------
 
-STATIC_URL = 'static/'
+# IMPORTANTE: com Nginx servindo /static/ em produção, use "/static/"
+STATIC_URL = '/static/'
+
+# Útil em DEV para arquivos em BASE_DIR/static.
+# Em produção, o Nginx deve apontar para STATIC_ROOT.
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Onde o collectstatic vai juntar tudo
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ------------------------------------------------------------------------------
+# Auth redirects
+# ------------------------------------------------------------------------------
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
+
+# ------------------------------------------------------------------------------
+# Media
+# ------------------------------------------------------------------------------
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ------------------------------------------------------------------------------
+# Hardening (somente em produção)
+# ------------------------------------------------------------------------------
+
+if not DEBUG:
+    # Se estiver atrás de proxy (Nginx) e HTTPS:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # Ative quando tiver HTTPS (certbot) e quiser forçar redirect http->https
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False)
+
+    # Recomendações adicionais
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
