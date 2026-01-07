@@ -51,6 +51,11 @@
                                 <i class="fa-solid fa-robot me-1"></i>IA
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/help' in request.path %}active{% endif %}" href="{% url 'tracker:help' %}">
+                                <i class="fa-solid fa-circle-question me-1"></i>Ajuda
+                            </a>
+                        </li>
                         {% if user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link {% if '/super/' in request.path %}active{% endif %}" href="{% url 'tracker:superuser_overview' %}" title="Visão geral de superusuário">
@@ -103,6 +108,7 @@
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li><a class="dropdown-item" href="{% url 'tracker:profile_edit' %}">Perfil</a></li>
                                     <li><a class="dropdown-item" href="{% url 'tracker:workspace_request_access' %}">Pedir acesso</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'tracker:help' %}">Ajuda</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="{% url 'tracker:logout' %}">Sair</a></li>
                                 </ul>
@@ -159,7 +165,7 @@
                 </div>
                 <div class="col-md-6 text-md-end">
                     <div class="d-flex justify-content-md-end gap-3">
-                        <a href="#" class="small">Suporte</a>
+                        <a href="{% url 'tracker:help' %}" class="small">Ajuda</a>
                         <a href="#" class="small">Política de privacidade</a>
                         <a href="#" class="small">Termos</a>
                     </div>

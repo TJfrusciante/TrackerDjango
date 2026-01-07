@@ -138,6 +138,26 @@ def home(request):
     return render(request, 'landing.html', context)
 
 
+def help_page(request):
+    quick_links = [
+        {"id": "transacoes", "label": "Transações", "icon": "fa-coins"},
+        {"id": "tarefas", "label": "Tarefas", "icon": "fa-list-check"},
+        {"id": "workspaces", "label": "Workspaces", "icon": "fa-users"},
+        {"id": "ia", "label": "Agente de IA", "icon": "fa-robot"},
+        {"id": "filtros", "label": "Filtros e exportação", "icon": "fa-filter"},
+        {"id": "faq", "label": "FAQ", "icon": "fa-circle-question"},
+    ]
+
+    faq_items = [
+        {"question": "Como pedir acesso a um workspace?", "answer": "Use o botão Pedir acesso no menu do usuário e informe o slug do workspace. O owner aprova na tela de membros."},
+        {"question": "Quem pode ver finanças?", "answer": "Apenas o dono do workspace (owner) e o superuser. Membros comuns veem tarefas, mas não finanças."},
+        {"question": "Como funciona o agente de IA?", "answer": "Ele responde com base nos dados do seu workspace. Se a chave da OpenAI estiver configurada, a resposta vem do modelo; senão, um resumo local é exibido."},
+        {"question": "Posso exportar dados?", "answer": "Sim, há exportação CSV nas listas e endpoint JSON para gráficos."},
+    ]
+
+    return render(request, 'tracker/help.html', {"quick_links": quick_links, "faq_items": faq_items})
+
+
 # -------- Dashboard --------
 
 @login_required

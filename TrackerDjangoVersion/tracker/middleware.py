@@ -19,6 +19,7 @@ class WorkspaceMiddleware(MiddlewareMixin):
         "/login/",
         "/logout/",
         "/register/",
+        "/help/",
         "/workspaces/select/",
         "/workspaces/create/",
         "/static/",

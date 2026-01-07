@@ -2,7 +2,7 @@ Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-06)
 -----------------------------------------------------------------
 
 - Escopo: app Django multi-tenant para finanças (transacoes) e tarefas; UI Bootstrap 5 com tema claro/escuro; graficos Chart.js.
-- Dados demo: 388 transacoes importadas de bases SQLite antigas; intervalo 06/07/2024 a 10/11/2025. Workspaces exemplo: principal (owner TJfrusciante), lena (Senha123!), teste (Senha123!).
+- Dados demo: 387 transacoes importadas de SQLite (Tracker exe) para o Postgres; intervalo 06/07/2024 a 10/11/2025. Workspace: principal (owner TJfrusciante).
 
 Modelos e infra
 - Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar), Assistant.ChatMessage.
@@ -25,9 +25,13 @@ Front/UX recentes
 - Selecao de workspace com dicas de isolamento/roles; pedido de acesso com passo a passo; membros com contadores e cards mais claros.
 - Categorias com contexto, dica de cores e cards com data; lista de usuarios admin com cabeçalho mais informativo; painel superuser com texto sem mojibake.
 - Favicon adicionado em `static/img/favicon.svg`; base tem botao flutuante do agente e navegacao topo/fundo.
+- Landing page publica em `/` (dashboard em `/app/`) e pagina de ajuda em `/help/` com guia interativo de transacoes, tarefas, workspaces e IA.
+- Ajuda: pagina /help com cards, GIFs ilustrativos, imagens e versao compacta para mobile (chips de navegacao).
+- Ajuda: layout ajustado para evitar blocos esticados; imagens com altura controlada e alinhamento ao topo.
+- Ajuda: midias abaixo do texto, sem distorcer (object-fit: contain, max 410px).
 
 Pendencias e riscos
 - Tests: ainda faltam suites para import CSV/PDF, IA de categorizacao, permissao de workspace, embed do chat e views sensiveis.
-- Rodar `python manage.py migrate` para aplicar indexes (0010) e garantir criacao de tabelas do assistant/workspace requests.
+- Migrations: 0011 aplicada (rename de indexes). Em novos bancos, executar `python manage.py migrate`.
 - IA em services.py ainda sem backoff/httpx; considerar trocar urllib por httpx com timeout e retry.
 - Import PDF depende de texto extraivel; PDFs escaneados precisam de OCR externo antes do upload.

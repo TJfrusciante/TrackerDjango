@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Ajuda | Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .help-hero {
+        padding: 2.5rem 0 2rem;
+    }
+    .help-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .45rem .9rem;
+        border-radius: 999px;
+        background: rgba(94, 234, 212, 0.12);
+        color: var(--primary-soft);
+        font-weight: 700;
+        letter-spacing: .3px;
+    }
+    .help-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.2rem;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.18);
+    }
+    .help-icon {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: rgba(94, 234, 212, 0.12);
+        color: var(--primary-soft);
+        margin-bottom: .8rem;
+    }
+    .help-nav {
+        position: sticky;
+        top: 90px;
+    }
+    .help-nav .nav-link {
+        color: var(--muted);
+        font-weight: 600;
+    }
+    .help-nav .nav-link.active {
+        color: var(--primary-soft);
+        background: rgba(94, 234, 212, 0.12);
+    }
+    .help-step {
+        border-left: 3px solid var(--primary-color);
+        padding-left: 1rem;
+    }
+    .help-callout {
+        border: 1px dashed var(--border);
+        border-radius: 14px;
+        padding: 1rem;
+        background: rgba(15,23,42,0.4);
+    }
+    [data-bs-theme="light"] .help-callout {
+        background: #f8fafc;
+    }
+    .faq-search {
+        border-radius: 999px;
+    }
+    #faqAccordion .accordion-button {
+        color: var(--text-color);
+    }
+    #faqAccordion .accordion-button:focus {
+        box-shadow: none;
+    }
+    .help-media {
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        background: rgba(255,255,255,0.02);
+        padding: .5rem;
+    }
+    .help-media img {
+        width: 100%;
+        height: auto;
+        display: block;
+        max-height: 410px;
+        object-fit: contain;
+    }
+    .help-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: .35rem .8rem;
+        color: var(--text-color);
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+    .help-chip:hover {
+        border-color: var(--primary-soft);
+        color: var(--primary-soft);
+    }
+    .help-scroll {
+        display: flex;
+        gap: .6rem;
+        overflow-x: auto;
+        padding-bottom: .3rem;
+    }
+    @media (max-width: 991px) {
+        .help-hero { padding: 2rem 0 1.2rem; }
+        .help-card { padding: 1rem; }
+        .help-nav { position: static; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="help-hero">
+    <div class="row g-4 align-items-center">
+        <div class="col-lg-7">
+            <div class="help-pill mb-3">Central de ajuda</div>
+            <h1 class="fw-bold mb-2">Como usar o Tracker no dia a dia</h1>
+            <p class="text-secondary mb-4">Guia rápido para lançar transações, organizar tarefas por etapas, convidar membros do workspace e usar o agente de IA.</p>
+            <div class="d-flex flex-wrap gap-2">
+                {% if user.is_authenticated %}
+                    <a class="btn btn-primary" href="{% url 'tracker:dashboard' %}"><i class="fa-solid fa-gauge-high me-2"></i>Ir para o dashboard</a>
+                    <a class="btn btn-outline-light" href="{% url 'tracker:categories_list' %}"><i class="fa-solid fa-tags me-2"></i>Categorias</a>
+                {% else %}
+                    <a class="btn btn-primary" href="{% url 'tracker:register' %}"><i class="fa-solid fa-user-plus me-2"></i>Criar conta</a>
+                    <a class="btn btn-outline-light" href="{% url 'tracker:login' %}"><i class="fa-solid fa-right-to-bracket me-2"></i>Entrar</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="help-card">
+                <h5 class="fw-bold mb-3"><i class="fa-solid fa-headset me-2 text-warning"></i>Precisa de suporte?</h5>
+                <p class="text-secondary small mb-3">Use este guia para resolver as dúvidas mais comuns. Se precisar, fale diretamente com o owner do workspace ou o admin do sistema.</p>
+                <div class="help-callout small text-secondary">
+                    Dica: o menu do usuário (avatar no topo) tem atalhos para Perfil, Pedir acesso e Ajuda.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-3 d-lg-none">
+    <div class="help-scroll">
+        {% for link in quick_links %}
+            <a class="help-chip" href="#{{ link.id }}"><i class="fa-solid {{ link.icon }}"></i>{{ link.label }}</a>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="py-4">
+    <div class="row g-3 text-center">
+        {% for link in quick_links %}
+        <div class="col-6 col-lg-4">
+            <a class="text-decoration-none" href="#{{ link.id }}">
+                <div class="help-card h-100">
+                    <div class="help-icon"><i class="fa-solid {{ link.icon }}"></i></div>
+                    <h6 class="fw-bold mb-1">{{ link.label }}</h6>
+                    <p class="text-secondary small mb-0">Veja instruções rápidas e exemplos.</p>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="py-4">
+    <div class="row g-4">
+        <div class="col-lg-3 d-none d-lg-block">
+            <div class="help-card help-nav">
+                <h6 class="fw-bold mb-3">Navegação rápida</h6>
+                <nav class="nav flex-column">
+                    {% for link in quick_links %}
+                        <a class="nav-link" href="#{{ link.id }}"><i class="fa-solid {{ link.icon }} me-2"></i>{{ link.label }}</a>
+                    {% endfor %}
+                </nav>
+            </div>
+        </div>
+        <div class="col-lg-9">
+            <div class="help-card mb-4" id="transacoes">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h4 class="fw-bold mb-0"><i class="fa-solid fa-coins me-2 text-warning"></i>Como lançar transações</h4>
+                            <span class="badge bg-primary-subtle text-primary">Financeiro</span>
+                        </div>
+            <p class="text-secondary">Use o botão “Nova transação” e escolha o tipo (entrada/saída). As datas seguem o formato <strong>dd/mm/aaaa</strong>.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">1. Categoria e cor</h6>
+                                    <p class="text-secondary small mb-0">Crie a categoria antes de lançar, definindo uma cor para destacar nos gráficos.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">2. Valor e descrição</h6>
+                                    <p class="text-secondary small mb-0">Descreva bem o lançamento para facilitar busca e análises.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">3. Filtros avançados</h6>
+                                    <p class="text-secondary small mb-0">Use período customizado ou quick actions (semana, mês, trimestre).</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">4. Exportar CSV</h6>
+                                    <p class="text-secondary small mb-0">Na lista de transações, use Exportar CSV para análises externas.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <div class="help-media">
+                            <img src="{% static 'help/transactions.gif' %}" alt="Transações animadas">
+                        </div>
+                        <p class="text-secondary small mt-2 mb-0">Mostra entradas/saídas e evolução do gráfico.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card mb-4" id="tarefas">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h4 class="fw-bold mb-0"><i class="fa-solid fa-list-check me-2 text-success"></i>Como lançar tarefas</h4>
+                            <span class="badge bg-success-subtle text-success">Tarefas</span>
+                        </div>
+                        <p class="text-secondary">As tarefas possuem etapas (subtarefas), responsáveis e progresso automático.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">1. Criar tarefa</h6>
+                                    <p class="text-secondary small mb-0">Defina título, status e data. O progresso será calculado.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">2. Adicionar etapas</h6>
+                                    <p class="text-secondary small mb-0">Cada etapa tem descrição, responsável e e-mail. A ordem é automática.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">3. Concluir etapas</h6>
+                                    <p class="text-secondary small mb-0">Clique no botão de status para marcar como feita e atualizar o progresso.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">4. Permissões</h6>
+                                    <p class="text-secondary small mb-0">Owners controlam quem pode editar tarefas no workspace.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <div class="help-media">
+                            <img src="{% static 'help/tasks.gif' %}" alt="Checklist animado de tarefas">
+                        </div>
+                        <p class="text-secondary small mt-2 mb-0">Mostra as etapas sendo concluídas e o progresso.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card mb-4" id="workspaces">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <h4 class="fw-bold mb-3"><i class="fa-solid fa-users me-2 text-info"></i>Workspaces e convites</h4>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Convidar pessoas</h6>
+                                    <p class="text-secondary small mb-0">Owners podem adicionar membros por username ou e-mail na tela de Membros.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Pedir acesso</h6>
+                            <p class="text-secondary small mb-0">Usuários podem pedir acesso com o slug do workspace e aguardam aprovação.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Permissão de tarefas</h6>
+                                    <p class="text-secondary small mb-0">O owner define se o membro pode editar tarefas ou apenas visualizar.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Financeiro privado</h6>
+                            <p class="text-secondary small mb-0">Apenas o owner do workspace e o superuser veem finanças.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <div class="help-media">
+                            <img src="{% static 'help/workspace.gif' %}" alt="Convites e membros">
+                        </div>
+                        <p class="text-secondary small mt-2 mb-0">Mostra convites, membros e permissões.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card mb-4" id="ia">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <h4 class="fw-bold mb-3"><i class="fa-solid fa-robot me-2 text-warning"></i>Agente de IA</h4>
+                        <p class="text-secondary">O assistente responde com base nos dados do seu workspace atual.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Onde acessar</h6>
+                                    <p class="text-secondary small mb-0">Use o menu “IA” no topo ou o botão flutuante no canto inferior.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">O que perguntar</h6>
+                                    <p class="text-secondary small mb-0">Saldo do período, top categorias, tarefas pendentes e status geral.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Limites de dados</h6>
+                                    <p class="text-secondary small mb-0">Membros veem apenas tarefas do workspace; finanças são do owner.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">IA externa</h6>
+                                    <p class="text-secondary small mb-0">Configure OPENAI_API_KEY para respostas completas. Sem chave, aparece resumo local.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <div class="help-media">
+                            <img src="{% static 'help/ai.gif' %}" alt="Chat do agente de IA">
+                        </div>
+                        <p class="text-secondary small mt-2 mb-0">Mostra perguntas e respostas do agente.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card mb-4" id="filtros">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <h4 class="fw-bold mb-3"><i class="fa-solid fa-filter me-2 text-primary"></i>Filtros, gráficos e exportações</h4>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Filtros por período</h6>
+                                    <p class="text-secondary small mb-0">Use data inicial/final e quick actions no dashboard para mudar o período.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Categorias coloridas</h6>
+                                    <p class="text-secondary small mb-0">A cor da categoria aparece nos gráficos para facilitar leitura.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">Exportar CSV</h6>
+                                    <p class="text-secondary small mb-0">Disponível na lista de transações e tarefas com paginação.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">API de gráficos</h6>
+                                    <p class="text-secondary small mb-0">Use o endpoint JSON para integrar Chart.js com filtros avançados.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <div class="help-media">
+                            <img src="{% static 'help/dashboard.png' %}" alt="Ilustração do dashboard">
+                        </div>
+                        <p class="text-secondary small mt-2 mb-0">Mostra o dashboard com filtros rápidos.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card mb-4">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <h4 class="fw-bold mb-3"><i class="fa-solid fa-pen-to-square me-2 text-info"></i>Exemplo de lançamento</h4>
+                        <p class="text-secondary">Use este modelo para padronizar a descrição e facilitar buscas futuras.</p>
+                        <div class="help-callout small text-secondary">
+                            Ex.: “Aluguel Janeiro 2026”, “Internet escritório”, “Pagamento cliente XPTO”.
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <div class="help-media">
+                            <img src="{% static 'help/transaction_form.png' %}" alt="Ilustração do formulário de transação">
+                        </div>
+                        <p class="text-secondary small mt-2 mb-0">Mostra como lançar uma transação.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card" id="faq">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h4 class="fw-bold mb-0"><i class="fa-solid fa-circle-question me-2 text-warning"></i>Perguntas frequentes</h4>
+                    <input type="text" id="faqSearch" class="form-control form-control-sm faq-search" placeholder="Buscar ajuda...">
+                </div>
+                <div class="accordion" id="faqAccordion">
+                    {% for item in faq_items %}
+                    <div class="accordion-item bg-transparent border-0 faq-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.counter }}">
+                                {{ item.question }}
+                            </button>
+                        </h2>
+                        <div id="faq{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-secondary">{{ item.answer }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const search = document.getElementById('faqSearch');
+    if (search) {
+        search.addEventListener('input', () => {
+            const term = search.value.toLowerCase();
+            document.querySelectorAll('.faq-item').forEach(item => {
+                const text = item.innerText.toLowerCase();
+                item.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+    }
+
+    const navLinks = document.querySelectorAll('.help-nav .nav-link');
+    const sections = Array.from(navLinks).map(link => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            const id = entry.target.getAttribute('id');
+            const link = document.querySelector(`.help-nav .nav-link[href=\"#${id}\"]`);
+            if (link) {
+                link.classList.toggle('active', entry.isIntersecting);
+            }
+        });
+    }, { rootMargin: '-30% 0px -60% 0px', threshold: 0.1 });
+    sections.forEach(section => observer.observe(section));
+</script>
+{% endblock %}
