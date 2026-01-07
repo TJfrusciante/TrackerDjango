@@ -153,7 +153,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # ------------------------------------------------------------------------------
 
-# IMPORTANTE: com Nginx servindo /static/ em produção, use "/static/"
+# IMPORTANTE: com Nginx servindo /static/ em producao, use '/static/'
 STATIC_URL = '/static/'
 
 # Útil em DEV para arquivos em BASE_DIR/static.
@@ -163,6 +163,7 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 # Onde o collectstatic vai juntar tudo
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Serve estaticos em producao sem depender do Nginx
 
 # ------------------------------------------------------------------------------
 # Auth redirects
@@ -185,7 +186,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # ------------------------------------------------------------------------------
-# Hardening (somente em produção)
+# Hardening (somente em producao)
 # ------------------------------------------------------------------------------
 
 if not DEBUG:
@@ -201,3 +202,4 @@ if not DEBUG:
     # Recomendações adicionais
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
+

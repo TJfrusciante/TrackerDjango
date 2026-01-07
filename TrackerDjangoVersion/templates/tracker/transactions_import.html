@@ -101,7 +101,7 @@
                                 {% endfor %}
                             </select>
                             <div class="small text-secondary">
-                                Sugerido: {% if row.category_source == 'ai' %}IA{% else %}Heurística{% endif %} - {{ row.category_reason }}
+                                Sugerido: {% if row.category_source == 'ai' %}IA{% elif row.category_source == 'csv' %}Arquivo{% else %}Heuristica{% endif %} - {{ row.category_reason }}
                             </div>
                         </td>
                         <td class="text-center">

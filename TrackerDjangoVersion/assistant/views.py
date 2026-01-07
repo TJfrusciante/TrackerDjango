@@ -2,10 +2,11 @@ import datetime
 import logging
 import os
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.db.models import Sum, Case, When, DecimalField, F
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from tracker.models import Transaction, Task, WorkspaceMembership
 from .models import ChatMessage
@@ -90,6 +91,10 @@ def _assistant_reply(message, workspace, request, local_only: bool = False):
 @login_required
 def chat(request):
     workspace = getattr(request, "workspace", None)
+    profile = getattr(request.user, "profile", None)
+    if profile and profile.is_guest and not request.user.is_superuser:
+        messages.error(request, "Conta de convidado não tem acesso ao agente de IA.")
+        return redirect('tracker:tasks_list')
     if request.user.is_superuser and workspace is None:
         # se superuser estiver em modo global, não mostrar histórico para evitar volume; não bloqueia
         pass
@@ -114,6 +119,9 @@ def chat(request):
 @xframe_options_exempt
 def chat_embed(request):
     workspace = getattr(request, "workspace", None)
+    profile = getattr(request.user, "profile", None)
+    if profile and profile.is_guest and not request.user.is_superuser:
+        return render(request, 'assistant/embed.html', {'history': [], 'guest_blocked': True})
     history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:20][::-1]
 
     if request.method == 'POST':

@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.text import slugify
 
 from .models import Category, Task, TaskStep, Transaction, Workspace, UserProfile, WorkspaceAccessRequest
@@ -57,9 +59,9 @@ class TaskStepForm(BaseStyledForm):
         model = TaskStep
         fields = ['title', 'responsible', 'responsible_email']
         widgets = {
-            'title': forms.TextInput(attrs={'placeholder': 'Descrição da etapa', 'title': 'Descrição da etapa', 'class': 'form-control form-control-lg'}),
-            'responsible': forms.TextInput(attrs={'placeholder': 'Responsável da etapa', 'title': 'Responsável da etapa', 'class': 'form-control form-control-lg'}),
-            'responsible_email': forms.EmailInput(attrs={'placeholder': 'Email do responsável', 'title': 'Email do responsável', 'class': 'form-control form-control-lg'}),
+            'title': forms.TextInput(attrs={'placeholder': 'Descri\u00e7\u00e3o da etapa', 'title': 'Descri\u00e7\u00e3o da etapa', 'class': 'form-control form-control-lg'}),
+            'responsible': forms.TextInput(attrs={'placeholder': 'Respons\u00e1vel da etapa', 'title': 'Respons\u00e1vel da etapa', 'class': 'form-control form-control-lg'}),
+            'responsible_email': forms.EmailInput(attrs={'placeholder': 'E-mail do respons\u00e1vel', 'title': 'E-mail do respons\u00e1vel', 'class': 'form-control form-control-lg'}),
         }
 
 
@@ -101,10 +103,10 @@ class WorkspaceSlugForm(forms.Form):
 
 
 class WorkspaceMemberInviteForm(forms.Form):
-    name = forms.CharField(label="Nome", required=False, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome do responsável'}))
+    name = forms.CharField(label='Nome', required=False, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome do respons\u00e1vel'}))
     email = forms.EmailField(label="Email", widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@dominio.com'}))
     role = forms.ChoiceField(
-        choices=(('member', 'Membro'), ('owner', 'Owner')),
+        choices=(("member", "Membro"), ("owner", "Owner")),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -112,7 +114,7 @@ class WorkspaceMemberInviteForm(forms.Form):
 class StatementUploadForm(forms.Form):
     file = forms.FileField(
         label="Arquivo de extrato (CSV ou PDF)",
-        help_text="Use CSV (descrição, data, valor, tipo opcional, categoria opcional) ou PDF simples do extrato.",
+        help_text='Use CSV (descri\u00e7\u00e3o, data, valor, tipo opcional, categoria opcional) ou PDF simples do extrato.',
     )
 
     def clean_file(self):
@@ -126,7 +128,7 @@ class SignupForm(UserCreationForm):
     workspace_name = forms.CharField(
         label="Workspace",
         required=False,
-        help_text="Cria um workspace inicial para vocÇˆ.",
+        help_text='Cria um workspace inicial para voc\u00ea.',
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Financeiro pessoal'})
     )
     avatar = forms.ImageField(label="Foto", required=False)
@@ -157,12 +159,51 @@ class SignupForm(UserCreationForm):
         return user
 
 
+class GuestSignupForm(UserCreationForm):
+    avatar = forms.ImageField(label="Foto", required=False)
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "email", "password1", "password2", "avatar")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(field.widget, forms.Select):
+                field.widget.attrs.setdefault('class', 'form-select')
+            else:
+                field.widget.attrs.setdefault('class', 'form-control')
+            field.widget.attrs.setdefault('aria-label', field.label)
+        self.fields['email'].required = True
+
+    def save(self, commit=True):
+        user = super().save(commit)
+        avatar = self.cleaned_data.get('avatar')
+        if commit:
+            from .models import UserProfile
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            if avatar:
+                profile.avatar = avatar
+                profile.save(update_fields=['avatar', 'created_at'])
+        return user
+
+
 class LoginForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-control')
             field.widget.attrs.setdefault('aria-label', field.label)
+
+    def confirm_login_allowed(self, user):
+        super().confirm_login_allowed(user)
+        if user.is_superuser:
+            return
+        profile = getattr(user, "profile", None)
+        if not profile or not profile.is_approved:
+            raise ValidationError('Cadastro pendente de aprova\u00e7\u00e3o.', code='not_approved')
+        if profile.subscription_expires and profile.subscription_expires < timezone.localdate():
+            raise ValidationError("Assinatura expirada. Fale com o administrador.", code="expired")
 
 
 class UserAdminForm(forms.ModelForm):
@@ -174,6 +215,28 @@ class UserAdminForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
+class UserProfileAdminForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ['plan', 'payment_confirmed', 'subscription_expires', 'payment_notes', 'is_approved', 'is_guest']
+        widgets = {
+            'plan': forms.Select(attrs={'class': 'form-select'}),
+            'payment_confirmed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'subscription_expires': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'payment_notes': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Observa\u00e7\u00f5es do pagamento'}),
+            'is_approved': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_guest': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'plan': 'Plano',
+            'payment_confirmed': 'Pagamento confirmado',
+            'subscription_expires': 'Expira em',
+            'payment_notes': 'Observa\u00e7\u00f5es',
+            'is_approved': 'Conta aprovada',
+            'is_guest': 'Conta convidado',
         }
 
 
@@ -209,3 +272,5 @@ class AccessRequestForm(forms.ModelForm):
     class Meta:
         model = WorkspaceAccessRequest
         fields = ['slug']
+
+

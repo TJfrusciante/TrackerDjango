@@ -21,16 +21,19 @@
 </head>
 <body>
     <div class="chat-wrapper">
+        {% if guest_blocked %}
+            <div class="alert alert-warning small mb-0">Conta de convidado n&atilde;o tem acesso ao agente de IA.</div>
+        {% else %}
         <div class="chat-box" id="chatBox">
         {% for msg in history %}
             <div class="chat-bubble {% if msg.role == 'user' %}user text-end{% else %}assistant{% endif %}">
-                <div class="chat-meta mb-1 text-secondary">{{ msg.created_at|date:"d/m H:i" }} · {{ msg.role|capfirst }}</div>
+                <div class="chat-meta mb-1 text-secondary">{{ msg.created_at|date:"d/m H:i" }} &middot; {{ msg.role|capfirst }}</div>
                 <div class="chat-text">{{ msg.content|linebreaksbr }}</div>
             </div>
         {% empty %}
             <p class="text-secondary small mb-0">Sem mensagens.</p>
         {% endfor %}
-    </div>
+        </div>
         <form method="post" id="chatForm">
             {% csrf_token %}
             <div class="mb-2">
@@ -40,6 +43,7 @@
                 <button class="btn btn-primary btn-sm" type="submit">Enviar</button>
             </div>
         </form>
+        {% endif %}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>

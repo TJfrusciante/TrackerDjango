@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Visao geral | Tracker{% endblock %}
+{% block title %}Vis&atilde;o geral | Tracker{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
         <p class="text-secondary small text-uppercase mb-1">Superuser</p>
         <h1 class="h4 fw-bold mb-0">Painel geral</h1>
-        <p class="text-secondary mb-0">Visao global de usuarios, workspaces e volumes. Use o filtro para focar em um usuario.</p>
+        <p class="text-secondary mb-0">Vis&atilde;o global de usu&aacute;rios, workspaces e volumes. Use o filtro para focar em um usu&aacute;rio.</p>
     </div>
     <div class="d-flex gap-2 align-items-center">
         <form method="get" class="d-flex align-items-center gap-2">
             <select name="user" class="form-select form-select-sm">
-                <option value="">Todos os usuarios</option>
+                <option value="">Todos os usu&aacute;rios</option>
                 {% for u in users_all %}
                     <option value="{{ u.id }}" {% if selected_user and selected_user.id == u.id %}selected{% endif %}>{{ u.username }}</option>
                 {% endfor %}
@@ -26,7 +26,7 @@
 <div class="row g-3 mb-3">
     <div class="col-md-3">
         <div class="glass-card p-3 h-100">
-            <p class="text-secondary small mb-1">Usuarios</p>
+            <p class="text-secondary small mb-1">Usu&aacute;rios</p>
             <h4 class="mb-0">{{ total_users }}</h4>
         </div>
     </div>
@@ -38,7 +38,7 @@
     </div>
     <div class="col-md-3">
         <div class="glass-card p-3 h-100">
-            <p class="text-secondary small mb-1">Transacoes</p>
+            <p class="text-secondary small mb-1">Transa&ccedil;&otilde;es</p>
             <h4 class="mb-0">{{ total_transactions }}</h4>
         </div>
     </div>
@@ -80,7 +80,7 @@
 <div class="row g-3 mb-3">
     <div class="col-md-3">
         <div class="glass-card p-3 h-100">
-            <p class="text-secondary small mb-1">Media transacoes/usuario</p>
+            <p class="text-secondary small mb-1">M&eacute;dia transa&ccedil;&otilde;es/usu&aacute;rio</p>
             <h4 class="mb-0">{{ avg_tx_per_user|floatformat:1 }}</h4>
         </div>
     </div>
@@ -92,7 +92,7 @@
     </div>
     <div class="col-md-3">
         <div class="glass-card p-3 h-100">
-            <p class="text-secondary small mb-1">Tarefas concluidas</p>
+            <p class="text-secondary small mb-1">Tarefas conclu&iacute;das</p>
             <h4 class="mb-0 text-success">{{ tasks_done }}</h4>
         </div>
     </div>
@@ -109,7 +109,7 @@
         <div class="glass-card p-3 h-100">
             <p class="text-secondary small mb-1">Entradas</p>
             <h4 class="text-success">R$ {{ income_total|floatformat:2 }}</h4>
-            <p class="text-secondary small mb-1">Saidas</p>
+            <p class="text-secondary small mb-1">Sa&iacute;das</p>
             <h4 class="text-danger">R$ {{ expense_total|floatformat:2 }}</h4>
             <p class="text-secondary small mb-1">Saldo</p>
             <h4 class="text-info">R$ {{ balance_total|floatformat:2 }}</h4>
@@ -150,7 +150,7 @@
 <div class="glass-card p-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Workspaces recentes</h5>
-        <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Gerenciar usuarios</a>
+        <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Gerenciar usu&aacute;rios</a>
     </div>
     <div class="table-responsive">
         <table class="table align-middle mb-0 table-hover">
@@ -189,7 +189,7 @@
                 labels: {{ ws_labels|safe }},
                 datasets: [
                     {label: 'Entradas', data: {{ ws_income|safe }}, backgroundColor: '#22c55e'},
-                    {label: 'Saidas', data: {{ ws_expense|safe }}, backgroundColor: '#ef4444'},
+                    {label: 'Sa&iacute;das', data: {{ ws_expense|safe }}, backgroundColor: '#ef4444'},
                 ]
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
@@ -202,7 +202,7 @@
             data: {
                 labels: {{ monthly_labels|safe }},
                 datasets: [
-                    {label: 'Saldo liquido', data: {{ monthly_values|safe }}, borderColor: '#3b82f6', fill:false, tension:0.2}
+                    {label: 'Saldo l&iacute;quido', data: {{ monthly_values|safe }}, borderColor: '#3b82f6', fill:false, tension:0.2}
                 ]
             },
             options: {responsive: true, plugins:{legend:{display:true}}}

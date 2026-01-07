@@ -50,7 +50,7 @@ class Command(BaseCommand):
         db_path = Path(options['db']) if options.get('db') else default_path
 
         if not db_path.exists():
-            raise CommandError(f'Banco legado nao encontrado em {db_path}')
+            raise CommandError(f'Banco legado não encontrado em {db_path}')
 
         self.stdout.write(f'Usando banco legado: {db_path}')
 
@@ -84,7 +84,7 @@ class Command(BaseCommand):
         if username:
             owner = User.objects.filter(username=username).first()
             if not owner:
-                raise CommandError(f'Usuario owner "{username}" nao encontrado.')
+                raise CommandError(f'Usuário owner "{username}" não encontrado.')
             return owner
 
         owner = User.objects.filter(is_superuser=True).order_by('id').first()
@@ -93,7 +93,7 @@ class Command(BaseCommand):
         owner = User.objects.order_by('id').first()
         if owner:
             return owner
-        raise CommandError('Nenhum usuario encontrado para ser owner do workspace.')
+        raise CommandError('Nenhum usuário encontrado para ser owner do workspace.')
 
     def _resolve_workspace(self, workspace_slug, owner):
         if workspace_slug:

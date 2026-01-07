@@ -126,8 +126,22 @@ class WorkspaceMembership(models.Model):
 
 
 class UserProfile(models.Model):
+    PLAN_CHOICES = [
+        ('starter', 'B\u00e1sico'),
+        ('pro', 'Pro'),
+        ('team', 'Equipe'),
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    is_approved = models.BooleanField(default=False)
+    is_guest = models.BooleanField(default=False)
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='starter')
+    payment_confirmed = models.BooleanField(default=False)
+    payment_confirmed_at = models.DateTimeField(null=True, blank=True)
+    payment_notes = models.CharField(max_length=255, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='approved_profiles')
+    subscription_expires = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

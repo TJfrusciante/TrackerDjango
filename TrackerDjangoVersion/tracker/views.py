@@ -22,6 +22,7 @@ from .forms import (
     CategoryForm,
     LoginForm,
     SignupForm,
+    GuestSignupForm,
     TaskForm,
     TaskStepForm,
     TransactionForm,
@@ -29,6 +30,7 @@ from .forms import (
     WorkspaceMemberInviteForm,
     WorkspaceSlugForm,
     UserAdminForm,
+    UserProfileAdminForm,
     ProfileForm,
     ProfileAvatarForm,
     InviteByUsernameForm,
@@ -44,11 +46,14 @@ User = get_user_model()
 # -------- Helpers --------
 
 def _user_can_view_finance(request, workspace) -> bool:
-    """Only superuser or owners can ver/editar finanças."""
+    """Only superuser or owners can ver/editar financas."""
     if not workspace:
         return request.user.is_superuser
     if request.user.is_superuser:
         return True
+    profile = getattr(request.user, "profile", None)
+    if profile and profile.is_guest:
+        return False
     if workspace.owner_id == request.user.id:
         return True
     role = getattr(request, "workspace_role", None)
@@ -659,7 +664,19 @@ def _build_preview(rows, categories):
         if date_obj is None:
             date_obj = timezone.now().date()
 
-        category, source, reason = _suggest_category_for_desc(desc, cat_hint, categories)
+        category = None
+        source = ''
+        reason = ''
+        if cat_hint:
+            for cat in categories:
+                if cat.name.strip().lower() == cat_hint.strip().lower():
+                    category = cat
+                    source = 'csv'
+                    reason = 'Categoria informada no arquivo'
+                    break
+
+        if not category:
+            category, source, reason = _suggest_category_for_desc(desc, cat_hint, categories)
         if source == 'ai':
             ai_used = True
         preview.append({
@@ -673,6 +690,35 @@ def _build_preview(rows, categories):
             'category_reason': reason,
         })
     return preview, ai_used
+
+
+def _decode_upload(file_bytes: bytes) -> str:
+    for enc in ('utf-8-sig', 'utf-8', 'cp1252', 'latin-1'):
+        try:
+            return file_bytes.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return file_bytes.decode('utf-8', errors='ignore')
+
+
+def _ensure_categories_for_rows(rows, categories, workspace):
+    if not rows:
+        return categories
+    existing = {c.name.strip().lower(): c for c in categories}
+    created = False
+    for row in rows:
+        name = (row.get('category') or '').strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in existing:
+            continue
+        cat, _ = Category.objects.get_or_create(name=name, workspace=workspace)
+        existing[key] = cat
+        created = True
+    if created:
+        categories = list(Category.objects.filter(workspace=workspace) if workspace else Category.objects.all())
+    return categories
 
 
 def _match_category(name_hint: str, description: str, categories):
@@ -824,8 +870,9 @@ def transaction_import(request):
             if name.endswith('.pdf'):
                 rows, parse_error = _parse_pdf_statement(file_bytes)
             else:
-                raw = file_bytes.decode('utf-8-sig', errors='ignore')
+                raw = _decode_upload(file_bytes)
                 rows = _parse_statement_rows(raw, categories)
+            categories = _ensure_categories_for_rows(rows, categories, workspace)
             preview_rows, ai_used = _build_preview(rows, categories)
             if not preview_rows:
                 messages.warning(request, 'Nenhuma linha válida encontrada no arquivo.')
@@ -1112,6 +1159,9 @@ def task_toggle_selected(request, pk):
 @login_required
 def categories_list(request):
     workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Você não tem permissão para ver categorias.')
+        return redirect('tracker:dashboard')
     qs = Category.objects.all()
     if workspace:
         qs = qs.filter(workspace=workspace)
@@ -1353,8 +1403,6 @@ def login_view(request):
             login(request, user)
             messages.success(request, 'Bem-vindo(a) de volta!')
             return redirect(request.GET.get('next') or 'tracker:workspace_select')
-        else:
-            messages.error(request, 'Usuário ou senha inválidos.')
     return render(request, 'tracker/auth_login.html', {'form': form})
 
 
@@ -1373,17 +1421,36 @@ def register_view(request):
             user = form.save()
             ws_name = form.cleaned_data.get('workspace_name') or f"Workspace de {user.username}"
             slug = _ensure_unique_slug(ws_name)
-            ws = Workspace.objects.create(name=ws_name, slug=slug, owner=user)
+            ws = Workspace.objects.create(name=ws_name, slug=slug, owner=user, is_active=False)
             WorkspaceMembership.objects.create(workspace=ws, user=user, role='owner')
-        login(request, user)
-        request.session['workspace_slug'] = ws.slug
-        messages.success(request, 'Conta criada com sucesso.')
-        return redirect('tracker:dashboard')
+        messages.success(request, 'Cadastro enviado. Aguarde aprova\u00e7\u00e3o do administrador.')
+        return redirect('tracker:login')
     return render(request, 'tracker/auth_register.html', {'form': form})
+
+
+def register_guest_view(request):
+    if request.user.is_authenticated:
+        return redirect('tracker:dashboard')
+    form = GuestSignupForm(request.POST or None, request.FILES or None)
+    if request.method == 'POST' and form.is_valid():
+        with db_transaction.atomic():
+            user = form.save()
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            profile.is_guest = True
+            profile.is_approved = True
+            profile.approved_at = timezone.now()
+            profile.approved_by = None
+            profile.save(update_fields=['is_guest', 'is_approved', 'approved_at', 'approved_by'])
+        login(request, user)
+        messages.success(request, 'Conta de convidado criada. Pe\u00e7a acesso a um workspace.')
+        return redirect('tracker:workspace_select')
+    return render(request, 'tracker/auth_register_guest.html', {'form': form})
 
 
 @login_required
 def workspace_select(request):
+    profile = getattr(request.user, "profile", None)
+    is_guest = bool(profile and profile.is_guest)
     memberships = WorkspaceMembership.objects.select_related('workspace').filter(user=request.user, workspace__is_active=True)
     create_form = WorkspaceForm(prefix='create')
     slug_form = WorkspaceSlugForm(prefix='slug')
@@ -1391,6 +1458,9 @@ def workspace_select(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'create':
+            if is_guest:
+                messages.error(request, 'Contas de convidado n\u00e3o podem criar workspaces.')
+                return redirect('tracker:workspace_select')
             create_form = WorkspaceForm(request.POST, prefix='create')
             if create_form.is_valid():
                 workspace = create_form.save(commit=False)
@@ -1408,12 +1478,16 @@ def workspace_select(request):
                 if request.user.is_superuser:
                     workspace = Workspace.objects.filter(slug=slug, is_active=True).first()
                 else:
-                    workspace = Workspace.objects.filter(slug=slug, memberships__user=request.user, is_active=True).first()
+                    workspace = Workspace.objects.filter(
+                        slug=slug,
+                        memberships__user=request.user,
+                        is_active=True,
+                    ).first()
                 if workspace:
                     request.session['workspace_slug'] = workspace.slug
                     messages.success(request, f'Workspace {workspace.name} selecionado.')
                     return redirect(request.GET.get('next') or 'tracker:dashboard')
-                messages.error(request, 'Workspace não encontrado ou sem permissão.')
+                messages.error(request, 'Workspace n\u00e3o encontrado ou sem permiss\u00e3o.')
 
     all_workspaces = Workspace.objects.filter(is_active=True).order_by('name') if request.user.is_superuser else None
     return render(
@@ -1424,6 +1498,8 @@ def workspace_select(request):
             'create_form': create_form,
             'slug_form': slug_form,
             'all_workspaces': all_workspaces,
+            'is_guest': is_guest,
+            'can_create': not is_guest,
         },
     )
 
@@ -1433,9 +1509,9 @@ def workspace_switch(request, slug):
     if slug == 'global':
         if request.user.is_superuser:
             request.session.pop('workspace_slug', None)
-            messages.success(request, 'Visão global ativada.')
+            messages.success(request, 'Vis\u00e3o global ativada.')
         else:
-            messages.error(request, 'Apenas superusuários podem usar a visão global.')
+            messages.error(request, 'Apenas superusu\u00e1rios podem usar a vis\u00e3o global.')
         return redirect(request.GET.get('next') or 'tracker:dashboard')
 
     if request.user.is_superuser:
@@ -1443,12 +1519,11 @@ def workspace_switch(request, slug):
     else:
         workspace = Workspace.objects.filter(slug=slug, memberships__user=request.user, is_active=True).first()
     if not workspace:
-        messages.error(request, 'Workspace não encontrado ou sem permissão.')
+        messages.error(request, 'Workspace n\u00e3o encontrado ou sem permiss\u00e3o.')
         return redirect('tracker:workspace_select')
     request.session['workspace_slug'] = workspace.slug
     messages.success(request, f'Usando workspace {workspace.name}.')
     return redirect(request.GET.get('next') or 'tracker:dashboard')
-
 
 @login_required
 def workspace_members(request, slug=None):
@@ -1766,11 +1841,64 @@ def superuser_overview(request):
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def user_admin_list(request):
-    users = User.objects.all().annotate(
+    users = User.objects.select_related('profile').all().annotate(
         workspace_count=Count('workspace_memberships'),
         last_login_ts=F('last_login'),
     ).order_by('-date_joined')
-    return render(request, 'tracker/user_admin_list.html', {'users': users})
+    today = timezone.localdate()
+    pending_count = 0
+    active_count = 0
+    expired_count = 0
+    suspended_count = 0
+    guest_count = 0
+    paid_count = 0
+    unpaid_count = 0
+    for user in users:
+        profile = getattr(user, 'profile', None)
+        user.profile_obj = profile
+        user.subscription_expires = profile.subscription_expires if profile else None
+        user.plan_label = profile.get_plan_display() if profile else 'B\u00e1sico'
+        user.payment_confirmed = profile.payment_confirmed if profile else False
+        user.payment_confirmed_at = profile.payment_confirmed_at if profile else None
+        if user.is_superuser:
+            user.approval_status = 'superuser'
+            user.plan_label = 'Superuser'
+            continue
+        if profile and profile.is_guest:
+            user.approval_status = 'guest'
+            guest_count += 1
+            user.plan_label = 'Convidado'
+            continue
+        if not profile or not profile.is_approved:
+            if profile and profile.approved_at:
+                user.approval_status = 'suspended'
+                suspended_count += 1
+            else:
+                user.approval_status = 'pending'
+                pending_count += 1
+            continue
+        if profile.subscription_expires and profile.subscription_expires < today:
+            user.approval_status = 'expired'
+            expired_count += 1
+            continue
+        user.approval_status = 'active'
+        active_count += 1
+        if profile and profile.payment_confirmed:
+            paid_count += 1
+        else:
+            unpaid_count += 1
+
+    context = {
+        'users': users,
+        'pending_count': pending_count,
+        'active_count': active_count,
+        'expired_count': expired_count,
+        'suspended_count': suspended_count,
+        'guest_count': guest_count,
+        'paid_count': paid_count,
+        'unpaid_count': unpaid_count,
+    }
+    return render(request, 'tracker/user_admin_list.html', context)
 
 
 @login_required
@@ -1781,11 +1909,85 @@ def user_admin_form(request, pk=None):
     else:
         user_obj = None
     form = UserAdminForm(request.POST or None, instance=user_obj)
-    if request.method == 'POST' and form.is_valid():
-        form.save()
+    profile_instance = None
+    if user_obj:
+        profile_instance, _ = UserProfile.objects.get_or_create(user=user_obj)
+    profile_form = UserProfileAdminForm(request.POST or None, instance=profile_instance)
+    if request.method == 'POST' and form.is_valid() and profile_form.is_valid():
+        saved_user = form.save()
+        profile = profile_form.save(commit=False)
+        profile.user = saved_user
+        if profile.payment_confirmed and not profile.payment_confirmed_at:
+            profile.payment_confirmed_at = timezone.now()
+        if not profile.payment_confirmed:
+            profile.payment_confirmed_at = None
+        profile.save()
         messages.success(request, 'Usuário salvo.')
         return redirect('tracker:user_admin_list')
-    return render(request, 'tracker/user_admin_form.html', {'form': form, 'object': user_obj})
+    return render(
+        request,
+        'tracker/user_admin_form.html',
+        {'form': form, 'profile_form': profile_form, 'object': user_obj},
+    )
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def user_admin_status(request, pk):
+    user_obj = get_object_or_404(User, pk=pk)
+    if request.method != 'POST':
+        messages.error(request, 'Requisição inválida.')
+        return redirect('tracker:user_admin_list')
+
+    action = request.POST.get('action')
+    profile, _ = UserProfile.objects.get_or_create(user=user_obj)
+    today = timezone.localdate()
+    if profile.is_guest:
+        messages.error(request, 'Conta de convidado não requer aprovação.')
+        return redirect('tracker:user_admin_list')
+
+    if action == 'approve':
+        profile.is_approved = True
+        profile.approved_at = timezone.now()
+        profile.approved_by = request.user
+        if not profile.subscription_expires or profile.subscription_expires < today:
+            profile.subscription_expires = today + datetime.timedelta(days=30)
+        profile.save(update_fields=['is_approved', 'approved_at', 'approved_by', 'subscription_expires'])
+        Workspace.objects.filter(owner=user_obj).update(is_active=True)
+        messages.success(request, 'Cadastro aprovado.')
+    elif action == 'renew':
+        base_date = profile.subscription_expires or today
+        if base_date < today:
+            base_date = today
+        profile.subscription_expires = base_date + datetime.timedelta(days=30)
+        profile.is_approved = True
+        if not profile.approved_at:
+            profile.approved_at = timezone.now()
+        profile.save(update_fields=['subscription_expires', 'is_approved', 'approved_at'])
+        Workspace.objects.filter(owner=user_obj).update(is_active=True)
+        messages.success(request, 'Cadastro renovado por 30 dias.')
+    elif action == 'suspend':
+        if request.user == user_obj:
+            messages.error(request, 'Você não pode suspender a si mesmo.')
+            return redirect('tracker:user_admin_list')
+        profile.is_approved = False
+        profile.save(update_fields=['is_approved'])
+        Workspace.objects.filter(owner=user_obj).update(is_active=False)
+        messages.success(request, 'Cadastro suspenso.')
+    elif action == 'mark_paid':
+        profile.payment_confirmed = True
+        profile.payment_confirmed_at = timezone.now()
+        profile.save(update_fields=['payment_confirmed', 'payment_confirmed_at'])
+        messages.success(request, 'Pagamento marcado como confirmado.')
+    elif action == 'mark_unpaid':
+        profile.payment_confirmed = False
+        profile.payment_confirmed_at = None
+        profile.save(update_fields=['payment_confirmed', 'payment_confirmed_at'])
+        messages.success(request, 'Pagamento marcado como pendente.')
+    else:
+        messages.error(request, 'Ação inválida.')
+
+    return redirect('tracker:user_admin_list')
 
 
 @login_required
@@ -1801,3 +2003,7 @@ def user_admin_delete(request, pk):
     else:
         messages.error(request, 'Requisição inválida.')
     return redirect('tracker:user_admin_list')
+
+
+
+

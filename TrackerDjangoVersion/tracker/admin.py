@@ -5,7 +5,7 @@ from .models import Category, Task, Transaction, Workspace
 
 class WorkspaceScopedAdmin(admin.ModelAdmin):
     """
-    Restringe itens para staff nÇåo-superuser ao que pertence aos seus workspaces.
+    Restringe itens para staff nao-superuser ao que pertence aos seus workspaces.
     """
 
     def get_queryset(self, request):
@@ -41,3 +41,4 @@ class TransactionAdmin(WorkspaceScopedAdmin):
     list_filter = ('workspace', 'type', 'category', 'date')
     search_fields = ('description',)
     ordering = ('-date',)
+

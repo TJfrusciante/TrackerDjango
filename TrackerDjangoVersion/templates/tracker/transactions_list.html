@@ -49,7 +49,7 @@
             <select name="type" class="form-select" aria-label="Filtrar por tipo">
                 <option value="">Todas</option>
                 <option value="income" {% if filters.type == 'income' %}selected{% endif %}>Entrada</option>
-                <option value="expense" {% if filters.type == 'expense' %}selected{% endif %}>Saida</option>
+                <option value="expense" {% if filters.type == 'expense' %}selected{% endif %}>Sa&iacute;da</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -131,7 +131,7 @@
     </div>
     <div class="col-md-4">
         <div class="glass-card p-3">
-            <p class="text-secondary small mb-1">Saidas</p>
+            <p class="text-secondary small mb-1">Sa&iacute;das</p>
             <h4 class="text-danger mb-0">R$ {{ expense_total|floatformat:2 }}</h4>
         </div>
     </div>
@@ -223,7 +223,7 @@
                     {% endif %}
                 {% endfor %}
                 {% if transactions_page.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ transactions_page.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Proxima</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ transactions_page.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Pr&oacute;xima</a></li>
                 {% endif %}
             </ul>
         </nav>

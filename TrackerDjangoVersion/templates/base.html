@@ -32,13 +32,14 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if '/transacoes' in request.path %}active{% endif %}" href="{% url 'tracker:transactions_list' %}" data-bs-toggle="tooltip" data-bs-title="Transações" aria-label="Transações">
-                                <i class="fa-solid fa-coins"></i><span class="nav-label">Transações</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link {% if '/tarefas' in request.path %}active{% endif %}" href="{% url 'tracker:tasks_list' %}" data-bs-toggle="tooltip" data-bs-title="Tarefas" aria-label="Tarefas">
                                 <i class="fa-solid fa-list-check"></i><span class="nav-label">Tarefas</span>
+                            </a>
+                        </li>
+                        {% if not user_is_guest %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/transacoes' in request.path %}active{% endif %}" href="{% url 'tracker:transactions_list' %}" data-bs-toggle="tooltip" data-bs-title="Transações" aria-label="Transações">
+                                <i class="fa-solid fa-coins"></i><span class="nav-label">Transa&ccedil;&otilde;es</span>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -51,6 +52,7 @@
                                 <i class="fa-solid fa-robot"></i><span class="nav-label">IA</span>
                             </a>
                         </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link {% if '/help' in request.path %}active{% endif %}" href="{% url 'tracker:help' %}" data-bs-toggle="tooltip" data-bs-title="Ajuda" aria-label="Ajuda">
                                 <i class="fa-solid fa-circle-question"></i><span class="nav-label">Ajuda</span>
@@ -59,7 +61,12 @@
                         {% if user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link {% if '/super/' in request.path %}active{% endif %}" href="{% url 'tracker:superuser_overview' %}" data-bs-toggle="tooltip" data-bs-title="Visão geral" aria-label="Visão geral">
-                                <i class="fa-solid fa-eye"></i><span class="nav-label">Visão geral</span>
+                                <i class="fa-solid fa-eye"></i><span class="nav-label">Vis&atilde;o geral</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/super/users' in request.path %}active{% endif %}" href="{% url 'tracker:user_admin_list' %}" data-bs-toggle="tooltip" data-bs-title="Usuários" aria-label="Usuários">
+                                <i class="fa-solid fa-users-gear"></i><span class="nav-label">Usu&aacute;rios</span>
                             </a>
                         </li>
                         {% endif %}
@@ -149,19 +156,21 @@
     <button id="scrollBottomBtn" class="nav-fab nav-bottom" type="button" aria-label="Ir para o final">
         <i class="fa-solid fa-arrow-down"></i>
     </button>
+    {% if user.is_authenticated and not user_is_guest %}
     <button id="agentFab" class="agent-fab" type="button" aria-label="Abrir assistente">
         <i class="fa-solid fa-robot"></i>
     </button>
     <div id="agentPanel" class="agent-panel">
         <iframe src="{% url 'assistant:chat_embed' %}" title="Assistente" loading="lazy" referrerpolicy="same-origin"></iframe>
     </div>
+    {% endif %}
 
     <footer>
         <div class="container">
             <div class="row gy-3">
                 <div class="col-md-6">
                     <h5 class="fw-bold text-white mb-2"><i class="fa-solid fa-bolt me-2 text-warning"></i>Tracker Django</h5>
-                    <p class="mb-0">Controle de tarefas e finanças com visual moderno e pronto para dispositivos móveis.</p>
+                    <p class="mb-0">Controle de tarefas e finan&ccedil;as com visual moderno e pronto para dispositivos m&oacute;veis.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <div class="d-flex justify-content-md-end gap-3">

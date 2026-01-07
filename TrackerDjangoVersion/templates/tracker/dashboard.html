@@ -11,7 +11,7 @@
                 <div>
                     <p class="text-uppercase small mb-1 text-secondary">Visão geral</p>
                     <h1 class="h3 fw-bold mb-2">Controle de financas e tarefas</h1>
-                    <p class="mb-0 text-secondary">Resumo rapido do mes atual e últimas movimentacoes.</p>
+                    <p class="mb-0 text-secondary">Resumo r&aacute;pido do m&ecirc;s atual e &uacute;ltimas movimenta&ccedil;&otilde;es.</p>
                 </div>
                 <div class="d-flex gap-2">
                     <a href="{% url 'tracker:transactions_list' %}" class="btn btn-outline-light">
@@ -38,7 +38,7 @@
             </div>
             <div class="col-md-3">
                 <div class="glass-card p-3 h-100">
-                    <p class="text-secondary small mb-1">Saidas</p>
+                    <p class="text-secondary small mb-1">Sa&iacute;das</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 text-danger" id="expenseValue">R$ {{ expense_total|floatformat:2 }}</h3>
                         <i class="fa-solid fa-arrow-trend-down text-danger"></i>
@@ -105,7 +105,7 @@
                     <h5 class="mb-0">Distribuição por categoria</h5>
                     <span class="text-secondary small">Entradas - saídas (filtrável)</span>
                     {% if not period_has_data %}
-                        <div class="text-warning small mt-1">Sem dados neste periodo.</div>
+                        <div class="text-warning small mt-1">Sem dados neste per&iacute;odo.</div>
                     {% endif %}
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
@@ -209,7 +209,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="5" class="text-secondary">Sem transacoes por enquanto.</td>
+                                <td colspan="5" class="text-secondary">Sem transa&ccedil;&otilde;es por enquanto.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -373,7 +373,7 @@
         typeChartInstance = new Chart(typeCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Entradas', 'Saidas'],
+                labels: ['Entradas', 'Sa&iacute;das'],
                 datasets: [{
                     data,
                     backgroundColor: ['rgba(16,185,129,0.7)', 'rgba(239,68,68,0.7)'],

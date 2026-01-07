@@ -1,36 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Criar conta | Tracker{% endblock %}
+{% block title %}Conta convidado | Tracker{% endblock %}
 
 {% block content %}
 <div class="row g-4 align-items-center">
     <div class="col-lg-6">
         <div class="glass-card p-4 h-100">
-            <p class="text-secondary small text-uppercase mb-1">Comece em minutos</p>
-            <h1 class="fw-bold h3 mb-2">Crie sua conta e seu primeiro workspace</h1>
-            <p class="text-secondary mb-3">Convide o time, isole dados por workspace e use a IA para classificar transa&ccedil;&otilde;es e tarefas.</p>
+            <p class="text-secondary small text-uppercase mb-1">Conta convidado</p>
+            <h1 class="fw-bold h3 mb-2">Participe de um workspace sem assinatura</h1>
+            <p class="text-secondary mb-3">Contas de convidado acessam apenas tarefas do workspace. Transa&ccedil;&otilde;es e IA ficam dispon&iacute;veis somente para quem assina.</p>
             <div class="row g-3">
                 <div class="col-sm-6">
                     <div class="p-3 rounded-3 border border-dark-subtle h-100">
-                        <div class="fw-bold">Onboarding guiado</div>
-                        <div class="text-secondary small">Geramos o slug automaticamente e voc&ecirc; pode ajustar antes de convidar pessoas.</div>
+                        <div class="fw-bold">Uso r&aacute;pido</div>
+                        <div class="text-secondary small">Crie a conta e pe&ccedil;a acesso pelo slug do workspace.</div>
                     </div>
                 </div>
                 <div class="col-sm-6">
                     <div class="p-3 rounded-3 border border-dark-subtle h-100">
-                        <div class="fw-bold">Seguran&ccedil;a e acesso</div>
-                        <div class="text-secondary small">Permiss&otilde;es por workspace; cada usu&aacute;rio v&ecirc; apenas o que pertence ao espa&ccedil;o atual.</div>
+                        <div class="fw-bold">Somente tarefas</div>
+                        <div class="text-secondary small">Visualize e edite etapas conforme permiss&otilde;es do owner.</div>
                     </div>
-                </div>
-            </div>
-            <div class="d-flex flex-wrap gap-3 mt-3">
-                <div>
-                    <div class="fw-bold">IA ativa</div>
-                    <div class="text-secondary small">Sugere categorias, explica decis&otilde;es e registra motivos.</div>
-                </div>
-                <div>
-                    <div class="fw-bold">Importe r&aacute;pido</div>
-                    <div class="text-secondary small">CSV ou PDF com progresso vis&iacute;vel e preview edit&aacute;vel.</div>
                 </div>
             </div>
         </div>
@@ -38,11 +28,11 @@
     <div class="col-lg-6">
         <div class="glass-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 fw-bold mb-0">Criar conta</h2>
+                <h2 class="h5 fw-bold mb-0">Criar conta convidado</h2>
                 <div class="d-flex gap-2">
                     <a class="small" href="{% url 'tracker:login' %}">J&aacute; tem login? Entrar</a>
                     <span class="text-secondary small">&middot;</span>
-                    <a class="small" href="{% url 'tracker:register_guest' %}">Sou convidado</a>
+                    <a class="small" href="{% url 'tracker:register' %}">Quero assinar</a>
                 </div>
             </div>
             {% if form.non_field_errors %}
@@ -63,10 +53,10 @@
                     </div>
                 {% endfor %}
                 <div class="col-12 d-grid">
-                    <button class="btn btn-primary" type="submit">Solicitar acesso</button>
+                    <button class="btn btn-primary" type="submit">Criar conta convidado</button>
                 </div>
             </form>
-            <p class="small mt-3 mb-0 text-secondary">Seu cadastro fica pendente at&eacute; a aprova&ccedil;&atilde;o do administrador.</p>
+            <p class="small mt-3 mb-0 text-secondary">Depois de entrar, use "Pedir acesso" para entrar em um workspace.</p>
         </div>
     </div>
 </div>

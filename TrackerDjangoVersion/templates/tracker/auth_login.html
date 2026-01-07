@@ -8,11 +8,11 @@
         <div class="glass-card p-4 h-100">
             <p class="text-secondary small text-uppercase mb-1">Bem-vindo de volta</p>
             <h1 class="fw-bold h3 mb-2">Entre para acessar seus workspaces</h1>
-            <p class="text-secondary mb-3">Dashboards de finanças, tarefas e IA. Se ainda não tem conta, crie em segundos.</p>
+            <p class="text-secondary mb-3">Dashboards de finan&ccedil;as, tarefas e IA. Se ainda n&atilde;o tem conta, crie em segundos.</p>
             <div class="d-flex flex-wrap gap-3">
                 <div>
                     <div class="fw-bold">3x</div>
-                    <div class="text-secondary small">Mais rápido para lançar transações</div>
+                    <div class="text-secondary small">Mais r&aacute;pido para lan&ccedil;ar transa&ccedil;&otilde;es</div>
                 </div>
                 <div>
                     <div class="fw-bold">IA</div>
@@ -20,7 +20,7 @@
                 </div>
                 <div>
                     <div class="fw-bold">Multi-tenant</div>
-                    <div class="text-secondary small">Workspaces isolados com membros e permissões</div>
+                    <div class="text-secondary small">Workspaces isolados com membros e permiss&otilde;es</div>
                 </div>
             </div>
         </div>
@@ -29,7 +29,11 @@
         <div class="glass-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h2 class="h5 fw-bold mb-0">Entrar</h2>
-                <a class="small" href="{% url 'tracker:register' %}">Criar conta</a>
+                <div class="d-flex gap-2">
+                    <a class="small" href="{% url 'tracker:register' %}">Criar conta</a>
+                    <span class="text-secondary small">&middot;</span>
+                    <a class="small" href="{% url 'tracker:register_guest' %}">Sou convidado</a>
+                </div>
             </div>
             {% if form.non_field_errors %}
                 <div class="alert alert-danger py-2 small mb-3">

@@ -5,9 +5,9 @@
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
     <div>
-        <p class="text-secondary small text-uppercase mb-1">Colaboracao</p>
+        <p class="text-secondary small text-uppercase mb-1">Colabora&ccedil;&atilde;o</p>
         <h1 class="h4 fw-bold mb-0">Membros de {{ workspace.name }}</h1>
-        <p class="text-secondary mb-0">Acesso e papeis sao isolados por workspace. Ajuste permissoes rapidamente.</p>
+        <p class="text-secondary mb-0">Acesso e pap&eacute;is s&atilde;o isolados por workspace. Ajuste permiss&otilde;es rapidamente.</p>
     </div>
     <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
 </div>
@@ -28,8 +28,8 @@
                     <div class="list-group-item d-flex justify-content-between align-items-start py-3">
                         <div>
                             <div class="fw-semibold">{{ member.user.get_full_name|default:member.user.username }}</div>
-                            <div class="small text-secondary">{{ member.user.email|default:"sem email" }}</div>
-                            <div class="small text-secondary">Papel: {{ member.role }} • Edita tarefas: {{ member.can_edit_tasks|yesno:"Sim,Nao" }}</div>
+                            <div class="small text-secondary">{{ member.user.email|default:"sem e-mail" }}</div>
+                            <div class="small text-secondary">Papel: {{ member.role }} &middot; Edita tarefas: {% if member.can_edit_tasks %}Sim{% else %}N&atilde;o{% endif %}</div>
                         </div>
                         {% if user.is_superuser or member.user_id != user.id %}
                         <div class="d-flex flex-column gap-2 align-items-end">
@@ -57,16 +57,16 @@
                 {% endfor %}
             </div>
             {% else %}
-                <div class="alert alert-info small mb-0">Nenhum membro por aqui. Convide alguem ao lado.</div>
+                <div class="alert alert-info small mb-0">Nenhum membro por aqui. Convide algu&eacute;m ao lado.</div>
             {% endif %}
-            <div class="mt-3 text-secondary small">Dica: papeis controlam financas/tarefas; apenas owners e superusers podem remover.</div>
+            <div class="mt-3 text-secondary small">Dica: pap&eacute;is controlam finan&ccedil;as/tarefas; apenas owners e superusers podem remover.</div>
         </div>
     </div>
     <div class="col-lg-6">
         <div class="glass-card p-4 h-100">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h3 class="h6 fw-bold mb-0">Adicionar membro</h3>
-                <span class="badge text-bg-success">Convite rapido</span>
+                <span class="badge text-bg-success">Convite r&aacute;pido</span>
             </div>
             <form method="post" class="row g-3">
                 {% csrf_token %}
@@ -90,7 +90,7 @@
             <hr>
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h3 class="h6 fw-bold mb-0">Adicionar por username</h3>
-                <span class="badge text-bg-secondary">Para usuarios existentes</span>
+                <span class="badge text-bg-secondary">Para usu&aacute;rios existentes</span>
             </div>
             <form method="post" class="row g-3">
                 {% csrf_token %}
@@ -107,7 +107,7 @@
                     <button class="btn btn-outline-light" type="submit">Adicionar</button>
                 </div>
             </form>
-            <div class="text-secondary small mt-3">Os convites sao auditados por workspace; notificamos os admins quando ha pedidos pendentes.</div>
+            <div class="text-secondary small mt-3">Os convites s&atilde;o auditados por workspace; notificamos os admins quando h&aacute; pedidos pendentes.</div>
         </div>
     </div>
     <div class="col-lg-12">
@@ -138,3 +138,6 @@
     </div>
 </div>
 {% endblock %}
+
+
+

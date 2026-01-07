@@ -1,24 +1,52 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}{{ object|default:"Novo usuário" }} | Tracker{% endblock %}
+{% block title %}{{ object|default:"Novo usu&aacute;rio" }} | Tracker{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-6">
+    <div class="col-lg-10">
         <div class="glass-card p-4">
-            <h1 class="h5 fw-bold mb-3">{{ object|default:"Novo usuário" }}</h1>
+            <h1 class="h5 fw-bold mb-3">{{ object|default:"Novo usu&aacute;rio" }}</h1>
             <form method="post" novalidate>
                 {% csrf_token %}
-                {% for field in form %}
-                    <div class="mb-3">
-                        <label class="form-label">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}
-                            <div class="text-danger small">{{ field.errors|striptags }}</div>
-                        {% endif %}
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="p-3 bg-dark bg-opacity-10 rounded">
+                            <h6 class="mb-3">Dados do usu&aacute;rio</h6>
+                            {% for field in form %}
+                                <div class="mb-3">
+                                    <label class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
-                {% endfor %}
-                <div class="d-flex gap-2">
+                    <div class="col-lg-6">
+                        <div class="p-3 bg-dark bg-opacity-10 rounded">
+                            <h6 class="mb-3">Plano e pagamento</h6>
+                            {% for field in profile_form %}
+                                <div class="mb-3">
+                                    {% if field.field.widget.input_type == "checkbox" %}
+                                        <div class="form-check">
+                                            {{ field }}
+                                            <label class="form-check-label">{{ field.label }}</label>
+                                        </div>
+                                    {% else %}
+                                        <label class="form-label">{{ field.label }}</label>
+                                        {{ field }}
+                                    {% endif %}
+                                    {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-3">
                     <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Voltar</a>
                     <button class="btn btn-primary" type="submit">Salvar</button>
                 </div>

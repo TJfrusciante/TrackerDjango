@@ -9,9 +9,9 @@ from .models import Workspace, WorkspaceMembership
 
 class WorkspaceMiddleware(MiddlewareMixin):
     """
-    Define request.workspace (tenant atual) e protege rotas para quem nÇœo tem vÇðnculo.
+    Define request.workspace (tenant atual) e protege rotas para quem nao tem vinculo.
     - Superuser: pode navegar em modo global (workspace=None) ou escolher um workspace por slug.
-    - UsuÇ­rio comum: precisa ter membership; valida slug da sessÇœo/querystring e redireciona para seleÇõÇœo se nÇœo tiver.
+    - Usuario comum: precisa ter membership; valida slug da sessao/querystring e redireciona para selecao se nao tiver.
     """
 
     PUBLIC_PREFIXES = (
@@ -45,7 +45,7 @@ class WorkspaceMiddleware(MiddlewareMixin):
                     request.workspace = ws
                     request.session["workspace_slug"] = ws.slug
             else:
-                # superuser: se tiver membership, usa a primeira como default para não cair em visão global sempre
+                # superuser: se tiver membership, usa a primeira como default para nao cair em visao global sempre
                 membership = (
                     WorkspaceMembership.objects.select_related("workspace")
                     .filter(user=request.user, workspace__is_active=True)
@@ -64,7 +64,7 @@ class WorkspaceMiddleware(MiddlewareMixin):
             .order_by("id")
         )
         if not memberships.exists():
-            messages.error(request, "VocÇ¦ precisa escolher ou criar um workspace para continuar.")
+            messages.error(request, "Você precisa escolher ou criar um workspace para continuar.")
             return redirect("tracker:workspace_select")
 
         slug = request.GET.get("workspace") or request.session.get("workspace_slug")
@@ -76,3 +76,9 @@ class WorkspaceMiddleware(MiddlewareMixin):
         request.workspace_role = membership.role
         request.session["workspace_slug"] = membership.workspace.slug
         return None
+
+
+
+
+
+

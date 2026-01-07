@@ -1,11 +1,11 @@
-Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-06)
+﻿Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-07)
 -----------------------------------------------------------------
 
-- Escopo: app Django multi-tenant para finanças (transacoes) e tarefas; UI Bootstrap 5 com tema claro/escuro; graficos Chart.js.
+- Escopo: app Django multi-tenant para financas (transacoes) e tarefas; UI Bootstrap 5 com tema claro/escuro; graficos Chart.js.
 - Dados demo: 387 transacoes importadas de SQLite (Tracker exe) para o Postgres; intervalo 06/07/2024 a 10/11/2025. Workspace: principal (owner TJfrusciante).
 
 Modelos e infra
-- Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar), Assistant.ChatMessage.
+- Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar,is_guest,plan,payment_confirmed,payment_confirmed_at,payment_notes), Assistant.ChatMessage.
 - Indexes adicionados em workspace/type/date/status/category para consultas mais rapidas (migration 0010_auto_indexes).
 - Requisitos: requirements.txt/requirements-dev.txt criados (inclui pdfminer.six, PyPDF2, pytest, ruff). Makefile com alvos run/lint/test/import-demo. README atualizado com setup, env vars e limites de import PDF/CSV.
 
@@ -17,23 +17,34 @@ Funcionalidades principais
 - Admin: painel superuser `/super/overview/` com graficos globais; lista de usuarios em `/super/users/` com CRUD.
 
 IA e chat
-- App `assistant`: chat em `/ia/` com historico; resumo local de finanças/tarefas e chamada OpenAI se OPENAI_API_KEY definido; fallback local sempre ativo. Novo embed em iframe com botao flutuante (icone robo) em todas as paginas; painel abre/fecha e ocupa totalmente o container.
+- App `assistant`: chat em `/ia/` com historico; resumo local de financas/tarefas e chamada OpenAI se OPENAI_API_KEY definido; fallback local sempre ativo. Novo embed em iframe com botao flutuante (icone robo) em todas as paginas; painel abre/fecha e ocupa totalmente o container.
 - Importacao: CSV/PDF com preview editavel. Sugestoes de categoria por IA ou heuristica retornam motivo (sem sufixo no nome) e indicacao visual. Barra de progresso fake ate 90% + final; alerta de uso de IA fica visivel por 5s. Checkboxes coloridos para destacar (amarelo) e remover (vermelho). Preview com mais espaco por linha.
+- Importacao CSV: categorias informadas no arquivo agora sao criadas automaticamente e marcadas como origem "Arquivo" no preview.
+- Importacao CSV: decode com fallback (utf-8/cp1252/latin-1) para preservar acentos nas categorias.
 
 Front/UX recentes
 - Login e registro redesenhados com hero, beneficios (IA, isolamento, onboarding), CTA rapido.
 - Selecao de workspace com dicas de isolamento/roles; pedido de acesso com passo a passo; membros com contadores e cards mais claros.
-- Categorias com contexto, dica de cores e cards com data; lista de usuarios admin com cabeçalho mais informativo; painel superuser com texto sem mojibake.
+- Categorias com contexto, dica de cores e cards com data; lista de usuarios admin com cabecalho mais informativo.
 - Favicon adicionado em `static/img/favicon.svg`; base tem botao flutuante do agente e navegacao topo/fundo.
 - Landing page publica em `/` (dashboard em `/app/`) e pagina de ajuda em `/help/` com guia interativo de transacoes, tarefas, workspaces e IA.
 - Ajuda: pagina /help com cards, GIFs ilustrativos, imagens e versao compacta para mobile (chips de navegacao).
 - Ajuda: layout ajustado para evitar blocos esticados; imagens com altura controlada e alinhamento ao topo.
 - Ajuda: midias abaixo do texto, sem distorcer (object-fit: contain, max 410px).
-- Tarefas: prazo agora mostra "Concluída no prazo" para tarefas finalizadas, sem marcar como atrasada.
-- Header: navegação com ícones e tooltips; textos ocultos no desktop e exibidos no mobile; ícone de visão geral trocado por olho.
+- Tarefas: prazo agora mostra "Concluida no prazo" para tarefas finalizadas, sem marcar como atrasada.
+- Header: navegacao com icones e tooltips; textos ocultos no desktop e exibidos no mobile; icone de visao geral trocado por olho.
+- Estaticos: removido WhiteNoise no projeto local; dev usa staticfiles do Django e producao segue Nginx + collectstatic.
+
+Aprovacao e convidados
+- Superuser: controle de plano e pagamento confirmado no /super/users; campos no perfil incluem plano, pagamento_confirmado e observacoes.
+- Aprovacao de contas: novos cadastros ficam pendentes; tela /super/users permite aprovar, renovar 30d, suspender e excluir; login bloqueia pendentes/expirados.
+- Cadastros: contas de owner ficam pendentes ate aprovacao. Conta convidado (guest) cria usuario sem workspace e sem IA/financas.
+- Guest: UserProfile.is_guest, rota `/register/guest/`, bloqueio de categorias/transacoes e IA, e nao permite criar workspace.
 
 Pendencias e riscos
 - Tests: ainda faltam suites para import CSV/PDF, IA de categorizacao, permissao de workspace, embed do chat e views sensiveis.
-- Migrations: 0011 aplicada (rename de indexes). Em novos bancos, executar `python manage.py migrate`.
+- Migrations: 0014 aplicada (plan/pagamento). Em novos bancos, executar `python manage.py migrate`.
 - IA em services.py ainda sem backoff/httpx; considerar trocar urllib por httpx com timeout e retry.
 - Import PDF depende de texto extraivel; PDFs escaneados precisam de OCR externo antes do upload.
+- CSV legado: gerado `legacy_transactions.csv` com transacoes do SQLite para import em instancias externas (colunas description,date,value,type,category).
+

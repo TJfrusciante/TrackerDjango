@@ -6,7 +6,7 @@ from django.core.files.storage import default_storage
 
 def workspace_context(request):
     """
-    Injeta o workspace atual e a lista de workspaces do usuÇ­rio autenticado.
+    Injeta o workspace atual e a lista de workspaces do usuario autenticado.
     Superuser enxerga todos os workspaces ativos e pode operar em modo global (None).
     """
     current = getattr(request, "workspace", None)
@@ -29,6 +29,7 @@ def workspace_context(request):
         "available_workspaces": available,
         "current_workspace_role": getattr(request, "workspace_role", None),
         "user_avatar_url": _avatar_url(user),
+        "user_is_guest": _is_guest(user),
     }
 
 
@@ -42,3 +43,11 @@ def _avatar_url(user):
         except Exception:
             return ""
     return ""
+
+
+def _is_guest(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    profile = getattr(user, "profile", None)
+    return bool(profile and profile.is_guest)
+
