@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Notifica&ccedil;&otilde;es | iTracker{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="glass-card p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <p class="text-secondary small text-uppercase mb-1">Centro de alertas</p>
+                    <h1 class="h5 fw-bold mb-0">Notifica&ccedil;&otilde;es</h1>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-light btn-sm" href="?filter=all">Todas</a>
+                    <a class="btn btn-outline-light btn-sm" href="?filter=unread">N&atilde;o lidas</a>
+                    <form method="post" action="{% url 'tracker:notifications_mark_all' %}">
+                        {% csrf_token %}
+                        <button class="btn btn-primary btn-sm" type="submit">Marcar tudo como lido</button>
+                    </form>
+                </div>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for item in notifications %}
+                <div class="list-group-item bg-transparent py-3">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <div class="d-flex gap-3">
+                            <div class="icon-pill {% if item.level == 'success' %}bg-success-subtle text-success{% elif item.level == 'warning' %}bg-warning-subtle text-warning{% elif item.level == 'danger' %}bg-danger-subtle text-danger{% else %}bg-primary-subtle text-primary{% endif %}">
+                                <i class="fa-solid {% if item.level == 'success' %}fa-check{% elif item.level == 'warning' %}fa-triangle-exclamation{% elif item.level == 'danger' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %}"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold {% if not item.read_at %}text-white{% endif %}">{{ item.title }}</div>
+                                {% if item.body %}
+                                <div class="text-secondary small">{{ item.body|linebreaksbr }}</div>
+                                {% endif %}
+                                <div class="text-secondary small mt-1">{{ item.created_at|date:"d/m/Y H:i" }}</div>
+                                {% if item.action_url %}
+                                <a class="btn btn-outline-light btn-sm mt-2" href="{{ item.action_url }}">Abrir</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if not item.read_at %}
+                        <form method="post" action="{% url 'tracker:notifications_mark_read' item.id %}">
+                            {% csrf_token %}
+                            <button class="btn btn-outline-light btn-sm" type="submit">Marcar lida</button>
+                        </form>
+                        {% else %}
+                        <span class="badge text-bg-secondary">Lida</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-secondary">Nenhuma notifica&ccedil;&atilde;o encontrada.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="glass-card p-4 mb-3">
+            <h2 class="h6 fw-bold mb-2">Alertas financeiros</h2>
+            {% if current_workspace and can_manage_finance %}
+            <form method="post" action="{% url 'tracker:category_budget_create' %}" class="row g-2">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label class="form-label small">{{ budget_form.category.label }}</label>
+                    {{ budget_form.category }}
+                </div>
+                <div class="col-6">
+                    <label class="form-label small">{{ budget_form.period.label }}</label>
+                    {{ budget_form.period }}
+                </div>
+                <div class="col-6">
+                    <label class="form-label small">{{ budget_form.limit_value.label }}</label>
+                    {{ budget_form.limit_value }}
+                </div>
+                <div class="col-12 form-check">
+                    {{ budget_form.notify_owner }}
+                    <label class="form-check-label" for="{{ budget_form.notify_owner.id_for_label }}">{{ budget_form.notify_owner.label }}</label>
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary btn-sm" type="submit">Salvar or&ccedil;amento</button>
+                </div>
+            </form>
+            <div class="mt-3">
+                <h6 class="small text-uppercase text-secondary">Or&ccedil;amentos ativos</h6>
+                {% for budget in budgets %}
+                <div class="d-flex justify-content-between align-items-center border-top border-opacity-25 py-2">
+                    <div>
+                        <div class="fw-semibold">{{ budget.category.name }}</div>
+                        <div class="text-secondary small">{{ budget.get_period_display }} &middot; Limite R$ {{ budget.limit_value }}</div>
+                    </div>
+                    <form method="post" action="{% url 'tracker:category_budget_delete' budget.id %}">
+                        {% csrf_token %}
+                        <button class="btn btn-outline-danger btn-sm" type="submit">Remover</button>
+                    </form>
+                </div>
+                {% empty %}
+                <div class="text-secondary small">Nenhum or&ccedil;amento configurado.</div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-secondary mb-0">Selecione um workspace com acesso financeiro para configurar or&ccedil;amentos.</p>
+            {% endif %}
+        </div>
+
+        <div class="glass-card p-4 mb-3">
+            <h2 class="h6 fw-bold mb-2">Metas de saldo</h2>
+            {% if current_workspace and can_manage_finance %}
+            <form method="post" action="{% url 'tracker:balance_goal_create' %}" class="row g-2">
+                {% csrf_token %}
+                <div class="col-6">
+                    <label class="form-label small">{{ goal_form.period.label }}</label>
+                    {{ goal_form.period }}
+                </div>
+                <div class="col-6">
+                    <label class="form-label small">{{ goal_form.direction.label }}</label>
+                    {{ goal_form.direction }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">{{ goal_form.target_value.label }}</label>
+                    {{ goal_form.target_value }}
+                </div>
+                <div class="col-12 form-check">
+                    {{ goal_form.notify_owner }}
+                    <label class="form-check-label" for="{{ goal_form.notify_owner.id_for_label }}">{{ goal_form.notify_owner.label }}</label>
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary btn-sm" type="submit">Salvar meta</button>
+                </div>
+            </form>
+            <div class="mt-3">
+                <h6 class="small text-uppercase text-secondary">Metas ativas</h6>
+                {% for goal in goals %}
+                <div class="d-flex justify-content-between align-items-center border-top border-opacity-25 py-2">
+                    <div>
+                        <div class="fw-semibold">{{ goal.get_period_display }} &middot; {{ goal.get_direction_display }}</div>
+                        <div class="text-secondary small">Meta R$ {{ goal.target_value }}</div>
+                    </div>
+                    <form method="post" action="{% url 'tracker:balance_goal_delete' goal.id %}">
+                        {% csrf_token %}
+                        <button class="btn btn-outline-danger btn-sm" type="submit">Remover</button>
+                    </form>
+                </div>
+                {% empty %}
+                <div class="text-secondary small">Nenhuma meta configurada.</div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-secondary mb-0">Selecione um workspace com acesso financeiro para configurar metas.</p>
+            {% endif %}
+        </div>
+
+        <div class="glass-card p-4">
+            <h2 class="h6 fw-bold mb-2">Notifica&ccedil;&otilde;es push</h2>
+            <p class="text-secondary small">Ative o push para receber alertas no navegador. Dispon&iacute;vel quando chaves VAPID estiverem configuradas.</p>
+            <button class="btn btn-outline-light btn-sm" id="pushToggleBtn" type="button">Ativar push</button>
+            <div id="pushStatus" class="text-secondary small mt-2"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function() {
+        const btn = document.getElementById('pushToggleBtn');
+        const status = document.getElementById('pushStatus');
+        const vapidKey = "{{ vapid_public_key|default:'' }}";
+        if (!btn || !status) return;
+        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidKey) {
+            btn.disabled = true;
+            status.textContent = 'Push indispon\u00edvel no momento.';
+            return;
+        }
+
+        const urlBase64ToUint8Array = (base64String) => {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+        };
+
+        const updateButton = (subscribed) => {
+            btn.textContent = subscribed ? 'Desativar push' : 'Ativar push';
+        };
+
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        };
+        const csrfToken = getCookie('csrftoken');
+
+        const sendSubscription = (sub) => {
+            return fetch("{% url 'tracker:push_subscribe' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify(sub),
+            });
+        };
+
+        const removeSubscription = () => {
+            return fetch("{% url 'tracker:push_unsubscribe' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                },
+            });
+        };
+
+        navigator.serviceWorker.register("{% static 'js/push_sw.js' %}", { scope: '/' }).then((reg) => {
+            reg.pushManager.getSubscription().then((sub) => {
+                updateButton(!!sub);
+            });
+        });
+
+        btn.addEventListener('click', () => {
+            navigator.serviceWorker.ready.then((reg) => {
+                reg.pushManager.getSubscription().then((sub) => {
+                    if (sub) {
+                        sub.unsubscribe().then(() => {
+                            updateButton(false);
+                            status.textContent = 'Push desativado.';
+                            removeSubscription();
+                        });
+                        return;
+                    }
+                    reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+                    }).then((newSub) => {
+                        updateButton(true);
+                        status.textContent = 'Push ativado.';
+                        sendSubscription(newSub);
+                    }).catch(() => {
+                        status.textContent = 'N\u00e3o foi poss\u00edvel ativar o push.';
+                    });
+                });
+            });
+        });
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Pagamento aprovado | iTracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 text-center">
+            <i class="fa-solid fa-circle-check text-success fa-2x mb-3"></i>
+            <h1 class="h5 fw-bold mb-2">Assinatura confirmada</h1>
+            <p class="text-secondary mb-3">Seu pagamento foi aprovado. A conta est&aacute; ativa.</p>
+            <a class="btn btn-primary" href="{% url 'tracker:dashboard' %}">Ir para o dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

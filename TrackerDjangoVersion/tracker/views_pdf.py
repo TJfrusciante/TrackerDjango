@@ -7,6 +7,7 @@ from django.utils import timezone
 from .forms import StatementUploadForm
 from .models import Category, Transaction
 from .views import _user_can_view_finance, _parse_pdf_statement, _build_preview
+from .notifications import notify_balance_threshold, check_category_budgets, check_balance_goals
 
 @login_required
 def transaction_import_pdf(request):
@@ -62,6 +63,10 @@ def transaction_import_pdf(request):
                 ))
             if to_create:
                 Transaction.objects.bulk_create(to_create, batch_size=500)
+                if workspace:
+                    notify_balance_threshold(workspace.owner, workspace)
+                    check_category_budgets(workspace)
+                    check_balance_goals(workspace)
                 messages.success(request, f'{len(to_create)} transações importadas com sucesso.')
             else:
                 messages.warning(request, 'Nenhuma transação válida para importar.')

@@ -1,11 +1,11 @@
-﻿Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-07)
+Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-12)
 -----------------------------------------------------------------
 
 - Escopo: app Django multi-tenant para financas (transacoes) e tarefas; UI Bootstrap 5 com tema claro/escuro; graficos Chart.js.
 - Dados demo: 387 transacoes importadas de SQLite (Tracker exe) para o Postgres; intervalo 06/07/2024 a 10/11/2025. Workspace: principal (owner TJfrusciante).
 
 Modelos e infra
-- Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar,is_guest,plan,payment_confirmed,payment_confirmed_at,payment_notes), Assistant.ChatMessage.
+- Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceInvite(workspace,invited_user,status,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar,is_guest,plan,payment_confirmed,payment_confirmed_at,payment_notes,email_verified,deletion_requested_at), SubscriptionInvite(code,plan_cycle,max_uses,used_count,is_active,expires_at), SubscriptionInviteUse(invite,user), MetricEvent(event_type,metadata,user,workspace), Assistant.ChatMessage, Assistant.AiUsage(tokens/custos).
 - Indexes adicionados em workspace/type/date/status/category para consultas mais rapidas (migration 0010_auto_indexes).
 - Requisitos: requirements.txt/requirements-dev.txt criados (inclui pdfminer.six, PyPDF2, pytest, ruff). Makefile com alvos run/lint/test/import-demo. README atualizado com setup, env vars e limites de import PDF/CSV.
 
@@ -14,10 +14,12 @@ Funcionalidades principais
 - Transacoes/tarefas: filtros (busca, tipo/status, categoria, periodo dd/mm/aaaa), paginacao, export CSV, CRUD completo, toggles de selecao/tipo/status.
 - Tarefas: etapas com responsavel/email, ordenacao automatica, progresso calculado; can_edit_tasks por membro controla quem edita.
 - Auth/multi-tenant: login `/login/`, cadastro `/register/`, logout. Selecao/criacao de workspace `/workspaces/select/`; troca via slug; pedidos de acesso em `/workspaces/request/`; membros e roles em `/workspaces/<slug>/members/`. Navbar mostra workspace atual.
+- Convites: owners enviam convites; usuario precisa aceitar em `/workspaces/select/` antes de virar membro.
 - Admin: painel superuser `/super/overview/` com graficos globais; lista de usuarios em `/super/users/` com CRUD.
 
 IA e chat
 - App `assistant`: chat em `/ia/` com historico; resumo local de financas/tarefas e chamada OpenAI se OPENAI_API_KEY definido; fallback local sempre ativo. Novo embed em iframe com botao flutuante (icone robo) em todas as paginas; painel abre/fecha e ocupa totalmente o container.
+- IA: metricas de uso gravadas em AiUsage (tokens e custo estimado); painel superuser mostra totais e ultimos 30 dias (multiplicador de custo via OPENAI_COST_MULTIPLIER).
 - Importacao: CSV/PDF com preview editavel. Sugestoes de categoria por IA ou heuristica retornam motivo (sem sufixo no nome) e indicacao visual. Barra de progresso fake ate 90% + final; alerta de uso de IA fica visivel por 5s. Checkboxes coloridos para destacar (amarelo) e remover (vermelho). Preview com mais espaco por linha.
 - Importacao CSV: categorias informadas no arquivo agora sao criadas automaticamente e marcadas como origem "Arquivo" no preview.
 - Importacao CSV: decode com fallback (utf-8/cp1252/latin-1) para preservar acentos nas categorias.
@@ -33,9 +35,21 @@ Front/UX recentes
 - Ajuda: midias abaixo do texto, sem distorcer (object-fit: contain, max 410px).
 - Tarefas: prazo agora mostra "Concluida no prazo" para tarefas finalizadas, sem marcar como atrasada.
 - Tarefas: criacao permite etapas iniciais; prazo usa input type=date (abre calendario nativo).
+- Tarefas: edicao de etapas inline (titulo/responsavel/email) e status com badges claros; ditado por voz para titulo e data.
+- Transacoes: ditado por voz agora tenta extrair descricao, valor, tipo, data e categoria (match por nome nas categorias).
+- Tarefas: ditado por voz parseia titulo, data e etapas (com responsavel/email quando presentes) e mostra preview antes de aplicar.
+- Ditado: agora funciona em modo continuo com botao Finalizar e preview aplicavel para transacoes/tarefas.
+- Ditado tarefas: etapas e prazo agora atualizam em tempo real, com suporte a datas por extenso (meses).
+- Ditado: campos editados manualmente durante o ditado ficam travados (nao sobrescreve).
+- Tarefas: etapas agora suportam status (em andamento, concluida, cancelada) com badge e edicao inline; migracao 0016_taskstep_status.
+- Superuser: Workspaces recentes viraram cards com dados extras (ultimas datas, entradas/saidas/saldo).
+- Categorias: edicao habilitada em /categorias/<id>/editar/.
+- Legal: paginas de Termos (/termos/) e Politica de privacidade (/privacidade/) com links no footer.
+- Exportacao CSV: resposta inclui BOM UTF-8 para preservar acentos no Excel.
 - Header: navegacao com icones e tooltips; textos ocultos no desktop e exibidos no mobile; icone de visao geral trocado por olho.
 - Estaticos: removido WhiteNoise no projeto local; dev usa staticfiles do Django e producao segue Nginx + collectstatic.
 - Workspaces: botao "Modo global" na tela de selecao para superuser; exclusao de workspace habilitada no card de membros (POST).
+- Cadastro: nome/sobrenome obrigatorios; avatar opcional. Categorias agora usam input tipo color (seletor).
 
 Aprovacao e convidados
 - Superuser: controle de plano e pagamento confirmado no /super/users; campos no perfil incluem plano, pagamento_confirmado e observacoes.
@@ -45,8 +59,84 @@ Aprovacao e convidados
 
 Pendencias e riscos
 - Tests: ainda faltam suites para import CSV/PDF, IA de categorizacao, permissao de workspace, embed do chat e views sensiveis.
-- Migrations: 0014 aplicada (plan/pagamento). Em novos bancos, executar `python manage.py migrate`.
+- Migrations: 0014 aplicada (plan/pagamento). Novas: tracker 0015 (WorkspaceInvite) e assistant 0002 (AiUsage). Em novos bancos, executar `python manage.py migrate`.
+- Migrations: tracker 0016 adiciona status em TaskStep (rodar migrate).
 - IA em services.py ainda sem backoff/httpx; considerar trocar urllib por httpx com timeout e retry.
 - Import PDF depende de texto extraivel; PDFs escaneados precisam de OCR externo antes do upload.
 - CSV legado: gerado `legacy_transactions.csv` com transacoes do SQLite para import em instancias externas (colunas description,date,value,type,category).
+- Sugestao: unificar encoding UTF-8 em todos os templates (alguns arquivos antigos ainda estavam com acentos quebrados).
+- Sugestao: decidir regra de progresso quando etapas estao canceladas (ignorar ou contar no total).
+
+Atualizacoes recentes
+- Botoes de acao (page-action-btn) com altura maior e padrao aplicado em mais telas (usuarios, workspaces, import).
+- Botoes de acao em tabelas (tarefas/transacoes) normalizados com tamanho fixo e alinhamento do icon.
+- Footer agora usa cores do tema; titulo "Tracker" com classe dedicada para contraste no modo claro/escuro.
+- Dashboard e perfil convertidos para entidades HTML para evitar acentos quebrados; textos principais revisados.
+- Tarefas: exportacao CSV movida para o topo (padrao transacoes); prazo usa input texto dd/mm/aaaa.
+- Notificacoes por e-mail: preferencias no perfil (saldo, tarefas, admin) + pagina de contato `/contato/`.
+- Notificacoes: alerta de saldo ao atingir limite, aviso de etapa/tarefa concluida por colaborador, aviso de novo cadastro pendente, contato/pagamento para admin.
+- Notificacoes: centro in-app em `/notificacoes/` com badge de nao lidas, marcar lida/limpar tudo, e area de alertas financeiros.
+- Alertas financeiros: orcamento por categoria (semanal/mensal) e metas de saldo com aviso por e-mail + in-app; checks ao criar/importar transacoes.
+- Preferencias novas no perfil: lembretes de tarefas proximas/atrasadas, resumos semanal/mensal, alertas de orcamento e metas.
+- Push: scaffolding de Web Push (service worker + endpoints) e variaveis VAPID em settings; depende de pywebpush.
+- Comandos: `send_task_reminders`, `send_digest_emails` e `check_finance_alerts` para agendar em cron.
+- Dashboard: corrigido JS dos graficos (operador ternario) para evitar erro e sumico dos charts.
+- Landing page: textos revisados + precos atualizados (Mensal 8,99; Anual 5,99/mes) e novos destaques de features.
+- Ajuda: conteudo reescrito com novas secoes (notificacoes, orcamentos/metas, voz) e textos corrigidos.
+- Landing page: layout expandido com secoes de alertas, IA/voz, seguranca e CTA final; mais conteudo para conversao.
+- Ajuda: navegacao rapida com icones alinhados e FAQ ampliado.
+- Dashboard: labels de data nos graficos agora usam dd/mm/aaaa; bloco de transacoes vem antes e tarefas no final.
+- Planejamento Mercado Pago (somente docs): ver comentario em `TrackerDjangoVersion/requirements.txt`.
+- Guia de rotinas AWS: `guia_rotinas_notificacoes.txt` com cron para Ubuntu + nginx + gunicorn.
+- Dashboard: periodo padrao agora usa "Tudo" para evitar graficos vazios ao entrar.
+- Tarefas: concluida apos o prazo mostra "Concluida com atraso" na lista e no bloco de ultimas tarefas.
+- Superuser: "Workspaces recentes" agora usa subqueries para evitar somas infladas por joins.
+- Workspaces: nova tela de convite por username em `/workspaces/<slug>/convites/`.
+- IA: chat ganhou ditado por voz (tambem no embed do header) com botao Finalizar.
+- Cadastro: escolha de ciclo de cobranca (mensal/anual) salva em `UserProfile.billing_cycle` (migration 0020).
+- Workspaces: botao "Convidar" adicionado na tela de membros para acessar a pagina de convites.
+- IA embed: mostra o contexto do workspace no topo do painel flutuante.
+- Workspaces: criado painel dedicado em `/workspaces/` com workspace ativo, lista de participacoes e convites pendentes.
+- IA: ditado no chat agora mostra texto em tempo real e pode enviar automaticamente ao finalizar o audio.
+- Ditado: botoes renomeados para "Falar" em tarefas/transacoes/IA.
+- Header: icone de Workspaces no menu principal com acesso ao painel /workspaces/.
+- Landing/ajuda: textos atualizados para refletir painel de workspaces, Falar por voz e limites de convidados.
+- Convites: limite de 3 convidados sem assinatura aplicado na criacao/aceite; superuser e assinantes ignoram o limite.
+- Tarefas: completado_at registrado ao mudar para "done" (migracao 0021) e usado para detectar atraso.
+- Seguranca: aprovar/rejeitar acesso a workspace e alternar status de etapa agora exigem POST (CSRF).
+- Categorias: delete agora respeita workspace/permissão.
+
+- LGPD: exportacao de dados e solicitacao de exclusao no perfil (botao Exportar meus dados + Solicitar exclusao).
+- Auth: reset de senha por e-mail (templates registration/*), confirmacao de e-mail opcional (EMAIL_CONFIRMATION_REQUIRED) e rate limit de login (LOGIN_RATE_LIMIT_ATTEMPTS/WINDOW).
+- Convites de assinatura: tela admin /super/convites/ com planos mensal/anual, limite de uso e expiracao; campo "Tenho convite" no cadastro ativa plano sem cobranca.
+- Planos: acao "Renovar 1 ano" no admin (user_admin_status) atualiza billing_cycle=annual.
+- Promocao landing/checkout: precos dinamicos via PricingConfig (promo ativa, limite de usuarios, preco promo/regular); contagem considera apenas usuarios pagantes (payment_confirmed), ignorando superuser e convidados.
+- Observabilidade: MetricEvent grava login/convites/IA/pagamentos/exportacao; cards no superuser_overview; logs JSON em tracker/logging.py + Sentry opcional via env.
+- Pagamentos (Mercado Pago): app `TrackerDjangoVersion/payments/` com MpSubscription/MpWebhookEvent, views de assinatura e webhook, templates em `TrackerDjangoVersion/templates/payments/`.
+- Email SES: settings aceita EMAIL_USE_SSL/EMAIL_TIMEOUT; guia em `guia_ses.txt` com config SMTP do Amazon SES.
+
+Mapa rapido (onde mexer)
+- Landing/marketing: `TrackerDjangoVersion/tracker/views.py` -> `def home` (linha 180) e `TrackerDjangoVersion/templates/landing.html`.
+- Ajuda: `TrackerDjangoVersion/tracker/views.py` -> `def help_page` (linha 267) e `TrackerDjangoVersion/templates/tracker/help.html`.
+- Dashboard e graficos: `TrackerDjangoVersion/templates/tracker/dashboard.html` e `TrackerDjangoVersion/tracker/views.py` -> `def dashboard` (linha 341).
+- Transacoes: `TrackerDjangoVersion/tracker/views.py` -> `transactions_list` (linha 493), `transaction_create`, `transaction_update`; template em `TrackerDjangoVersion/templates/tracker/transactions_list.html`.
+- Tarefas e etapas: `TrackerDjangoVersion/tracker/views.py` -> `tasks_list` (linha 1089), `task_create`, `task_update`, `task_step_*`; template em `TrackerDjangoVersion/templates/tracker/task_form.html`.
+- Painel de workspaces: `TrackerDjangoVersion/tracker/views.py` -> `workspace_overview` (linha 1778) e template `TrackerDjangoVersion/templates/tracker/workspace_overview.html`.
+- Notificacoes: logica em `TrackerDjangoVersion/tracker/notifications.py`; centro em `TrackerDjangoVersion/templates/tracker/notifications_center.html`; rotas em `TrackerDjangoVersion/tracker/urls.py`.
+- Preferencias de notificacao: `TrackerDjangoVersion/tracker/forms.py` -> `NotificationPreferencesForm` e `TrackerDjangoVersion/templates/tracker/profile_edit.html`.
+- Alertas financeiros: `TrackerDjangoVersion/tracker/models.py` -> `CategoryBudget`, `BalanceGoal`; views em `TrackerDjangoVersion/tracker/views.py` -> `category_budget_*`, `balance_goal_*`.
+- Push: `TrackerDjangoVersion/static/js/push_sw.js`, endpoints em `TrackerDjangoVersion/tracker/views.py` -> `push_*`, chaves VAPID em `TrackerDjangoVersion/TrackerDjangoVersion/settings.py`.
+- IA: app `assistant/` (chat em `assistant/views.py`, LLM em `assistant/services.py`, uso em `assistant/models.py`).
+- Multi-tenant: `TrackerDjangoVersion/tracker/middleware.py` e `TrackerDjangoVersion/tracker/context_processors.py`.
+- Usuarios/admin: `TrackerDjangoVersion/tracker/views.py` -> `superuser_overview` (linha 2441), `user_admin_*` e templates em `TrackerDjangoVersion/templates/tracker/`.
+- Promocoes/precos: model `PricingConfig` em `TrackerDjangoVersion/tracker/models.py`, helper em `TrackerDjangoVersion/tracker/pricing.py`, formulario no `superuser_overview` e landing em `TrackerDjangoVersion/templates/landing.html`.
+- Landing: layout atualizado com bloco de promocao, contador animado, carousel de recursos e cards com hover (CSS em `TrackerDjangoVersion/static/css/landing.css`).
+- Convites: `TrackerDjangoVersion/tracker/views.py` -> `workspace_invite` (linha 2011) e template `TrackerDjangoVersion/templates/tracker/workspace_invite.html`.
+- Pagamentos MP: `TrackerDjangoVersion/payments/views.py` -> `subscription_start`, `subscription_success`, `mp_webhook`; rotas em `TrackerDjangoVersion/payments/urls.py`.
+- LGPD/exportacao: `TrackerDjangoVersion/tracker/views.py` -> `export_my_data` (linha 2402) e `account_delete_request` (linha 2484); botoes em `TrackerDjangoVersion/templates/tracker/profile_edit.html`.
+- Convites de assinatura: `TrackerDjangoVersion/tracker/views.py` -> `subscription_invite_list` (linha 2725) e `subscription_invite_action` (linha 2740); template `TrackerDjangoVersion/templates/tracker/subscription_invites.html`.
+- Reset/confirmacao de email: `TrackerDjangoVersion/tracker/views.py` -> `TrackerPasswordResetView` (linha 256) e `verify_email` (linha 1930); templates em `TrackerDjangoVersion/templates/registration/` e `TrackerDjangoVersion/templates/tracker/email_verified.html`.
+- Metricas/observabilidade: `TrackerDjangoVersion/tracker/metrics.py` (record_metric), model `MetricEvent` em `TrackerDjangoVersion/tracker/models.py`, cards em `TrackerDjangoVersion/templates/tracker/superuser_overview.html`.
+- Logs/Sentry: `TrackerDjangoVersion/tracker/logging.py` e configuracao em `TrackerDjangoVersion/TrackerDjangoVersion/settings.py` (LOG_JSON/SENTRY_*).
+
 

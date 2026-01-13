@@ -1,19 +1,43 @@
 import csv
 import datetime
 import io
+import json
 import os
 import re
+import secrets
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.views import PasswordResetView
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
+from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import transaction as db_transaction
-from django.db.models import Case, Count, DecimalField, F, Q, Sum, When, Max
+from django.db.models import (
+    Case,
+    Count,
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    Max,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce, TruncDate
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.cache import cache_control
@@ -33,12 +57,50 @@ from .forms import (
     UserProfileAdminForm,
     ProfileForm,
     ProfileAvatarForm,
+    NotificationPreferencesForm,
+    ContactAdminForm,
     InviteByUsernameForm,
     AccessRequestForm,
     StatementUploadForm,
+    CategoryBudgetForm,
+    BalanceGoalForm,
+    SubscriptionInviteForm,
+    PasswordResetRequestForm,
+    PricingConfigForm,
 )
-from .models import Category, Task, TaskStep, Transaction, Workspace, WorkspaceMembership, WorkspaceAccessRequest, UserProfile
-from assistant.services import llm_reply
+from .models import (
+    Category,
+    Task,
+    TaskStep,
+    Transaction,
+    Workspace,
+    WorkspaceMembership,
+    WorkspaceAccessRequest,
+    UserProfile,
+    WorkspaceInvite,
+    Notification,
+    CategoryBudget,
+    BalanceGoal,
+    PushSubscription,
+    SubscriptionInvite,
+    SubscriptionInviteUse,
+    MetricEvent,
+    PricingConfig,
+)
+from .notifications import (
+    notify_balance_threshold,
+    notify_contact_message,
+    notify_new_account,
+    notify_account_deletion_request,
+    notify_step_completed,
+    notify_task_completed,
+    check_category_budgets,
+    check_balance_goals,
+)
+from .metrics import record_metric
+from .pricing import get_pricing_state
+from assistant.services import llm_complete, estimate_costs
+from assistant.models import AiUsage
 
 User = get_user_model()
 
@@ -60,6 +122,37 @@ def _user_can_view_finance(request, workspace) -> bool:
     return role == 'owner'
 
 
+def _is_paid_user(user) -> bool:
+    if user.is_superuser:
+        return True
+    profile = getattr(user, "profile", None)
+    if not profile:
+        return False
+    if profile.is_guest:
+        return False
+    return bool(profile.payment_confirmed)
+
+
+def _workspace_unpaid_count(workspace) -> int:
+    return WorkspaceMembership.objects.filter(workspace=workspace).exclude(
+        role='owner'
+    ).exclude(
+        user__is_superuser=True
+    ).filter(
+        Q(user__profile__isnull=True) | Q(user__profile__is_guest=True) | Q(user__profile__payment_confirmed=False)
+    ).count()
+
+
+def _workspace_unpaid_invite_count(workspace) -> int:
+    return WorkspaceInvite.objects.filter(workspace=workspace, status='pending').exclude(
+        invited_user__is_superuser=True
+    ).filter(
+        Q(invited_user__profile__isnull=True)
+        | Q(invited_user__profile__is_guest=True)
+        | Q(invited_user__profile__payment_confirmed=False)
+    ).count()
+
+
 def _apply_workspace_filter(queryset, workspace, user):
     if workspace:
         return queryset.filter(workspace=workspace)
@@ -78,64 +171,201 @@ def _ensure_unique_slug(base: str) -> str:
     return slug
 
 
+def _record_ai_usage(user, workspace, feature, usage, model_name):
+    if not user or not usage:
+        return
+    total = int(usage.get('total_tokens') or 0)
+    prompt_tokens = int(usage.get('prompt_tokens') or 0)
+    completion_tokens = int(usage.get('completion_tokens') or 0)
+    if total <= 0 and prompt_tokens <= 0 and completion_tokens <= 0:
+        return
+    cost_usd, cost_brl = estimate_costs(usage)
+    AiUsage.objects.create(
+        user=user,
+        workspace=workspace,
+        feature=feature,
+        model_name=model_name or '',
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total,
+        cost_usd=cost_usd,
+        cost_brl=cost_brl,
+    )
+
+
+def _login_rate_limit_key(request) -> str:
+    ip = request.META.get('REMOTE_ADDR', 'unknown')
+    username = (request.POST.get('username') or '').strip().lower()
+    return f'login_attempts:{ip}:{username}'
+
+
+def _is_login_blocked(request) -> bool:
+    max_attempts = int(getattr(settings, 'LOGIN_RATE_LIMIT_ATTEMPTS', 5))
+    window_seconds = int(getattr(settings, 'LOGIN_RATE_LIMIT_WINDOW', 900))
+    key = _login_rate_limit_key(request)
+    payload = cache.get(key)
+    if not payload:
+        return False
+    count = payload.get('count', 0)
+    first_at = payload.get('first_at')
+    if not first_at:
+        return False
+    elapsed = (timezone.now() - first_at).total_seconds()
+    if elapsed > window_seconds:
+        cache.delete(key)
+        return False
+    return count >= max_attempts
+
+
+def _register_login_failure(request) -> None:
+    max_attempts = int(getattr(settings, 'LOGIN_RATE_LIMIT_ATTEMPTS', 5))
+    window_seconds = int(getattr(settings, 'LOGIN_RATE_LIMIT_WINDOW', 900))
+    key = _login_rate_limit_key(request)
+    payload = cache.get(key)
+    if payload:
+        payload['count'] = payload.get('count', 0) + 1
+    else:
+        payload = {'count': 1, 'first_at': timezone.now()}
+    cache.set(key, payload, window_seconds)
+    if payload['count'] >= max_attempts:
+        record_metric('login_blocked', metadata={'ip': request.META.get('REMOTE_ADDR')})
+
+
+def _clear_login_failures(request) -> None:
+    cache.delete(_login_rate_limit_key(request))
+
+
+def _generate_invite_code() -> str:
+    return secrets.token_urlsafe(8).replace('-', '').replace('_', '').upper()
+
+
+def _send_email_verification(request, user) -> None:
+    if not user.email:
+        return
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    verify_url = request.build_absolute_uri(
+        reverse('tracker:verify_email', args=[uid, token])
+    )
+    subject = 'Confirme seu e-mail no iTracker'
+    body = (
+        'Para ativar sua conta, confirme seu e-mail no link abaixo:\n\n'
+        f'{verify_url}\n\n'
+        'Se você não solicitou este cadastro, ignore esta mensagem.'
+    )
+    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+
+
+class TrackerPasswordResetView(PasswordResetView):
+    form_class = PasswordResetRequestForm
+
+    def form_valid(self, form):
+        record_metric('password_reset', metadata={'email': form.cleaned_data.get('email')})
+        return super().form_valid(form)
+
+
 # -------- Landing --------
 
 def home(request):
     if request.user.is_authenticated:
         return redirect('tracker:dashboard')
 
+    pricing_state = get_pricing_state()
+    annual_total = pricing_state.annual_price * Decimal("12")
+    workspace_count = Workspace.objects.filter(is_active=True).count()
+    transaction_count = Transaction.objects.count()
+    task_count = Task.objects.count() + TaskStep.objects.count()
+    alert_count = CategoryBudget.objects.count() + BalanceGoal.objects.count()
+    landing_stats = [
+        {"label": "Workspaces ativos", "value": workspace_count, "suffix": ""},
+        {"label": "Transa\u00e7\u00f5es registradas", "value": transaction_count, "suffix": ""},
+        {"label": "Tarefas e etapas", "value": task_count, "suffix": ""},
+        {"label": "Alertas inteligentes", "value": alert_count, "suffix": "ativos"},
+    ]
     pricing_plans = [
         {
             "name": "Mensal",
-            "price": Decimal("39.90"),
-            "subtitle": "Para começar agora, sem fidelidade.",
-            "badge": "Flexível",
+            "price": pricing_state.monthly_price,
+            "regular_price": pricing_state.regular_monthly_price,
+            "subtitle": f"R$ {pricing_state.monthly_price:.2f}/m\u00eas. Cancele quando quiser.",
+            "badge": "Promo\u00e7\u00e3o" if pricing_state.promo_active else "Flex\u00edvel",
             "features": [
-                "1 workspace com até 3 participantes",
-                "Dashboards financeiros e tarefas",
-                "Exportação CSV e filtros avançados",
+                "1 workspace + at\u00e9 3 participantes",
+                "Dashboards financeiros e tarefas em etapas",
+                "Notifica\u00e7\u00f5es, or\u00e7amentos e metas",
                 "Agente de IA com dados do workspace",
             ],
         },
         {
             "name": "Anual",
-            "price": Decimal("29.90"),
-            "subtitle": "Melhor custo benefício (cobrança mensal).",
+            "price": pricing_state.annual_price,
+            "regular_price": pricing_state.regular_annual_price,
+            "subtitle": f"R$ {pricing_state.annual_price:.2f}/m\u00eas (R$ {annual_total:.2f}/ano).",
             "badge": "Mais escolhido",
+            "annual_total": annual_total,
             "features": [
                 "Tudo do Mensal",
-                "Suporte prioritário",
+                "Resumos semanais e mensais",
                 "Uso de IA ampliado",
-                "Backups e histórico estendido",
+                "Backups e hist\u00f3rico estendido",
             ],
         },
     ]
 
     feature_cards = [
-        {"icon": "fa-solid fa-wallet", "title": "Finanças claras", "description": "Entradas, saídas, categorias coloridas e gráfico por período."},
-        {"icon": "fa-solid fa-list-check", "title": "Tarefas em etapas", "description": "Subtarefas com responsáveis, progresso automático e alertas."},
-        {"icon": "fa-solid fa-users", "title": "Multi-tenant", "description": "Workspaces, convites, permissões de edição e visão do owner."},
-        {"icon": "fa-solid fa-robot", "title": "Agente de IA", "description": "Responde sobre seu workspace; superuser enxerga tudo."},
-        {"icon": "fa-solid fa-cloud-arrow-down", "title": "Exportações", "description": "Listagens em CSV e APIs para gráficos/Chart.js."},
-        {"icon": "fa-solid fa-mobile-screen", "title": "Responsivo", "description": "Bootstrap 5 e tema atual do Tracker para qualquer dispositivo."},
+        {
+            "icon": "fa-solid fa-wallet",
+            "title": "Financeiro inteligente",
+            "description": "Entradas, sa\u00eddas, or\u00e7amentos por categoria e metas de saldo.",
+        },
+        {
+            "icon": "fa-solid fa-list-check",
+            "title": "Tarefas em etapas",
+            "description": "Subtarefas com respons\u00e1veis, progresso autom\u00e1tico e prazos.",
+        },
+        {
+            "icon": "fa-solid fa-bell",
+            "title": "Notifica\u00e7\u00f5es",
+            "description": "Centro in-app, e-mails, lembretes e resumos semanais/mensais.",
+        },
+        {
+            "icon": "fa-solid fa-robot",
+            "title": "Agente de IA",
+            "description": "Responde sobre seu workspace; superuser enxerga tudo.",
+        },
+        {
+            "icon": "fa-solid fa-cloud-arrow-down",
+            "title": "Importa\u00e7\u00e3o e exporta\u00e7\u00e3o",
+            "description": "CSV/PDF com preview e integra\u00e7\u00e3o via endpoint JSON.",
+        },
+        {
+            "icon": "fa-solid fa-briefcase",
+            "title": "Painel de workspaces",
+            "description": "Troca r\u00e1pida de ambiente, convites e controle de membros.",
+        },
     ]
 
+    carousel_slides = [feature_cards[i:i + 3] for i in range(0, len(feature_cards), 3)]
+
     steps = [
-        {"title": "Crie sua conta", "text": "Cadastro rápido e escolha do primeiro workspace."},
-        {"title": "Importe ou lance dados", "text": "Importação do SQLite antigo e lançamentos manuais."},
-        {"title": "Convide sua equipe", "text": "Até 3 participantes grátis por workspace do owner."},
-        {"title": "Use o agente", "text": "Pergunte sobre saldo, categorias e tarefas em segundos."},
+        {"title": "Crie sua conta", "text": "Escolha plano mensal ou anual e defina o primeiro workspace."},
+        {"title": "Importe dados", "text": "Importe CSV/PDF ou lance com o bot\u00e3o Falar em tempo real."},
+        {"title": "Convide sua equipe", "text": "At\u00e9 3 convidados sem assinatura; assinantes n\u00e3o contam no limite."},
+        {"title": "Acompanhe no painel", "text": "Troque workspaces, aprove convites e configure alertas."},
     ]
 
     faq_items = [
-        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. Participantes entram sem custo."},
-        {"question": "Meu financeiro é privado?", "answer": "Sim. Cada workspace isola finanças; o owner controla permissões de tarefas."},
-        {"question": "Precisa instalar algo?", "answer": "Não. É web, responsivo e pronto para uso."},
-        {"question": "Posso exportar dados?", "answer": "Sim, CSV das listas e endpoints JSON para gráficos."},
+        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. H\u00e1 limite de 3 convidados sem assinatura."},
+        {"question": "Posso escolher mensal ou anual?", "answer": "Sim. A escolha do ciclo \u00e9 feita no cadastro e pode ser revisada pelo admin."},
+        {"question": "Meu financeiro \u00e9 privado?", "answer": "Sim. Cada workspace isola finan\u00e7as; o owner controla permiss\u00f5es de tarefas."},
+        {"question": "Posso exportar dados?", "answer": "Sim, CSV das listas e endpoints JSON para gr\u00e1ficos."},
     ]
 
     context = {
         "pricing_plans": pricing_plans,
+        "pricing_state": pricing_state,
+        "landing_stats": landing_stats,
+        "carousel_slides": carousel_slides,
         "feature_cards": feature_cards,
         "steps": steps,
         "faq_items": faq_items,
@@ -145,22 +375,73 @@ def home(request):
 
 def help_page(request):
     quick_links = [
-        {"id": "transacoes", "label": "Transações", "icon": "fa-coins"},
+        {"id": "transacoes", "label": "Transa\u00e7\u00f5es", "icon": "fa-coins"},
         {"id": "tarefas", "label": "Tarefas", "icon": "fa-list-check"},
         {"id": "workspaces", "label": "Workspaces", "icon": "fa-users"},
+        {"id": "notificacoes", "label": "Notifica\u00e7\u00f5es", "icon": "fa-bell"},
+        {"id": "alertas", "label": "Or\u00e7amentos e metas", "icon": "fa-bullseye"},
+        {"id": "voz", "label": "Falar por voz", "icon": "fa-microphone"},
         {"id": "ia", "label": "Agente de IA", "icon": "fa-robot"},
-        {"id": "filtros", "label": "Filtros e exportação", "icon": "fa-filter"},
+        {"id": "filtros", "label": "Filtros e exporta\u00e7\u00e3o", "icon": "fa-filter"},
         {"id": "faq", "label": "FAQ", "icon": "fa-circle-question"},
     ]
 
     faq_items = [
-        {"question": "Como pedir acesso a um workspace?", "answer": "Use o botão Pedir acesso no menu do usuário e informe o slug do workspace. O owner aprova na tela de membros."},
-        {"question": "Quem pode ver finanças?", "answer": "Apenas o dono do workspace (owner) e o superuser. Membros comuns veem tarefas, mas não finanças."},
-        {"question": "Como funciona o agente de IA?", "answer": "Ele responde com base nos dados do seu workspace. Se a chave da OpenAI estiver configurada, a resposta vem do modelo; senão, um resumo local é exibido."},
-        {"question": "Posso exportar dados?", "answer": "Sim, há exportação CSV nas listas e endpoint JSON para gráficos."},
+        {
+            "question": "Como pedir acesso a um workspace?",
+            "answer": "Use o bot\u00e3o Pedir acesso no menu do usu\u00e1rio e informe o slug do workspace. O owner aprova na tela de membros.",
+        },
+        {
+            "question": "Quem pode ver finan\u00e7as?",
+            "answer": "Apenas o dono do workspace (owner) e o superuser. Membros comuns veem tarefas, mas n\u00e3o finan\u00e7as.",
+        },
+        {
+            "question": "Como funcionam alertas?",
+            "answer": "O owner configura or\u00e7amentos e metas na tela de Notifica\u00e7\u00f5es. Alertas chegam por e-mail e in-app.",
+        },
+        {
+            "question": "Onde configuro or\u00e7amentos e metas?",
+            "answer": "Acesse Notifica\u00e7\u00f5es e use os formul\u00e1rios de Or\u00e7amentos por categoria e Metas de saldo.",
+        },
+        {
+            "question": "Como ativar notificac\u00f5es por e-mail?",
+            "answer": "No Perfil, marque as prefer\u00eancias desejadas (saldo, tarefas, resumos, alertas).",
+        },
+        {
+            "question": "Como funciona o ditado por voz?",
+            "answer": "Use o bot\u00e3o Ditado em tarefas ou transa\u00e7\u00f5es. O sistema tenta extrair descri\u00e7\u00e3o, data, valor e etapas.",
+        },
+        {
+            "question": "Como funciona o agente de IA?",
+            "answer": "Ele responde com base nos dados do seu workspace. Se a chave da OpenAI estiver configurada, a resposta vem do modelo; sen\u00e3o, um resumo local \u00e9 exibido.",
+        },
+        {
+            "question": "Posso exportar dados?",
+            "answer": "Sim, h\u00e1 exporta\u00e7\u00e3o CSV nas listas e endpoint JSON para gr\u00e1ficos.",
+        },
+        {
+            "question": "Como trocar de workspace?",
+            "answer": "Use o seletor de workspace no topo da tela para alternar entre ambientes.",
+        },
+        {
+            "question": "Convidados acessam o financeiro?",
+            "answer": "N\u00e3o. Convidados acessam tarefas do workspace, mas n\u00e3o veem finan\u00e7as nem IA.",
+        },
+        {
+            "question": "Como ativar push no navegador?",
+            "answer": "Na tela de Notifica\u00e7\u00f5es, clique em Ativar push. Dispon\u00edvel quando VAPID estiver configurado.",
+        },
     ]
 
     return render(request, 'tracker/help.html', {"quick_links": quick_links, "faq_items": faq_items})
+
+
+def terms_page(request):
+    return render(request, 'tracker/terms.html')
+
+
+def privacy_page(request):
+    return render(request, 'tracker/privacy.html')
 
 
 # -------- Dashboard --------
@@ -200,7 +481,7 @@ def dashboard(request):
                 return first_tx.date, last_tx.date
         return reference_date.replace(day=1), reference_date
 
-    period = request.GET.get('period', '') or 'month'
+    period = request.GET.get('period', '') or 'all'
     start_param = request.GET.get('start')
     end_param = request.GET.get('end')
 
@@ -277,6 +558,15 @@ def dashboard(request):
     tasks_progress_pct = round((tasks_done / tasks_total) * 100, 1) if tasks_total else 100
     categories_qs = _apply_workspace_filter(Category.objects.all(), workspace, request.user)
     category_count = categories_qs.count()
+    latest_tasks = list(tasks_qs.order_by('-created_at')[:5])
+    for task in latest_tasks:
+        completed_late = False
+        if task.status == 'done' and task.due_date:
+            completed_at = task.completed_at or task.updated_at
+            completed_date = timezone.localdate(completed_at) if completed_at else None
+            if completed_date and completed_date > task.due_date:
+                completed_late = True
+        task.completed_late = completed_late
 
     context = {
         'income_total': income_total,
@@ -286,7 +576,7 @@ def dashboard(request):
         'tasks_done': tasks_done,
         'tasks_progress_pct': tasks_progress_pct,
         'latest_transactions': base_qs.order_by('-date')[:5],
-        'latest_tasks': tasks_qs.order_by('-created_at')[:5],
+        'latest_tasks': latest_tasks,
         'chart_labels': chart_labels,
         'chart_values': chart_values,
         'start_date': start_date,
@@ -389,7 +679,13 @@ def transaction_create(request):
         obj = form.save(commit=False)
         if workspace:
             obj.workspace = workspace
+        if obj.status == 'done':
+            obj.completed_at = timezone.now()
         obj.save()
+        if workspace:
+            notify_balance_threshold(workspace.owner, workspace)
+            check_category_budgets(workspace)
+            check_balance_goals(workspace)
         messages.success(request, 'Transação criada com sucesso.')
         return redirect('tracker:transactions_list')
     return render(request, 'tracker/transaction_form.html', {'form': form, 'is_edit': False})
@@ -413,6 +709,9 @@ def transaction_update(request, pk):
     is_detail = request.GET.get('detail') == '1'
     if request.method == 'POST' and form.is_valid():
         form.save()
+        if workspace:
+            check_category_budgets(workspace)
+            check_balance_goals(workspace)
         messages.success(request, 'Transação atualizada.')
         return redirect('tracker:transactions_list')
     return render(request, 'tracker/transaction_form.html', {'form': form, 'is_edit': True, 'object': transaction, 'is_detail': is_detail})
@@ -676,7 +975,7 @@ def _build_preview(rows, categories):
                     break
 
         if not category:
-            category, source, reason = _suggest_category_for_desc(desc, cat_hint, categories)
+            category, source, reason = _suggest_category_for_desc(desc, cat_hint, categories, user=request.user, workspace=workspace)
         if source == 'ai':
             ai_used = True
         preview.append({
@@ -738,28 +1037,28 @@ def _match_category(name_hint: str, description: str, categories):
     return categories[0]
 
 
-def _suggest_category_for_desc(desc: str, cat_hint: str, categories):
+def _suggest_category_for_desc(desc: str, cat_hint: str, categories, user=None, workspace=None):
     """
-    Sugere categoria com heurística + IA (se OPENAI_API_KEY estiver configurada).
-    Retorna (categoria, fonte, motivo) onde fonte é 'ai' ou 'heuristic'.
+    Sugere categoria com heuristica + IA (se OPENAI_API_KEY estiver configurada).
+    Retorna (categoria, fonte, motivo) onde fonte e 'ai' ou 'heuristic'.
     """
     if not categories:
-        return None, 'heuristic', 'Sem categorias disponíveis'
-    # heurística por hint
+        return None, 'heuristic', 'Sem categorias dispon\u00edveis'
+    # heuristica por hint
     hint = (cat_hint or '').strip().lower()
     if hint:
         for cat in categories:
             cname = cat.name.lower()
             if hint == cname or hint in cname:
-                return cat, 'heuristic', 'Correspondência pelo nome informado'
+                return cat, 'heuristic', 'Correspond\u00eancia pelo nome informado'
 
-    # heurística por substring no texto
+    # heuristica por substring no texto
     desc_lower = (desc or '').lower()
     for cat in categories:
         if cat.name.lower() in desc_lower:
-            return cat, 'heuristic', 'Nome da categoria presente na descrição'
+            return cat, 'heuristic', 'Nome da categoria presente na descri\u00e7\u00e3o'
 
-    # heurística por interseção de tokens
+    # heuristica por intersecao de tokens
     tokens = set(re.findall(r'\w+', desc_lower))
     best = None
     best_score = 0
@@ -770,29 +1069,31 @@ def _suggest_category_for_desc(desc: str, cat_hint: str, categories):
             best_score = score
             best = cat
     if best:
-        return best, 'heuristic', 'Maior interseção de palavras com a categoria'
+        return best, 'heuristic', 'Maior interse\u00e7\u00e3o de palavras com a categoria'
 
     # IA opcional
     if os.getenv("OPENAI_API_KEY"):
         names = [cat.name for cat in categories]
         sys_prompt = (
-            "Você é um classificador de categorias. Escolha uma das categorias existentes para a descrição fornecida. "
+            "Voc\u00ea \u00e9 um classificador de categorias. Escolha uma das categorias existentes para a descri\u00e7\u00e3o fornecida. "
             "Responda no formato 'CATEGORIA|motivo breve'. Use apenas uma das categorias listadas. "
-            "Se não souber, responda 'Sem categoria|motivo'."
+            "Se n\u00e3o souber, responda 'Sem categoria|motivo'."
         )
-        user_prompt = f"Categorias: {', '.join(names)}. Descrição: {desc}"
-        ai_choice = llm_reply(sys_prompt, user_prompt)
+        user_prompt = f"Categorias: {', '.join(names)}. Descri\u00e7\u00e3o: {desc}"
+        ai_choice, usage, model_name = llm_complete(sys_prompt, user_prompt)
         if ai_choice:
+            _record_ai_usage(user, workspace, 'import', usage or {}, model_name)
             parts = ai_choice.split('|', 1)
             choice_raw = parts[0].strip().lower()
-            reason = parts[1].strip() if len(parts) > 1 else 'Sugestão via IA'
+            reason = parts[1].strip() if len(parts) > 1 else 'Sugest\u00e3o via IA'
             for cat in categories:
                 if cat.name.lower() == choice_raw:
                     return cat, 'ai', reason
                 if choice_raw in cat.name.lower():
                     return cat, 'ai', reason
 
-    return categories[0], 'heuristic', 'Categoria padrão'
+    return categories[0], 'heuristic', 'Categoria padr\u00e3o'
+
 
 
 @login_required
@@ -856,6 +1157,10 @@ def transaction_import(request):
                 ))
             if to_create:
                 Transaction.objects.bulk_create(to_create, batch_size=500)
+                if workspace:
+                    notify_balance_threshold(workspace.owner, workspace)
+                    check_category_budgets(workspace)
+                    check_balance_goals(workspace)
                 messages.success(request, f'{len(to_create)} transações importadas com sucesso.')
             else:
                 messages.warning(request, 'Nenhuma transação válida para importar.')
@@ -914,6 +1219,14 @@ def tasks_list(request):
 
     paginator = Paginator(tasks, 12)
     page_obj = paginator.get_page(request.GET.get('page'))
+    for task in page_obj:
+        completed_late = False
+        if task.status == 'done' and task.due_date:
+            completed_at = task.completed_at or task.updated_at
+            completed_date = timezone.localdate(completed_at) if completed_at else None
+            if completed_date and completed_date > task.due_date:
+                completed_late = True
+        task.completed_late = completed_late
     query_params = request.GET.copy()
     query_params.pop('page', None)
     query_string = query_params.urlencode()
@@ -1001,13 +1314,21 @@ def task_update(request, pk):
     form = TaskForm(request.POST or None, instance=task)
     steps = task.steps.all()
     step_form = TaskStepForm()
+    prev_status = task.status
     if request.method == 'POST' and form.is_valid():
         if workspace and not request.user.is_superuser:
             membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
             if membership and not membership.can_edit_tasks:
                 messages.error(request, 'Você não tem permissão para editar tarefas neste workspace.')
                 return redirect('tracker:tasks_list')
-        form.save()
+        task = form.save(commit=False)
+        if prev_status != 'done' and task.status == 'done':
+            task.completed_at = timezone.now()
+        elif prev_status == 'done' and task.status != 'done':
+            task.completed_at = None
+        task.save()
+        if prev_status != 'done' and task.status == 'done':
+            notify_task_completed(task, actor=request.user)
         messages.success(request, 'Tarefa atualizada.')
         return redirect('tracker:tasks_list')
     return render(request, 'tracker/task_form.html', {'form': form, 'is_edit': True, 'object': task, 'is_detail': request.GET.get('detail') == '1', 'steps': steps, 'step_form': step_form})
@@ -1040,6 +1361,38 @@ def task_step_add(request, pk):
 
 
 @login_required
+def task_step_update(request, pk, step_id):
+    workspace = getattr(request, "workspace", None)
+    qs = Task.objects.all()
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    task = get_object_or_404(qs, pk=pk)
+    step = get_object_or_404(task.steps, pk=step_id)
+    prev_step_status = step.status
+    was_done = task.status == 'done'
+    if workspace and not request.user.is_superuser:
+        membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
+        if membership and not membership.can_edit_tasks:
+            messages.error(request, 'Voc\u00ea n\u00e3o pode editar etapas neste workspace.')
+            return redirect('tracker:task_update', pk=pk)
+    if request.method == 'POST':
+        form = TaskStepForm(request.POST, instance=step)
+        if form.is_valid():
+            step = form.save()
+            _update_task_progress(task)
+            if prev_step_status != 'done' and step.status == 'done':
+                notify_step_completed(task, step, actor=request.user)
+            if not was_done and task.status == 'done':
+                notify_task_completed(task, actor=request.user)
+            messages.success(request, 'Etapa atualizada.')
+        else:
+            messages.error(request, 'N\u00e3o foi poss\u00edvel atualizar a etapa.')
+    return redirect('tracker:task_update', pk=pk)
+
+
+@login_required
 def task_step_toggle(request, pk, step_id):
     workspace = getattr(request, "workspace", None)
     qs = Task.objects.all()
@@ -1049,14 +1402,28 @@ def task_step_toggle(request, pk, step_id):
         qs = qs.none()
     task = get_object_or_404(qs, pk=pk)
     step = get_object_or_404(TaskStep, pk=step_id, task=task)
+    was_done = task.status == 'done'
     if workspace and not request.user.is_superuser:
         membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
         if membership and not membership.can_edit_tasks:
             messages.error(request, 'Você não pode editar etapas neste workspace.')
             return redirect('tracker:task_update', pk=pk)
-    step.done = not step.done
+    if request.method != 'POST':
+        messages.error(request, 'Requisi\u00e7\u00e3o inv\u00e1lida.')
+        return redirect('tracker:task_update', pk=pk)
+
+    if step.status == 'done':
+        step.status = 'ongoing'
+    elif step.status == 'cancelled':
+        step.status = 'ongoing'
+    else:
+        step.status = 'done'
     step.save()
+    if step.status == 'done':
+        notify_step_completed(task, step, actor=request.user)
     _update_task_progress(task)
+    if not was_done and task.status == 'done':
+        notify_task_completed(task, actor=request.user)
     return redirect('tracker:task_update', pk=pk)
 
 
@@ -1081,17 +1448,27 @@ def task_step_delete(request, pk, step_id):
 
 
 def _update_task_progress(task: Task):
+    prev_status = task.status
     steps = task.steps.all()
     if steps.exists():
         total = steps.count()
-        done = steps.filter(done=True).count()
+        done = steps.filter(status='done').count()
         progress = (done / total) * 100
         task.progress = progress
         task.status = 'done' if done == total else 'ongoing'
     else:
         task.progress = 0
         task.status = 'done' if task.status == 'done' else 'ongoing'
-    task.save(update_fields=['progress', 'status', 'updated_at'])
+
+    update_fields = ['progress', 'status', 'updated_at']
+    if task.status == 'done' and prev_status != 'done':
+        task.completed_at = timezone.now()
+        update_fields.append('completed_at')
+    elif task.status != 'done' and prev_status == 'done':
+        task.completed_at = None
+        update_fields.append('completed_at')
+
+    task.save(update_fields=update_fields)
 
 
 @login_required
@@ -1131,23 +1508,28 @@ def task_toggle_status(request, pk):
             return redirect('tracker:tasks_list')
 
     if request.method == 'POST':
+        was_done = task.status == 'done'
         mark_done = task.status != 'done'
         if mark_done:
             if task.steps.exists():
-                task.steps.update(done=True)
+                task.steps.update(status='done', done=True)
                 _update_task_progress(task)
             else:
                 task.status = 'done'
                 task.progress = 100
-                task.save(update_fields=['status', 'progress', 'updated_at'])
+                task.completed_at = timezone.now()
+                task.save(update_fields=['status', 'progress', 'completed_at', 'updated_at'])
+            if not was_done:
+                notify_task_completed(task, actor=request.user)
         else:
             if task.steps.exists():
-                task.steps.update(done=False)
+                task.steps.update(status='ongoing', done=False)
                 _update_task_progress(task)
             else:
                 task.status = 'ongoing'
                 task.progress = 0
-                task.save(update_fields=['status', 'progress', 'updated_at'])
+                task.completed_at = None
+                task.save(update_fields=['status', 'progress', 'completed_at', 'updated_at'])
     return redirect('tracker:tasks_list')
 
 
@@ -1199,14 +1581,43 @@ def categories_list(request):
 
 
 @login_required
+def category_edit(request, pk):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Voc\u00ea n\u00e3o tem permiss\u00e3o para ver categorias.')
+        return redirect('tracker:dashboard')
+    qs = Category.objects.all()
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    category = get_object_or_404(qs, pk=pk)
+    form = CategoryForm(request.POST or None, instance=category)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Categoria atualizada.')
+        return redirect('tracker:categories_list')
+    return render(request, 'tracker/category_form.html', {'form': form, 'category': category})
+
+
+@login_required
 def category_delete(request, pk):
-    category = get_object_or_404(Category, pk=pk)
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Você não tem permissão para ver categorias.')
+        return redirect('tracker:dashboard')
+    qs = Category.objects.all()
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    category = get_object_or_404(qs, pk=pk)
     if request.method == 'POST':
         try:
             category.delete()
             messages.success(request, 'Categoria removida.')
         except ProtectedError:
-            messages.error(request, 'Não é possível remover: há transações vinculadas.')
+            messages.error(request, 'NÃo é possível remover: há transações vinculadas.')
     return redirect('tracker:categories_list')
 
 
@@ -1316,7 +1727,10 @@ def chart_data(request):
         )
         .order_by('year', 'month')
     )
-    monthly_labels = [f"{item['month']:02d}/{item['year']}" for item in monthly]
+    monthly_labels = [
+        datetime.date(item['year'], item['month'], 1).strftime('%d/%m/%Y')
+        for item in monthly
+    ]
     monthly_values = [float(item['net'] or 0) for item in monthly]
 
     top_income = (
@@ -1346,7 +1760,7 @@ def chart_data(request):
         )
         .order_by('date')
     )
-    daily_labels = [item['date'].strftime('%d/%m') for item in daily]
+    daily_labels = [item['date'].strftime('%d/%m/%Y') for item in daily]
     daily_values = [float(item['net'] or 0) for item in daily]
 
     running_labels = []
@@ -1354,7 +1768,7 @@ def chart_data(request):
     running_total = 0
     for item in daily:
         running_total += float(item['net'] or 0)
-        running_labels.append(item['date'].strftime('%d/%m'))
+        running_labels.append(item['date'].strftime('%d/%m/%Y'))
         running_values.append(running_total)
 
     return JsonResponse({
@@ -1380,8 +1794,9 @@ def chart_data(request):
 # -------- CSV exports --------
 
 def _export_transactions_csv(queryset):
-    response = HttpResponse(content_type='text/csv')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="transacoes.csv"'
+    response.write('\ufeff')
     writer = csv.writer(response)
     writer.writerow(['descricao', 'categoria', 'data', 'tipo', 'valor'])
     for tx in queryset:
@@ -1396,8 +1811,9 @@ def _export_transactions_csv(queryset):
 
 
 def _export_tasks_csv(queryset):
-    response = HttpResponse(content_type='text/csv')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="tarefas.csv"'
+    response.write('\ufeff')
     writer = csv.writer(response)
     writer.writerow(['titulo', 'prazo', 'status'])
     for task in queryset:
@@ -1417,11 +1833,33 @@ def login_view(request):
         return redirect('tracker:dashboard')
     form = LoginForm(request, data=request.POST or None)
     if request.method == 'POST':
+        if _is_login_blocked(request):
+            messages.error(request, 'Muitas tentativas. Aguarde alguns minutos e tente novamente.')
+            record_metric('login_blocked', metadata={'ip': request.META.get('REMOTE_ADDR')})
+            return render(request, 'tracker/auth_login.html', {'form': form})
         if form.is_valid():
             user = form.get_user()
+            profile = getattr(user, 'profile', None)
+            if getattr(settings, 'EMAIL_CONFIRMATION_REQUIRED', False) and not user.is_superuser:
+                if not (profile and profile.email_verified):
+                    messages.error(request, 'Confirme seu e-mail antes de entrar.')
+                    _register_login_failure(request)
+                    record_metric('login_failed', user=user, metadata={'reason': 'email_not_verified'})
+                    return render(request, 'tracker/auth_login.html', {'form': form})
             login(request, user)
+            _clear_login_failures(request)
+            record_metric('login_success', user=user, metadata={'ip': request.META.get('REMOTE_ADDR')})
+            if profile and profile.subscription_expires:
+                today = timezone.localdate()
+                grace_days = int(getattr(settings, 'SUBSCRIPTION_GRACE_DAYS', 7))
+                grace_until = profile.subscription_expires + datetime.timedelta(days=grace_days)
+                if today > profile.subscription_expires and today <= grace_until:
+                    remaining = (grace_until - today).days
+                    messages.warning(request, f'Assinatura expirada. Voc\u00ea tem {remaining} dia(s) de car\u00eancia.')
             messages.success(request, 'Bem-vindo(a) de volta!')
             return redirect(request.GET.get('next') or 'tracker:workspace_select')
+        _register_login_failure(request)
+        record_metric('login_failed', metadata={'ip': request.META.get('REMOTE_ADDR')})
     return render(request, 'tracker/auth_login.html', {'form': form})
 
 
@@ -1436,13 +1874,63 @@ def register_view(request):
         return redirect('tracker:dashboard')
     form = SignupForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
+        invite_code = (form.cleaned_data.get('invite_code') or '').strip()
+        invite = None
+        if invite_code:
+            invite = SubscriptionInvite.objects.filter(code__iexact=invite_code).first()
+            if not invite or not invite.can_use():
+                form.add_error('invite_code', 'Convite inv\u00e1lido ou expirado.')
+                return render(request, 'tracker/auth_register.html', {'form': form})
         with db_transaction.atomic():
             user = form.save()
             ws_name = form.cleaned_data.get('workspace_name') or f"Workspace de {user.username}"
             slug = _ensure_unique_slug(ws_name)
-            ws = Workspace.objects.create(name=ws_name, slug=slug, owner=user, is_active=False)
+            ws_active = False
+            if invite:
+                ws_active = True
+            ws = Workspace.objects.create(name=ws_name, slug=slug, owner=user, is_active=ws_active)
             WorkspaceMembership.objects.create(workspace=ws, user=user, role='owner')
-        messages.success(request, 'Cadastro enviado. Aguarde aprova\u00e7\u00e3o do administrador.')
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            if invite:
+                today = timezone.localdate()
+                if invite.plan_cycle == 'annual':
+                    expires = today + datetime.timedelta(days=365)
+                else:
+                    expires = today + datetime.timedelta(days=30)
+                profile.billing_cycle = invite.plan_cycle
+                profile.payment_confirmed = True
+                profile.payment_confirmed_at = timezone.now()
+                profile.subscription_expires = expires
+                profile.is_approved = True
+                profile.approved_at = timezone.now()
+                profile.approved_by = None
+                profile.save(update_fields=[
+                    'billing_cycle',
+                    'payment_confirmed',
+                    'payment_confirmed_at',
+                    'subscription_expires',
+                    'is_approved',
+                    'approved_at',
+                    'approved_by',
+                ])
+                SubscriptionInviteUse.objects.create(invite=invite, user=user)
+                SubscriptionInvite.objects.filter(pk=invite.id).update(used_count=F('used_count') + 1)
+                record_metric('payment_confirmed', user=user, workspace=ws, metadata={'source': 'invite'})
+            if getattr(settings, 'EMAIL_CONFIRMATION_REQUIRED', False):
+                profile.email_verified = False
+                profile.email_verified_at = None
+                profile.save(update_fields=['email_verified', 'email_verified_at'])
+                _send_email_verification(request, user)
+            else:
+                profile.email_verified = True
+                profile.email_verified_at = timezone.now()
+                profile.save(update_fields=['email_verified', 'email_verified_at'])
+            record_metric('signup', user=user, workspace=ws, metadata={'invite': bool(invite)})
+        if invite:
+            messages.success(request, 'Conta criada com convite. Voc\u00ea j\u00e1 pode acessar o sistema.')
+        else:
+            notify_new_account(user)
+            messages.success(request, 'Cadastro enviado. Aguarde aprova\u00e7\u00e3o do administrador.')
         return redirect('tracker:login')
     return render(request, 'tracker/auth_register.html', {'form': form})
 
@@ -1459,11 +1947,63 @@ def register_guest_view(request):
             profile.is_approved = True
             profile.approved_at = timezone.now()
             profile.approved_by = None
-            profile.save(update_fields=['is_guest', 'is_approved', 'approved_at', 'approved_by'])
+            profile.email_verified = True
+            profile.email_verified_at = timezone.now()
+            profile.save(update_fields=['is_guest', 'is_approved', 'approved_at', 'approved_by', 'email_verified', 'email_verified_at'])
+        record_metric('signup', user=user, metadata={'guest': True})
         login(request, user)
         messages.success(request, 'Conta de convidado criada. Pe\u00e7a acesso a um workspace.')
         return redirect('tracker:workspace_select')
     return render(request, 'tracker/auth_register_guest.html', {'form': form})
+
+
+def verify_email(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    success = False
+    if user and default_token_generator.check_token(user, token):
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile.email_verified = True
+        profile.email_verified_at = timezone.now()
+        profile.save(update_fields=['email_verified', 'email_verified_at'])
+        success = True
+
+    return render(request, 'tracker/email_verified.html', {'success': success})
+
+
+@login_required
+def workspace_overview(request):
+    profile = getattr(request.user, "profile", None)
+    is_guest = bool(profile and profile.is_guest)
+    current_workspace = getattr(request, "workspace", None)
+    memberships = WorkspaceMembership.objects.select_related('workspace', 'workspace__owner').filter(
+        user=request.user,
+        workspace__is_active=True,
+    ).order_by('workspace__name')
+    owned_workspaces = Workspace.objects.filter(owner=request.user, is_active=True).order_by('name')
+    pending_invites = WorkspaceInvite.objects.select_related('workspace', 'invited_by').filter(
+        invited_user=request.user,
+        status='pending',
+    )
+    all_workspaces = Workspace.objects.filter(is_active=True).order_by('name') if request.user.is_superuser else None
+
+    return render(
+        request,
+        'tracker/workspace_overview.html',
+        {
+            'current_workspace': current_workspace,
+            'memberships': memberships,
+            'owned_workspaces': owned_workspaces,
+            'pending_invites': pending_invites,
+            'all_workspaces': all_workspaces,
+            'is_guest': is_guest,
+            'can_create': not is_guest,
+        },
+    )
 
 
 @login_required
@@ -1471,6 +2011,7 @@ def workspace_select(request):
     profile = getattr(request.user, "profile", None)
     is_guest = bool(profile and profile.is_guest)
     memberships = WorkspaceMembership.objects.select_related('workspace').filter(user=request.user, workspace__is_active=True)
+    pending_invites = WorkspaceInvite.objects.select_related('workspace', 'invited_by').filter(invited_user=request.user, status='pending')
     create_form = WorkspaceForm(prefix='create')
     slug_form = WorkspaceSlugForm(prefix='slug')
 
@@ -1516,6 +2057,7 @@ def workspace_select(request):
         'tracker/workspace_select.html',
         {
             'memberships': memberships,
+            'pending_invites': pending_invites,
             'create_form': create_form,
             'slug_form': slug_form,
             'all_workspaces': all_workspaces,
@@ -1569,6 +2111,7 @@ def workspace_members(request, slug=None):
     invite_form = WorkspaceMemberInviteForm(request.POST or None)
     invite_username_form = InviteByUsernameForm(request.POST or None, prefix='byuser')
     pending_requests = WorkspaceAccessRequest.objects.filter(workspace=target_ws, status='pending')
+    pending_invites = WorkspaceInvite.objects.filter(workspace=target_ws, status='pending').select_related('invited_user')
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1579,25 +2122,39 @@ def workspace_members(request, slug=None):
 
             user = User.objects.filter(email=email).first()
             if not user:
-                base_username = slugify(email.split('@')[0]) or 'usuario'
-                username = base_username
-                counter = 1
-                while User.objects.filter(username=username).exists():
-                    username = f"{base_username}{counter}"
-                    counter += 1
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    password=User.objects.make_random_password(),
-                    first_name=name,
-                )
-            membership, created = WorkspaceMembership.objects.get_or_create(workspace=target_ws, user=user, defaults={'role': role, 'can_edit_tasks': True})
+                messages.error(request, 'Usuário não encontrado. Peça para ele criar uma conta.')
+                return redirect('tracker:workspace_members', slug=target_ws.slug)
+            if WorkspaceMembership.objects.filter(workspace=target_ws, user=user).exists():
+                messages.info(request, 'Usuário já faz parte do workspace.')
+                return redirect('tracker:workspace_members', slug=target_ws.slug)
+
+            existing_invite = WorkspaceInvite.objects.filter(
+                workspace=target_ws,
+                invited_user=user,
+                status='pending',
+            ).first()
+            if not existing_invite and not request.user.is_superuser and not _is_paid_user(user):
+                unpaid_total = _workspace_unpaid_count(target_ws) + _workspace_unpaid_invite_count(target_ws)
+                if unpaid_total >= 3:
+                    messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+                    return redirect('tracker:workspace_members', slug=target_ws.slug)
+
+
+            invite, created = WorkspaceInvite.objects.get_or_create(
+                workspace=target_ws,
+                invited_user=user,
+                status='pending',
+                defaults={'invited_by': request.user, 'role': role, 'can_edit_tasks': True},
+            )
             if not created:
-                membership.role = role
-                membership.save(update_fields=['role', 'updated_at'])
-                messages.info(request, 'Membro atualizado.')
+                invite.role = role
+                invite.invited_by = request.user
+                invite.can_edit_tasks = True
+                invite.save(update_fields=['role', 'invited_by', 'can_edit_tasks'])
+                messages.info(request, 'Convite atualizado e reenviado.')
             else:
-                messages.success(request, 'Membro adicionado.')
+                messages.success(request, 'Convite enviado.')
+            record_metric('invite_sent', user=request.user, workspace=target_ws, metadata={'target': user.username})
             return redirect('tracker:workspace_members', slug=target_ws.slug)
         if action == 'invite_username' and invite_username_form.is_valid():
             username = invite_username_form.cleaned_data['username']
@@ -1606,13 +2163,37 @@ def workspace_members(request, slug=None):
             if not user:
                 messages.error(request, 'Usuário não encontrado.')
                 return redirect('tracker:workspace_members', slug=target_ws.slug)
-            membership, created = WorkspaceMembership.objects.get_or_create(workspace=target_ws, user=user, defaults={'role': role, 'can_edit_tasks': True})
+            if WorkspaceMembership.objects.filter(workspace=target_ws, user=user).exists():
+                messages.info(request, 'Usuário já faz parte do workspace.')
+                return redirect('tracker:workspace_members', slug=target_ws.slug)
+
+            existing_invite = WorkspaceInvite.objects.filter(
+                workspace=target_ws,
+                invited_user=user,
+                status='pending',
+            ).first()
+            if not existing_invite and not request.user.is_superuser and not _is_paid_user(user):
+                unpaid_total = _workspace_unpaid_count(target_ws) + _workspace_unpaid_invite_count(target_ws)
+                if unpaid_total >= 3:
+                    messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+                    return redirect('tracker:workspace_members', slug=target_ws.slug)
+
+
+            invite, created = WorkspaceInvite.objects.get_or_create(
+                workspace=target_ws,
+                invited_user=user,
+                status='pending',
+                defaults={'invited_by': request.user, 'role': role, 'can_edit_tasks': True},
+            )
             if not created:
-                membership.role = role
-                membership.save(update_fields=['role', 'updated_at'])
-                messages.info(request, 'Membro atualizado.')
+                invite.role = role
+                invite.invited_by = request.user
+                invite.can_edit_tasks = True
+                invite.save(update_fields=['role', 'invited_by', 'can_edit_tasks'])
+                messages.info(request, 'Convite atualizado e reenviado.')
             else:
-                messages.success(request, 'Membro adicionado.')
+                messages.success(request, 'Convite enviado.')
+            record_metric('invite_sent', user=request.user, workspace=target_ws, metadata={'target': user.username})
             return redirect('tracker:workspace_members', slug=target_ws.slug)
 
     return render(
@@ -1624,6 +2205,84 @@ def workspace_members(request, slug=None):
             'invite_form': invite_form,
             'invite_username_form': invite_username_form,
             'pending_requests': pending_requests,
+            'pending_invites': pending_invites,
+        },
+    )
+
+
+@login_required
+def workspace_invite(request, slug=None):
+    target_ws = None
+    if slug:
+        target_ws = Workspace.objects.filter(slug=slug).first()
+    else:
+        target_ws = getattr(request, "workspace", None)
+
+    if not target_ws:
+        messages.error(request, 'Selecione um workspace antes de convidar membros.')
+        return redirect('tracker:workspace_select')
+
+    is_owner = request.user.is_superuser or WorkspaceMembership.objects.filter(
+        workspace=target_ws,
+        user=request.user,
+        role='owner'
+    ).exists()
+    if not is_owner:
+        messages.error(request, 'Apenas owners podem convidar membros.')
+        return redirect('tracker:dashboard')
+
+    invite_form = InviteByUsernameForm(request.POST or None)
+    pending_invites = WorkspaceInvite.objects.filter(
+        workspace=target_ws,
+        status='pending'
+    ).select_related('invited_user', 'invited_by')
+
+    if request.method == 'POST' and invite_form.is_valid():
+        username = invite_form.cleaned_data['username']
+        role = invite_form.cleaned_data['role']
+        user = User.objects.filter(username=username).first()
+        if not user:
+            messages.error(request, 'Usu\u00e1rio n\u00e3o encontrado.')
+            return redirect('tracker:workspace_invite', slug=target_ws.slug)
+        if WorkspaceMembership.objects.filter(workspace=target_ws, user=user).exists():
+            messages.info(request, 'Usu\u00e1rio j\u00e1 faz parte do workspace.')
+            return redirect('tracker:workspace_invite', slug=target_ws.slug)
+
+        existing_invite = WorkspaceInvite.objects.filter(
+            workspace=target_ws,
+            invited_user=user,
+            status='pending',
+        ).first()
+        if not existing_invite and not request.user.is_superuser and not _is_paid_user(user):
+            unpaid_total = _workspace_unpaid_count(target_ws) + _workspace_unpaid_invite_count(target_ws)
+            if unpaid_total >= 3:
+                messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+                return redirect('tracker:workspace_invite', slug=target_ws.slug)
+
+        invite, created = WorkspaceInvite.objects.get_or_create(
+            workspace=target_ws,
+            invited_user=user,
+            status='pending',
+            defaults={'invited_by': request.user, 'role': role, 'can_edit_tasks': True},
+        )
+        if not created:
+            invite.role = role
+            invite.invited_by = request.user
+            invite.can_edit_tasks = True
+            invite.save(update_fields=['role', 'invited_by', 'can_edit_tasks'])
+            messages.info(request, 'Convite atualizado e reenviado.')
+        else:
+            messages.success(request, 'Convite enviado.')
+        record_metric('invite_sent', user=request.user, workspace=target_ws, metadata={'target': user.username})
+        return redirect('tracker:workspace_invite', slug=target_ws.slug)
+
+    return render(
+        request,
+        'tracker/workspace_invite.html',
+        {
+            'workspace': target_ws,
+            'invite_form': invite_form,
+            'pending_invites': pending_invites,
         },
     )
 
@@ -1681,12 +2340,20 @@ def workspace_request_action(request, slug, req_id, decision):
     if not workspace:
         messages.error(request, 'Workspace não encontrado.')
         return redirect('tracker:workspace_select')
+    if request.method != 'POST':
+        messages.error(request, 'Requisição inválida.')
+        return redirect('tracker:workspace_members', slug=slug)
     is_owner = request.user.is_superuser or WorkspaceMembership.objects.filter(workspace=workspace, user=request.user, role='owner').exists()
     if not is_owner:
         messages.error(request, 'Apenas owners podem aprovar pedidos.')
         return redirect('tracker:dashboard')
     req = get_object_or_404(WorkspaceAccessRequest, pk=req_id, workspace=workspace)
     if decision == 'approve':
+        if not request.user.is_superuser and not _is_paid_user(req.user):
+            unpaid_total = _workspace_unpaid_count(workspace) + _workspace_unpaid_invite_count(workspace)
+            if unpaid_total >= 3:
+                messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+                return redirect('tracker:workspace_members', slug=slug)
         WorkspaceMembership.objects.get_or_create(workspace=workspace, user=req.user, defaults={'role': 'member'})
         req.status = 'approved'
         req.save(update_fields=['status', 'updated_at'])
@@ -1699,17 +2366,331 @@ def workspace_request_action(request, slug, req_id, decision):
 
 
 @login_required
+def workspace_invite_action(request, invite_id, decision):
+    invite = get_object_or_404(WorkspaceInvite, pk=invite_id, invited_user=request.user)
+    if request.method != 'POST':
+        messages.error(request, 'Requisi\u00e7\u00e3o inv\u00e1lida.')
+        return redirect('tracker:workspace_select')
+    if invite.status != 'pending':
+        messages.info(request, 'Este convite j\u00e1 foi respondido.')
+        return redirect('tracker:workspace_select')
+
+    if decision == 'accept':
+        if not request.user.is_superuser and not _is_paid_user(invite.invited_user):
+            unpaid_invites = _workspace_unpaid_invite_count(invite.workspace)
+            unpaid_total = _workspace_unpaid_count(invite.workspace) + max(unpaid_invites - 1, 0)
+            if unpaid_total >= 3:
+                messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+                return redirect('tracker:workspace_select')
+        WorkspaceMembership.objects.get_or_create(
+            workspace=invite.workspace,
+            user=request.user,
+            defaults={'role': invite.role, 'can_edit_tasks': invite.can_edit_tasks},
+        )
+        invite.status = 'accepted'
+        invite.responded_at = timezone.now()
+        invite.save(update_fields=['status', 'responded_at'])
+        record_metric('invite_accepted', user=request.user, workspace=invite.workspace)
+        request.session['workspace_slug'] = invite.workspace.slug
+        request.session['workspace_global'] = False
+        messages.success(request, 'Convite aceito. Workspace selecionado.')
+    elif decision == 'decline':
+        invite.status = 'declined'
+        invite.responded_at = timezone.now()
+        invite.save(update_fields=['status', 'responded_at'])
+        messages.info(request, 'Convite recusado.')
+    return redirect('tracker:workspace_select')
+
+
+@login_required
 def profile_edit(request):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
     form = ProfileForm(request.POST or None, instance=user)
     avatar_form = ProfileAvatarForm(request.POST or None, request.FILES or None, instance=profile)
-    if request.method == 'POST' and form.is_valid() and avatar_form.is_valid():
+    pref_form = NotificationPreferencesForm(request.POST or None, instance=profile, user=request.user)
+    if request.method == 'POST' and form.is_valid() and avatar_form.is_valid() and pref_form.is_valid():
         form.save()
         avatar_form.save()
+        pref_form.save()
         messages.success(request, 'Perfil atualizado.')
         return redirect('tracker:profile_edit')
-    return render(request, 'tracker/profile_edit.html', {'form': form, 'avatar_form': avatar_form})
+    return render(
+        request,
+        'tracker/profile_edit.html',
+        {
+            'form': form,
+            'avatar_form': avatar_form,
+            'pref_form': pref_form,
+            'show_admin_prefs': request.user.is_superuser,
+            'profile': profile,
+        },
+    )
+
+
+@login_required
+def export_my_data(request):
+    user = request.user
+    owned_workspaces = Workspace.objects.filter(owner=user)
+    member_workspace_ids = WorkspaceMembership.objects.filter(user=user).values_list('workspace_id', flat=True)
+    workspace_ids = set(member_workspace_ids) | set(owned_workspaces.values_list('id', flat=True))
+
+    task_qs = Task.objects.filter(workspace_id__in=workspace_ids).select_related('workspace')
+    steps_qs = TaskStep.objects.filter(task__in=task_qs).select_related('task')
+
+    transactions_qs = Transaction.objects.none()
+    categories_qs = Category.objects.none()
+    profile = getattr(user, 'profile', None)
+    if user.is_superuser or (profile and not profile.is_guest):
+        transactions_qs = Transaction.objects.filter(workspace__in=owned_workspaces).select_related('workspace', 'category')
+        categories_qs = Category.objects.filter(workspace__in=owned_workspaces)
+
+    payload = {
+        'user': {
+            'username': user.username,
+            'name': user.get_full_name(),
+            'email': user.email,
+            'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+        },
+        'workspaces_owned': [
+            {'id': ws.id, 'name': ws.name, 'slug': ws.slug, 'created_at': ws.created_at.isoformat()}
+            for ws in owned_workspaces
+        ],
+        'tasks': [
+            {
+                'id': t.id,
+                'title': t.title,
+                'due_date': t.due_date.isoformat() if t.due_date else None,
+                'status': t.status,
+                'progress': float(t.progress or 0),
+                'workspace': t.workspace.slug if t.workspace else None,
+                'created_at': t.created_at.isoformat(),
+            }
+            for t in task_qs
+        ],
+        'task_steps': [
+            {
+                'id': s.id,
+                'task_id': s.task_id,
+                'title': s.title,
+                'status': s.status,
+                'order': s.order,
+                'responsible': s.responsible,
+                'responsible_email': s.responsible_email,
+                'created_at': s.created_at.isoformat(),
+            }
+            for s in steps_qs
+        ],
+        'transactions': [
+            {
+                'id': tx.id,
+                'description': tx.description,
+                'date': tx.date.isoformat(),
+                'value': float(tx.value),
+                'type': tx.type,
+                'category': tx.category.name if tx.category else None,
+                'workspace': tx.workspace.slug if tx.workspace else None,
+                'created_at': tx.created_at.isoformat(),
+            }
+            for tx in transactions_qs
+        ],
+        'categories': [
+            {
+                'id': cat.id,
+                'name': cat.name,
+                'color': cat.color,
+                'workspace': cat.workspace.slug if cat.workspace else None,
+            }
+            for cat in categories_qs
+        ],
+    }
+    record_metric('data_export', user=user, metadata={'scope': 'self'})
+    response = HttpResponse(json.dumps(payload, ensure_ascii=False, indent=2), content_type='application/json; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="meus_dados.json"'
+    return response
+
+
+@login_required
+def account_delete_request(request):
+    if request.method != 'POST':
+        return redirect('tracker:profile_edit')
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if profile.deletion_requested_at:
+        messages.info(request, 'Sua solicita\u00e7\u00e3o j\u00e1 foi registrada.')
+        return redirect('tracker:profile_edit')
+    profile.deletion_requested_at = timezone.now()
+    profile.save(update_fields=['deletion_requested_at'])
+    notify_account_deletion_request(request.user)
+    record_metric('deletion_request', user=request.user)
+    messages.success(request, 'Solicita\u00e7\u00e3o enviada. O administrador entrar\u00e1 em contato.')
+    return redirect('tracker:profile_edit')
+
+
+@login_required
+def contact_admin(request):
+    initial = {}
+    if request.GET.get('topic') in ('general', 'payment', 'support'):
+        initial['topic'] = request.GET.get('topic')
+    form = ContactAdminForm(request.POST or None, initial=initial)
+    if request.method == 'POST' and form.is_valid():
+        notify_contact_message(
+            request.user,
+            form.cleaned_data['topic'],
+            form.cleaned_data['subject'],
+            form.cleaned_data['message'],
+        )
+        messages.success(request, 'Mensagem enviada ao administrador.')
+        return redirect('tracker:contact_admin')
+    return render(request, 'tracker/contact_admin.html', {'form': form})
+
+
+@login_required
+def notifications_center(request):
+    user = request.user
+    filter_mode = request.GET.get('filter', 'all')
+    qs = Notification.objects.filter(user=user).select_related('workspace')
+    if filter_mode == 'unread':
+        qs = qs.filter(read_at__isnull=True)
+    notifications = qs.order_by('-created_at')[:80]
+
+    workspace = getattr(request, "workspace", None)
+    can_manage_finance = _user_can_view_finance(request, workspace)
+    budget_form = CategoryBudgetForm()
+    goal_form = BalanceGoalForm()
+    budgets = CategoryBudget.objects.none()
+    goals = BalanceGoal.objects.none()
+    if workspace and can_manage_finance:
+        budget_form.fields['category'].queryset = Category.objects.filter(workspace=workspace)
+        budgets = CategoryBudget.objects.filter(workspace=workspace).select_related('category').order_by('category__name')
+        goals = BalanceGoal.objects.filter(workspace=workspace).order_by('period')
+
+    context = {
+        'notifications': notifications,
+        'budget_form': budget_form,
+        'goal_form': goal_form,
+        'budgets': budgets,
+        'goals': goals,
+        'current_workspace': workspace,
+        'can_manage_finance': can_manage_finance,
+        'vapid_public_key': getattr(settings, 'VAPID_PUBLIC_KEY', ''),
+    }
+    return render(request, 'tracker/notifications_center.html', context)
+
+
+@login_required
+def notifications_mark_read(request, pk):
+    if request.method == 'POST':
+        Notification.objects.filter(pk=pk, user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    return redirect('tracker:notifications')
+
+
+@login_required
+def notifications_mark_all(request):
+    if request.method == 'POST':
+        Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    return redirect('tracker:notifications')
+
+
+@login_required
+def push_subscribe(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'invalid_method'}, status=405)
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'invalid_payload'}, status=400)
+    endpoint = payload.get('endpoint')
+    keys = payload.get('keys', {}) or {}
+    if not endpoint:
+        return JsonResponse({'error': 'missing_endpoint'}, status=400)
+    PushSubscription.objects.update_or_create(
+        user=request.user,
+        endpoint=endpoint,
+        defaults={'p256dh': keys.get('p256dh', ''), 'auth': keys.get('auth', '')},
+    )
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def push_unsubscribe(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'invalid_method'}, status=405)
+    PushSubscription.objects.filter(user=request.user).delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def category_budget_create(request):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Voc\u00ea n\u00e3o pode configurar or\u00e7amentos neste workspace.')
+        return redirect('tracker:notifications')
+    if request.method != 'POST':
+        return redirect('tracker:notifications')
+    form = CategoryBudgetForm(request.POST)
+    if form.is_valid():
+        CategoryBudget.objects.update_or_create(
+            workspace=workspace,
+            category=form.cleaned_data['category'],
+            period=form.cleaned_data['period'],
+            defaults={
+                'limit_value': form.cleaned_data['limit_value'],
+                'notify_owner': form.cleaned_data['notify_owner'],
+            },
+        )
+        messages.success(request, 'Or\u00e7amento atualizado.')
+    else:
+        messages.error(request, 'N\u00e3o foi poss\u00edvel salvar o or\u00e7amento.')
+    return redirect('tracker:notifications')
+
+
+@login_required
+def category_budget_delete(request, pk):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover or\u00e7amentos deste workspace.')
+        return redirect('tracker:notifications')
+    if request.method == 'POST':
+        CategoryBudget.objects.filter(pk=pk, workspace=workspace).delete()
+        messages.success(request, 'Or\u00e7amento removido.')
+    return redirect('tracker:notifications')
+
+
+@login_required
+def balance_goal_create(request):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Voc\u00ea n\u00e3o pode configurar metas neste workspace.')
+        return redirect('tracker:notifications')
+    if request.method != 'POST':
+        return redirect('tracker:notifications')
+    form = BalanceGoalForm(request.POST)
+    if form.is_valid():
+        BalanceGoal.objects.update_or_create(
+            workspace=workspace,
+            period=form.cleaned_data['period'],
+            direction=form.cleaned_data['direction'],
+            defaults={
+                'target_value': form.cleaned_data['target_value'],
+                'notify_owner': form.cleaned_data['notify_owner'],
+            },
+        )
+        messages.success(request, 'Meta atualizada.')
+    else:
+        messages.error(request, 'N\u00e3o foi poss\u00edvel salvar a meta.')
+    return redirect('tracker:notifications')
+
+
+@login_required
+def balance_goal_delete(request, pk):
+    workspace = getattr(request, "workspace", None)
+    if not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover metas deste workspace.')
+        return redirect('tracker:notifications')
+    if request.method == 'POST':
+        BalanceGoal.objects.filter(pk=pk, workspace=workspace).delete()
+        messages.success(request, 'Meta removida.')
+    return redirect('tracker:notifications')
 
 
 @login_required
@@ -1766,6 +2747,45 @@ def workspace_member_update(request, slug, member_id):
     return redirect('tracker:workspace_members', slug=slug)
 
 
+# ---------- Subscription invites ----------
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def subscription_invite_list(request):
+    form = SubscriptionInviteForm(request.POST or None)
+    invites = SubscriptionInvite.objects.all().order_by('-created_at')
+    if request.method == 'POST' and form.is_valid():
+        invite = form.save(commit=False)
+        invite.code = (invite.code or _generate_invite_code()).strip().upper()
+        invite.created_by = request.user
+        invite.save()
+        messages.success(request, f'Convite {invite.code} criado.')
+        return redirect('tracker:subscription_invite_list')
+    return render(request, 'tracker/subscription_invites.html', {'form': form, 'invites': invites})
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def subscription_invite_action(request, pk, action):
+    invite = get_object_or_404(SubscriptionInvite, pk=pk)
+    if request.method != 'POST':
+        return redirect('tracker:subscription_invite_list')
+    if action == 'toggle':
+        invite.is_active = not invite.is_active
+        invite.save(update_fields=['is_active'])
+        messages.success(request, 'Status do convite atualizado.')
+    elif action == 'reset':
+        invite.used_count = 0
+        invite.save(update_fields=['used_count'])
+        SubscriptionInviteUse.objects.filter(invite=invite).delete()
+        messages.success(request, 'Uso do convite reiniciado.')
+    elif action == 'delete':
+        invite.delete()
+        messages.success(request, 'Convite removido.')
+    return redirect('tracker:subscription_invite_list')
+
+
 # ---------- Admin / superuser dashboards ----------
 
 
@@ -1780,6 +2800,15 @@ def superuser_overview(request):
             selected_user = users_all.get(id=selected_user_id)
         except User.DoesNotExist:
             selected_user = None
+
+    pricing_config = PricingConfig.get_solo()
+    pricing_form = PricingConfigForm(request.POST or None, instance=pricing_config)
+    if request.method == 'POST' and request.POST.get('pricing_form') == '1':
+        if pricing_form.is_valid():
+            pricing_form.save()
+            messages.success(request, 'Pre\u00e7os atualizados com sucesso.')
+            return redirect('tracker:superuser_overview')
+        messages.error(request, 'Corrija os campos da promo\u00e7\u00e3o.')
 
     tx_qs = Transaction.objects.all()
     ws_qs = Workspace.objects.all()
@@ -1808,7 +2837,83 @@ def superuser_overview(request):
     avg_tx_per_user = total_transactions / total_users if total_users else 0
     tasks_open = task_qs.filter(status='ongoing').count()
     tasks_done = task_qs.filter(status='done').count()
-    recent_workspaces = ws_qs.order_by('-created_at')[:8]
+    income_sub = (
+        Transaction.objects.filter(workspace=OuterRef('pk'), type='income')
+        .values('workspace')
+        .annotate(total=Sum('value'))
+        .values('total')
+    )
+    expense_sub = (
+        Transaction.objects.filter(workspace=OuterRef('pk'), type='expense')
+        .values('workspace')
+        .annotate(total=Sum('value'))
+        .values('total')
+    )
+    zero_value = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
+    recent_workspaces = (
+        ws_qs.annotate(
+            member_count=Count('memberships', distinct=True),
+            tx_count=Count('transactions', distinct=True),
+            task_count=Count('tasks', distinct=True),
+            last_tx_date=Max('transactions__date'),
+            last_task_update=Max('tasks__updated_at'),
+            income_sum=Coalesce(Subquery(income_sub, output_field=DecimalField(max_digits=12, decimal_places=2)), zero_value),
+            expense_sum=Coalesce(Subquery(expense_sub, output_field=DecimalField(max_digits=12, decimal_places=2)), zero_value),
+        ).annotate(
+            net_sum=ExpressionWrapper(
+                F('income_sum') - F('expense_sum'),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        ).order_by('-created_at')[:8]
+    )
+
+    ai_qs = AiUsage.objects.all()
+    if selected_user:
+        ai_qs = ai_qs.filter(user=selected_user)
+    ai_requests = ai_qs.count()
+    ai_totals = ai_qs.aggregate(tokens=Sum('total_tokens'), cost_brl=Sum('cost_brl'), cost_usd=Sum('cost_usd'))
+    ai_tokens = ai_totals['tokens'] or 0
+    ai_cost_brl = ai_totals['cost_brl'] or 0
+    ai_cost_usd = ai_totals['cost_usd'] or 0
+    ai_last30 = ai_qs.filter(created_at__date__gte=last30).aggregate(tokens=Sum('total_tokens'), cost_brl=Sum('cost_brl'))
+    ai_last30_tokens = ai_last30['tokens'] or 0
+    ai_last30_cost_brl = ai_last30['cost_brl'] or 0
+    ai_chat_tokens = ai_qs.filter(feature='chat').aggregate(tokens=Sum('total_tokens'))['tokens'] or 0
+    ai_import_tokens = ai_qs.filter(feature='import').aggregate(tokens=Sum('total_tokens'))['tokens'] or 0
+
+    ai_daily = (
+        ai_qs.filter(created_at__date__gte=last30)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(tokens=Sum('total_tokens'), cost=Sum('cost_brl'))
+        .order_by('day')
+    )
+    ai_daily_labels = [item['day'].strftime('%d/%m') for item in ai_daily]
+    ai_daily_tokens = [int(item['tokens'] or 0) for item in ai_daily]
+    ai_daily_costs = [float(item['cost'] or 0) for item in ai_daily]
+
+    ai_by_feature = ai_qs.values('feature').annotate(tokens=Sum('total_tokens')).order_by('feature')
+    ai_feature_labels = ['Chat' if item['feature'] == 'chat' else 'Importa\u00e7\u00e3o' for item in ai_by_feature]
+    ai_feature_tokens = [int(item['tokens'] or 0) for item in ai_by_feature]
+
+    metric_qs = MetricEvent.objects.all()
+    if selected_user:
+        metric_qs = metric_qs.filter(user=selected_user)
+    metric_since = timezone.now() - datetime.timedelta(days=30)
+    metric_last30 = metric_qs.filter(created_at__gte=metric_since)
+    metric_counts = {
+        item['event_type']: item['total']
+        for item in metric_last30.values('event_type').annotate(total=Count('id'))
+    }
+    login_success_30 = metric_counts.get('login_success', 0)
+    login_failed_30 = metric_counts.get('login_failed', 0)
+    login_blocked_30 = metric_counts.get('login_blocked', 0)
+    signup_30 = metric_counts.get('signup', 0)
+    invite_sent_30 = metric_counts.get('invite_sent', 0)
+    invite_accepted_30 = metric_counts.get('invite_accepted', 0)
+    payment_confirmed_30 = metric_counts.get('payment_confirmed', 0)
+    subscription_renewed_30 = metric_counts.get('subscription_renewed', 0)
+    data_export_30 = metric_counts.get('data_export', 0)
 
     # Global finance stats
     income_total = tx_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
@@ -1878,6 +2983,30 @@ def superuser_overview(request):
         'top_users': top_users,
         'users_all': users_all,
         'selected_user': selected_user,
+        'ai_requests': ai_requests,
+        'ai_tokens': ai_tokens,
+        'ai_cost_brl': ai_cost_brl,
+        'ai_cost_usd': ai_cost_usd,
+        'ai_last30_tokens': ai_last30_tokens,
+        'ai_last30_cost_brl': ai_last30_cost_brl,
+        'ai_chat_tokens': ai_chat_tokens,
+        'ai_import_tokens': ai_import_tokens,
+        'ai_daily_labels': ai_daily_labels,
+        'ai_daily_tokens': ai_daily_tokens,
+        'ai_daily_costs': ai_daily_costs,
+        'ai_feature_labels': ai_feature_labels,
+        'ai_feature_tokens': ai_feature_tokens,
+        'login_success_30': login_success_30,
+        'login_failed_30': login_failed_30,
+        'login_blocked_30': login_blocked_30,
+        'signup_30': signup_30,
+        'invite_sent_30': invite_sent_30,
+        'invite_accepted_30': invite_accepted_30,
+        'payment_confirmed_30': payment_confirmed_30,
+        'subscription_renewed_30': subscription_renewed_30,
+        'data_export_30': data_export_30,
+        'pricing_form': pricing_form,
+        'pricing_config': pricing_config,
     }
     return render(request, 'tracker/superuser_overview.html', context)
 
@@ -1980,8 +3109,74 @@ def user_admin_form(request, pk=None):
 def user_admin_status(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
     if request.method != 'POST':
-        messages.error(request, 'Requisição inválida.')
+        messages.error(request, 'Requisi??o inv?lida.')
         return redirect('tracker:user_admin_list')
+
+    action = request.POST.get('action')
+    profile, _ = UserProfile.objects.get_or_create(user=user_obj)
+    today = timezone.localdate()
+    if profile.is_guest:
+        messages.error(request, 'Conta de convidado n?o requer aprova??o.')
+        return redirect('tracker:user_admin_list')
+
+    if action == 'approve':
+        profile.is_approved = True
+        profile.approved_at = timezone.now()
+        profile.approved_by = request.user
+        if not profile.subscription_expires or profile.subscription_expires < today:
+            profile.subscription_expires = today + datetime.timedelta(days=30)
+        profile.save(update_fields=['is_approved', 'approved_at', 'approved_by', 'subscription_expires'])
+        Workspace.objects.filter(owner=user_obj).update(is_active=True)
+        record_metric('subscription_renewed', user=user_obj, metadata={'cycle': 'monthly', 'action': 'approve'})
+        messages.success(request, 'Cadastro aprovado.')
+    elif action == 'renew':
+        base_date = profile.subscription_expires or today
+        if base_date < today:
+            base_date = today
+        profile.subscription_expires = base_date + datetime.timedelta(days=30)
+        profile.is_approved = True
+        if not profile.approved_at:
+            profile.approved_at = timezone.now()
+        profile.save(update_fields=['subscription_expires', 'is_approved', 'approved_at'])
+        Workspace.objects.filter(owner=user_obj).update(is_active=True)
+        record_metric('subscription_renewed', user=user_obj, metadata={'cycle': 'monthly'})
+        messages.success(request, 'Cadastro renovado por 30 dias.')
+    elif action == 'renew_annual':
+        base_date = profile.subscription_expires or today
+        if base_date < today:
+            base_date = today
+        profile.subscription_expires = base_date + datetime.timedelta(days=365)
+        profile.billing_cycle = 'annual'
+        profile.is_approved = True
+        if not profile.approved_at:
+            profile.approved_at = timezone.now()
+        profile.save(update_fields=['subscription_expires', 'billing_cycle', 'is_approved', 'approved_at'])
+        Workspace.objects.filter(owner=user_obj).update(is_active=True)
+        record_metric('subscription_renewed', user=user_obj, metadata={'cycle': 'annual'})
+        messages.success(request, 'Cadastro renovado por 1 ano.')
+    elif action == 'suspend':
+        if request.user == user_obj:
+            messages.error(request, 'Voc? n?o pode suspender a si mesmo.')
+            return redirect('tracker:user_admin_list')
+        profile.is_approved = False
+        profile.save(update_fields=['is_approved'])
+        Workspace.objects.filter(owner=user_obj).update(is_active=False)
+        messages.success(request, 'Cadastro suspenso.')
+    elif action == 'mark_paid':
+        profile.payment_confirmed = True
+        profile.payment_confirmed_at = timezone.now()
+        profile.save(update_fields=['payment_confirmed', 'payment_confirmed_at'])
+        record_metric('payment_confirmed', user=user_obj, metadata={'source': 'admin'})
+        messages.success(request, 'Pagamento marcado como confirmado.')
+    elif action == 'mark_unpaid':
+        profile.payment_confirmed = False
+        profile.payment_confirmed_at = None
+        profile.save(update_fields=['payment_confirmed', 'payment_confirmed_at'])
+        messages.success(request, 'Pagamento marcado como pendente.')
+    else:
+        messages.error(request, 'A??o inv?lida.')
+
+    return redirect('tracker:user_admin_list')
 
     action = request.POST.get('action')
     profile, _ = UserProfile.objects.get_or_create(user=user_obj)

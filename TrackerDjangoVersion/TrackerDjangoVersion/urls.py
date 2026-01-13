@@ -18,12 +18,16 @@ from django.contrib import admin
 from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('tracker.urls', namespace='tracker')),
     path('ia/', include('assistant.urls', namespace='assistant')),
+    path('pagamentos/', include('payments.urls', namespace='payments')),
+    path('', include('tracker.urls', namespace='tracker')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.SERVE_MEDIA:
+    urlpatterns = static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) + urlpatterns
+if settings.SERVE_STATIC and not settings.DEBUG:
+    urlpatterns += staticfiles_urlpatterns()

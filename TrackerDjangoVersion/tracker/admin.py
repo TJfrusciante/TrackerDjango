@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import Category, Task, Transaction, Workspace
+from .models import (
+    Category,
+    Task,
+    Transaction,
+    Workspace,
+    SubscriptionInvite,
+    MetricEvent,
+)
 
 
 class WorkspaceScopedAdmin(admin.ModelAdmin):
@@ -41,4 +48,18 @@ class TransactionAdmin(WorkspaceScopedAdmin):
     list_filter = ('workspace', 'type', 'category', 'date')
     search_fields = ('description',)
     ordering = ('-date',)
+
+
+@admin.register(SubscriptionInvite)
+class SubscriptionInviteAdmin(admin.ModelAdmin):
+    list_display = ('code', 'plan_cycle', 'used_count', 'max_uses', 'is_active', 'expires_at', 'created_at')
+    list_filter = ('plan_cycle', 'is_active')
+    search_fields = ('code',)
+
+
+@admin.register(MetricEvent)
+class MetricEventAdmin(admin.ModelAdmin):
+    list_display = ('event_type', 'user', 'workspace', 'created_at')
+    list_filter = ('event_type', 'created_at')
+    search_fields = ('user__username', 'workspace__name')
 

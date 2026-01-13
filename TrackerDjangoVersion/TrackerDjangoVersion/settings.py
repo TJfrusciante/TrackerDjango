@@ -52,9 +52,11 @@ SECRET_KEY = env("DJANGO_SECRET_KEY_TRACKER", "django-insecure-dev-only-change-m
 # SECURITY WARNING: don't run with debug turned on in production!
 # Em produção: export DJANGO_DEBUG=0
 DEBUG = env_bool("DJANGO_DEBUG", default=True)
+SERVE_STATIC = env_bool("DJANGO_SERVE_STATIC", default=DEBUG)
+SERVE_MEDIA = env_bool("DJANGO_SERVE_MEDIA", default=DEBUG)
 
 # Em produção: export DJANGO_ALLOWED_HOSTS="3.88.41.192,meudominio.com"
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhost", "3.88.41.192"])
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhost", "3.88.41.192","54.174.218.66"])
 
 
 # ------------------------------------------------------------------------------
@@ -70,6 +72,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'tracker',
     'assistant',
+    'payments',
 ]
 
 MIDDLEWARE = [
@@ -182,6 +185,45 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 
+# ------------------------------------------------------------------------------
+# Email (notificacoes)
+# ------------------------------------------------------------------------------
+
+EMAIL_BACKEND = env("EMAIL_BACKEND", "")
+if not EMAIL_BACKEND:
+    use_smtp = (not DEBUG) or bool(env("EMAIL_HOST_USER", ""))
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend" if use_smtp else "django.core.mail.backends.console.EmailBackend"
+EMAIL_HOST = env("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", default=False)
+if EMAIL_USE_SSL:
+    EMAIL_USE_TLS = False
+EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "30"))
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "iDevelopSystemsNotify@outlook.com")
+
+# ------------------------------------------------------------------------------
+# Mercado Pago
+# ------------------------------------------------------------------------------
+
+MP_ACCESS_TOKEN = env("MP_ACCESS_TOKEN", "")
+MP_PUBLIC_KEY = env("MP_PUBLIC_KEY", "")
+MP_BASE_URL = env("MP_BASE_URL", "https://api.mercadopago.com")
+MP_CURRENCY = env("MP_CURRENCY", "BRL")
+MP_PLAN_MONTHLY_AMOUNT = env("MP_PLAN_MONTHLY_AMOUNT", "8.99")
+MP_PLAN_ANNUAL_AMOUNT = env("MP_PLAN_ANNUAL_AMOUNT", "71.88")
+SUBSCRIPTION_GRACE_DAYS = int(env("SUBSCRIPTION_GRACE_DAYS", "7"))
+
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = env("VAPID_SUBJECT", "mailto:admin@tracker.local")
+EMAIL_CONFIRMATION_REQUIRED = env_bool("EMAIL_CONFIRMATION_REQUIRED", default=False)
+LOGIN_RATE_LIMIT_ATTEMPTS = int(env("LOGIN_RATE_LIMIT_ATTEMPTS", "5"))
+LOGIN_RATE_LIMIT_WINDOW = int(env("LOGIN_RATE_LIMIT_WINDOW", "900"))
+
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
@@ -195,6 +237,7 @@ if not DEBUG:
 
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 
     # Ative quando tiver HTTPS (certbot) e quiser forçar redirect http->https
     SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False)
@@ -202,4 +245,60 @@ if not DEBUG:
     # Recomendações adicionais
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
+    SECURE_HSTS_SECONDS = int(env("DJANGO_SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
+    SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
+    SESSION_COOKIE_SAMESITE = env("DJANGO_SESSION_SAMESITE", "Lax")
+    CSRF_COOKIE_SAMESITE = env("DJANGO_CSRF_SAMESITE", "Lax")
 
+
+
+# ------------------------------------------------------------------------------
+# Observabilidade e logs estruturados
+# ------------------------------------------------------------------------------
+
+LOG_LEVEL = env("DJANGO_LOG_LEVEL", "INFO")
+LOG_JSON = env_bool("DJANGO_LOG_JSON", default=not DEBUG)
+
+if LOG_JSON:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "json": {
+                "()": "tracker.logging.JsonFormatter",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "json",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+        },
+        "loggers": {
+            "django": {"level": LOG_LEVEL, "handlers": ["console"], "propagate": False},
+        },
+    }
+
+# ------------------------------------------------------------------------------
+# Sentry (opcional)
+# ------------------------------------------------------------------------------
+
+SENTRY_DSN = env("SENTRY_DSN", "")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=float(env("SENTRY_TRACES_SAMPLE_RATE", "0.05")),
+            environment=env("SENTRY_ENVIRONMENT", "production"),
+        )
+    except Exception:
+        pass

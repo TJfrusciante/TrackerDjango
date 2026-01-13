@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Pagamento falhou | iTracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 text-center">
+            <i class="fa-solid fa-circle-xmark text-danger fa-2x mb-3"></i>
+            <h1 class="h5 fw-bold mb-2">Pagamento n&atilde;o conclu&iacute;do</h1>
+            <p class="text-secondary mb-3">Tente novamente ou atualize o m&eacute;todo de pagamento.</p>
+            <div class="d-flex justify-content-center gap-2">
+                <a class="btn btn-primary" href="{% url 'payments:subscription_start' %}">Tentar novamente</a>
+                <a class="btn btn-outline-light" href="{% url 'tracker:profile_edit' %}">Voltar ao perfil</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Membros | Tracker{% endblock %}
+{% block title %}Membros | iTracker{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
@@ -10,11 +10,12 @@
         <p class="text-secondary mb-0">Acesso e pap&eacute;is s&atilde;o isolados por workspace. Ajuste permiss&otilde;es rapidamente.</p>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:workspace_invite' workspace.slug %}">Convidar</a>
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
         {% if user.is_superuser or workspace.owner_id == user.id %}
             <form method="post" action="{% url 'tracker:workspace_delete' workspace.slug %}" onsubmit="return confirm('Excluir este workspace? Esta ação remove transações e tarefas associadas.');">
                 {% csrf_token %}
-                <button class="btn btn-outline-danger btn-sm" type="submit">Excluir workspace</button>
+                <button class="btn btn-outline-danger page-action-btn" type="submit">Excluir workspace</button>
             </form>
         {% endif %}
     </div>
@@ -28,7 +29,7 @@
                     <span class="badge text-bg-dark">Membros</span>
                     <span class="text-secondary small">{{ memberships|length }} ativos</span>
                 </div>
-                <span class="badge text-bg-secondary">Pendentes: {{ pending_requests|length }}</span>
+                <span class="badge text-bg-secondary">Solicita&ccedil;&otilde;es: {{ pending_requests|length }} &middot; Convites: {{ pending_invites|length }}</span>
             </div>
             {% if memberships %}
             <div class="list-group">
@@ -73,7 +74,7 @@
     <div class="col-lg-6">
         <div class="glass-card p-4 h-100">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <h3 class="h6 fw-bold mb-0">Adicionar membro</h3>
+                <h3 class="h6 fw-bold mb-0">Convidar membro</h3>
                 <span class="badge text-bg-success">Convite r&aacute;pido</span>
             </div>
             <form method="post" class="row g-3">
@@ -92,12 +93,12 @@
                     {{ invite_form.role }}
                 </div>
                 <div class="col-12 d-grid">
-                    <button class="btn btn-primary" type="submit">Convidar/adicionar</button>
+                    <button class="btn btn-primary" type="submit">Enviar convite</button>
                 </div>
             </form>
             <hr>
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <h3 class="h6 fw-bold mb-0">Adicionar por username</h3>
+                <h3 class="h6 fw-bold mb-0">Convidar por username</h3>
                 <span class="badge text-bg-secondary">Para usu&aacute;rios existentes</span>
             </div>
             <form method="post" class="row g-3">
@@ -112,10 +113,34 @@
                     {{ invite_username_form.role }}
                 </div>
                 <div class="col-12 d-grid">
-                    <button class="btn btn-outline-light" type="submit">Adicionar</button>
+                    <button class="btn btn-outline-light" type="submit">Enviar convite</button>
                 </div>
             </form>
             <div class="text-secondary small mt-3">Os convites s&atilde;o auditados por workspace; notificamos os admins quando h&aacute; pedidos pendentes.</div>
+        </div>
+    </div>
+    <div class="col-lg-12">
+        <div class="glass-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h3 class="h6 fw-bold mb-0">Convites enviados</h3>
+                <span class="badge text-bg-info">{{ pending_invites|length }} pendentes</span>
+            </div>
+            {% if pending_invites %}
+                <div class="list-group">
+                    {% for invite in pending_invites %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">{{ invite.invited_user.username }}</div>
+                                <div class="small text-secondary">{{ invite.invited_user.email }}</div>
+                                <div class="small text-secondary">Papel: {{ invite.role }} &middot; Edita tarefas: {% if invite.can_edit_tasks %}Sim{% else %}N&atilde;o{% endif %}</div>
+                            </div>
+                            <span class="badge text-bg-warning">Aguardando aceite</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-secondary mb-0">Nenhum convite pendente.</p>
+            {% endif %}
         </div>
     </div>
     <div class="col-lg-12">
@@ -133,8 +158,14 @@
                                 <div class="small text-secondary">{{ req.user.email }}</div>
                             </div>
                             <div class="d-flex gap-2">
-                                <a class="btn btn-sm btn-success" href="{% url 'tracker:workspace_request_action' workspace.slug req.id 'approve' %}">Aprovar</a>
-                                <a class="btn btn-sm btn-outline-danger" href="{% url 'tracker:workspace_request_action' workspace.slug req.id 'reject' %}">Rejeitar</a>
+                                <form method="post" action="{% url 'tracker:workspace_request_action' workspace.slug req.id 'approve' %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-success" type="submit">Aprovar</button>
+                                </form>
+                                <form method="post" action="{% url 'tracker:workspace_request_action' workspace.slug req.id 'reject' %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Rejeitar</button>
+                                </form>
                             </div>
                         </div>
                     {% endfor %}

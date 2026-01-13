@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Convidar | iTracker{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+        <p class="text-secondary small mb-1">Workspace</p>
+        <h1 class="h4 fw-bold mb-0">Convidar membros</h1>
+        <p class="text-secondary small mb-0">{{ workspace.name }}</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-light" href="{% url 'tracker:workspace_members' workspace.slug %}">Gerenciar membros</a>
+        <a class="btn btn-outline-light" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="glass-card p-4 h-100">
+            <h2 class="h6 fw-bold mb-3">Enviar convite por username</h2>
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label class="form-label">Username</label>
+                    {{ invite_form.username }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Papel</label>
+                    {{ invite_form.role }}
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary" type="submit">Enviar convite</button>
+                </div>
+            </form>
+            <p class="small text-secondary mt-3 mb-0">O convite precisa ser aceito pelo usu&aacute;rio antes de entrar no workspace.</p>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="glass-card p-4">
+            <h2 class="h6 fw-bold mb-3">Convites pendentes</h2>
+            {% if pending_invites %}
+                <div class="list-group list-group-flush">
+                    {% for invite in pending_invites %}
+                        <div class="list-group-item bg-transparent px-0">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <div class="fw-semibold">{{ invite.invited_user.username }}</div>
+                                    <div class="small text-secondary">Enviado por {{ invite.invited_by.username }} &middot; {{ invite.created_at|date:"d/m/Y" }}</div>
+                                </div>
+                                <span class="badge bg-warning-subtle text-warning">Pendente</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-secondary mb-0">Nenhum convite pendente.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

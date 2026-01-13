@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}IA | Tracker{% endblock %}
+{% block title %}IA | iTracker{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -25,7 +25,7 @@
                                 {{ msg.created_at|date:"d/m/Y H:i" }} &middot; {{ msg.role|capfirst }}
                             </div>
                             <div class="chat-text">{{ msg.content|linebreaksbr }}</div>
-                            <button type="button" class="btn btn-sm btn-outline-light copy-btn" title="Copiar" aria-label="Copiar mensagem" data-content="{{ msg.content|escape }}">
+                            <button type="button" class="btn btn-sm btn-outline-light copy-btn" title="Copiar" aria-label="Copiar mensagem">
                                 <i class="fa-solid fa-copy"></i>
                             </button>
                         </div>
@@ -46,8 +46,18 @@
                         Usar apenas resumo local (sem chamar modelo externo)
                     </label>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" value="on" id="autoSendVoice" name="auto_send_voice">
+                    <label class="form-check-label" for="autoSendVoice">
+                        Enviar automaticamente ao finalizar o &aacute;udio
+                    </label>
+                </div>
+                <div class="d-flex gap-2 flex-wrap align-items-center mt-2">
                     <button class="btn btn-primary" type="submit" data-bs-toggle="tooltip" title="Enviar mensagem para o assistente">Enviar</button>
+                    <button class="btn btn-outline-light" type="button" id="aiVoiceBtn" data-bs-toggle="tooltip" title="Falar">
+                        <i class="fa-solid fa-microphone me-1"></i>Falar
+                    </button>
+                    <span id="aiVoiceStatus" class="small text-secondary"></span>
                 </div>
             </form>
             {% endif %}
@@ -111,12 +121,35 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    const copyText = async (text) => {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.top = '-1000px';
+        area.style.left = '-1000px';
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        document.execCommand('copy');
+        document.body.removeChild(area);
+    };
+
     document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const text = btn.dataset.content || '';
-            navigator.clipboard.writeText(text.replace(/\n/g, '\n'));
+        btn.addEventListener('click', async () => {
+            const bubble = btn.closest('.chat-bubble');
+            const textEl = bubble ? bubble.querySelector('.chat-text') : null;
+            const text = textEl ? textEl.innerText : '';
             const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+            try {
+                await copyText(text);
+                btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+            } catch (err) {
+                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            }
             setTimeout(() => { btn.innerHTML = original; }, 1200);
         });
     });
@@ -148,6 +181,98 @@
         };
         type();
     }
+
+    (function() {
+        const voiceBtn = document.getElementById('aiVoiceBtn');
+        if (!voiceBtn) return;
+        const status = document.getElementById('aiVoiceStatus');
+        const textarea = document.querySelector('#chatForm textarea[name="message"]');
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition || !textarea) {
+            voiceBtn.disabled = true;
+            if (status) status.textContent = 'Ditado indispon\u00edvel neste navegador.';
+            return;
+        }
+        const rec = new SpeechRecognition();
+        rec.lang = 'pt-BR';
+        rec.interimResults = true;
+        rec.continuous = true;
+        let listening = false;
+        let baseText = '';
+        let finalText = '';
+        let interimText = '';
+        const autoSend = document.getElementById('autoSendVoice');
+
+        const setButtonState = (active) => {
+            if (active) {
+                voiceBtn.innerHTML = '<i class="fa-solid fa-stop me-1"></i>Finalizar';
+            } else {
+                voiceBtn.innerHTML = '<i class="fa-solid fa-microphone me-1"></i>Falar';
+            }
+        };
+
+        const updateTextarea = () => {
+            const combined = [baseText, `${finalText}${interimText}`.trim()].filter(Boolean).join(' ').trim();
+            textarea.value = combined;
+        };
+
+        const finalizeText = () => {
+            updateTextarea();
+            interimText = '';
+            textarea.focus();
+        };
+
+        rec.onstart = () => {
+            if (status) status.textContent = 'Ouvindo... clique em Finalizar para encerrar.';
+        };
+        rec.onend = () => {
+            if (listening) {
+                setTimeout(() => {
+                    try { rec.start(); } catch (err) { /* ignore */ }
+                }, 250);
+            } else {
+                if (status) status.textContent = 'Ditado finalizado.';
+                finalizeText();
+                if (autoSend && autoSend.checked && textarea.value.trim()) {
+                    chatForm.submit();
+                }
+            }
+        };
+        rec.onerror = () => {
+            if (status) status.textContent = 'N\u00e3o consegui acessar o microfone.';
+        };
+        rec.onresult = (ev) => {
+            let interim = '';
+            for (let i = ev.resultIndex; i < ev.results.length; i += 1) {
+                const transcript = (ev.results[i][0].transcript || '').trim();
+                if (!transcript) continue;
+                if (ev.results[i].isFinal) {
+                    finalText = `${finalText}${transcript} `;
+                } else {
+                    interim += `${transcript} `;
+                }
+            }
+            interimText = interim.trim();
+            updateTextarea();
+        };
+
+        voiceBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            if (listening) {
+                listening = false;
+                setButtonState(false);
+                if (status) status.textContent = 'Finalizando...';
+                rec.stop();
+                return;
+            }
+            baseText = textarea.value.trim();
+            finalText = '';
+            interimText = '';
+            listening = true;
+            setButtonState(true);
+            try { rec.start(); } catch (err) { /* ignore */ }
+        });
+    })();
 </script>
 {% endblock %}
 {% endblock %}

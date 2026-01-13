@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Tracker | Finanças e tarefas em um só lugar{% endblock %}
+{% block title %}iTracker | Finan&ccedil;as e tarefas em um s&oacute; lugar{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/landing.css' %}">
+<link rel="stylesheet" href="{% static 'css/landing.css' %}?v=4">
 {% endblock %}
 
 {% block content %}
@@ -12,14 +12,24 @@
     <div class="container">
         <div class="row align-items-center g-4">
             <div class="col-lg-6">
-                <div class="lp-pill mb-3">Finanças + Tarefas + IA</div>
+                <div class="lp-pill mb-3">Finan&ccedil;as + Tarefas + IA</div>
                 <h1 class="fw-bold mb-3">Controle financeiro e to-do list modernos, multi-tenant.</h1>
-                <p class="lead lp-muted mb-4">Workspaces com permissões, dashboards em tempo real e um agente de IA que responde sobre seu período, categorias e tarefas.</p>
+                <p class="lead lp-muted mb-4">
+                    Painel de workspaces, permiss&otilde;es por membro, alertas inteligentes, resumos autom&aacute;ticos e um agente de IA
+                    que responde sobre per&iacute;odo, categorias e tarefas.
+                </p>
+                <div class="lp-badges mb-4">
+                    <span class="lp-badge"><i class="fa-solid fa-bell"></i>Alertas inteligentes</span>
+                    <span class="lp-badge"><i class="fa-solid fa-bullseye"></i>Or&ccedil;amentos e metas</span>
+                    <span class="lp-badge"><i class="fa-solid fa-microphone"></i>Falar por voz</span>
+                    <span class="lp-badge"><i class="fa-solid fa-robot"></i>IA contextual</span>
+                    <span class="lp-badge"><i class="fa-solid fa-briefcase"></i>Painel de workspaces</span>
+                </div>
                 <div class="d-flex flex-wrap gap-3">
                     <a class="btn btn-primary btn-lg" href="{% url 'tracker:register' %}">Criar conta</a>
-                    <a class="btn btn-outline-light btn-lg" href="{% url 'tracker:login' %}">Já tenho acesso</a>
+                    <a class="btn btn-outline-light btn-lg" href="{% url 'tracker:login' %}">J&aacute; tenho acesso</a>
                 </div>
-                <p class="lp-muted mt-3 small">Somente o dono do workspace paga; até 3 participantes incluídos.</p>
+                <p class="lp-muted mt-3 small">Somente o dono do workspace paga; at&eacute; 3 convidados sem assinatura.</p>
             </div>
             <div class="col-lg-6">
                 <div class="lp-hero-card">
@@ -51,10 +61,13 @@
                         </div>
                         <div class="col-6">
                             <div class="lp-stat">
-                                <div class="lp-muted small">IA consultas</div>
-                                <div class="lp-number">120/mês</div>
+                                <div class="lp-muted small">Consultas IA</div>
+                                <div class="lp-number">120/m&ecirc;s</div>
                             </div>
                         </div>
+                    </div>
+                    <div class="mt-3">
+                        <img class="img-fluid rounded-4 border" src="{% static 'help/dashboard.png' %}" alt="Preview do dashboard">
                     </div>
                 </div>
             </div>
@@ -65,28 +78,106 @@
 <section class="py-5">
     <div class="container">
         <div class="row g-3 text-center">
+            {% for stat in landing_stats %}
             <div class="col-6 col-lg-3">
-                <div class="lp-card">
-                    <div class="lp-muted small">Workspaces ativos</div>
-                    <div class="lp-number">+35</div>
+                <div class="lp-card lp-metric h-100">
+                    <div class="lp-muted small">{{ stat.label }}</div>
+                    <div class="lp-number">{{ stat.value }}</div>
+                    {% if stat.suffix %}
+                        <div class="lp-muted small">{{ stat.suffix }}</div>
+                    {% endif %}
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
-                <div class="lp-card">
-                    <div class="lp-muted small">Transações migradas</div>
-                    <div class="lp-number">+380</div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="py-5 lp-carousel-section">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+            <h2 class="section-title mb-2">Recursos em destaque</h2>
+            <p class="lp-muted mb-0">Clique nas setas e conhe&ccedil;a os pilares do iTracker.</p>
+        </div>
+        <div id="featureCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="7000" data-bs-touch="true">
+            <div class="carousel-indicators">
+                {% for slide in carousel_slides %}
+                <button type="button" data-bs-target="#featureCarousel" data-bs-slide-to="{{ forloop.counter0 }}" class="{% if forloop.first %}active{% endif %}" aria-current="{% if forloop.first %}true{% endif %}" aria-label="Slide {{ forloop.counter }}"></button>
+                {% endfor %}
+            </div>
+            <div class="carousel-inner">
+                {% for slide in carousel_slides %}
+                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                    <div class="row g-3">
+                        {% for card in slide %}
+                        <div class="col-md-4">
+                            <div class="lp-card lp-carousel-card h-100">
+                                <div class="lp-icon"><i class="{{ card.icon }}"></i></div>
+                                <h5 class="mb-1">{{ card.title }}</h5>
+                                <p class="lp-muted mb-3">{{ card.description }}</p>
+                                <div class="lp-carousel-meta">
+                                    <span class="badge bg-primary-subtle text-primary">Destaque</span>
+                                    <span class="badge bg-info-subtle text-info">Atualizado</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#featureCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#featureCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Pr&oacute;ximo</span>
+            </button>
+        </div>
+    </div>
+</section>
+
+<section class="py-5 lp-section">
+    <div class="container">
+        <div class="row g-4 align-items-center">
+            <div class="col-lg-6">
+                <div class="lp-highlight">
+                    <h3 class="fw-bold mb-2">Alertas que evitam surpresas</h3>
+                    <p class="lp-muted">Defina limites por categoria, metas de saldo e receba alertas por e-mail e no centro in-app.</p>
+                    <ul class="lp-checklist mt-3">
+                        <li><i class="fa-solid fa-check"></i><div>Or&ccedil;amentos semanais ou mensais por categoria.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Metas m&iacute;nimas/m&aacute;ximas de saldo.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Resumos autom&aacute;ticos semanais e mensais.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Centro de notifica&ccedil;&otilde;es com badge.</div></li>
+                    </ul>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
-                <div class="lp-card">
-                    <div class="lp-muted small">Tarefas/etapas</div>
-                    <div class="lp-number">+210</div>
-                </div>
-            </div>
-            <div class="col-6 col-lg-3">
-                <div class="lp-card">
-                    <div class="lp-muted small">Resposta média</div>
-                    <div class="lp-number">IA em segundos</div>
+            <div class="col-lg-6">
+                <div class="lp-card h-100">
+                    <h5 class="fw-bold mb-2">Tudo em um painel</h5>
+                    <p class="lp-muted mb-3">Controle visual de entradas, sa&iacute;das, categorias e tarefas com gr&aacute;ficos atualizados.</p>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Saldo projetado</div>
+                                <div class="lp-number">R$ 3.280</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Alertas ativos</div>
+                                <div class="lp-number">06</div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Notifica&ccedil;&otilde;es recentes</div>
+                                <div class="lp-number">Saldo atingiu meta mensal</div>
+                            </div>
+                        </div>
+                    </div>
+                    <a class="btn btn-outline-light w-100 mt-3" href="{% url 'tracker:register' %}">Quero testar</a>
                 </div>
             </div>
         </div>
@@ -95,26 +186,85 @@
 
 <section class="py-5 lp-section">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
-            <h2 class="section-title mb-2">Benefícios</h2>
-            <p class="lp-muted mb-0">Dashboards, IA, exportações e controle de equipe.</p>
-        </div>
         <div class="row g-4">
-            {% for card in feature_cards %}
-            <div class="col-md-4">
+            <div class="col-lg-6">
+                <h2 class="section-title mb-3">Fluxo inteligente</h2>
+                <p class="lp-muted mb-4">Da importa&ccedil;&atilde;o ao insight, em poucos passos.</p>
+                <div class="vstack gap-3">
+                    {% for step in steps %}
+                    <div class="lp-card lp-step">
+                        <h6 class="mb-1">{{ forloop.counter }}. {{ step.title }}</h6>
+                        <p class="lp-muted mb-0">{{ step.text }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-lg-6">
                 <div class="lp-card h-100">
-                    <div class="lp-icon"><i class="{{ card.icon }}"></i></div>
-                    <h5 class="mb-1">{{ card.title }}</h5>
-                    <p class="lp-muted mb-0">{{ card.description }}</p>
+                    <h3 class="fw-bold mb-2">IA + Falar por voz</h3>
+                    <p class="lp-muted mb-3">Ganhe velocidade com comandos de voz e um agente que interpreta dados do seu workspace.</p>
+                    <ul class="lp-checklist">
+                        <li><i class="fa-solid fa-check"></i><div>Falar para transa&ccedil;&otilde;es e tarefas com pr&eacute;-visualiza&ccedil;&atilde;o.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Respostas com saldo, top categorias e status das etapas.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Texto aparece em tempo real e pode enviar automaticamente.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Superuser enxerga vis&atilde;o global do sistema.</div></li>
+                    </ul>
+                    <a class="btn btn-outline-light w-100 mt-3" href="{% url 'tracker:register' %}">Ativar agora</a>
                 </div>
             </div>
-            {% empty %}
-            <div class="col-12">
-                <div class="lp-card h-100 text-center">
-                    <p class="lp-muted mb-0">Recursos chegando em breve.</p>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="lp-promo-banner">
+            <div class="lp-promo-left">
+                {% if pricing_state.promo_active %}
+                <div class="lp-pill mb-2">{{ pricing_state.promo_label }}</div>
+                <h3 class="fw-bold mb-2">Promo&ccedil;&atilde;o ativa para os primeiros {{ pricing_state.promo_limit }} usu&aacute;rios</h3>
+                <p class="lp-muted mb-3">
+                    Aproveite os pre&ccedil;os de lan&ccedil;amento e garanta acesso total ao iTracker com IA, alertas e tarefas em etapas.
+                </p>
+                <div class="d-flex flex-wrap gap-3">
+                    <div class="lp-promo-pill">
+                        <i class="fa-solid fa-sparkles"></i>
+                        Pre&ccedil;o exclusivo para early adopters
+                    </div>
+                    <div class="lp-promo-pill">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        Renove quando quiser
+                    </div>
+                </div>
+                {% else %}
+                <div class="lp-pill mb-2">Promo&ccedil;&atilde;o encerrada</div>
+                <h3 class="fw-bold mb-2">Os pre&ccedil;os voltaram ao valor padr&atilde;o</h3>
+                <p class="lp-muted mb-3">Aguarde novas campanhas para desbloquear condi&ccedil;&otilde;es especiais.</p>
+                <div class="d-flex flex-wrap gap-3">
+                    <div class="lp-promo-pill">
+                        <i class="fa-solid fa-bullseye"></i>
+                        Alertas inteligentes ativados
+                    </div>
+                    <div class="lp-promo-pill">
+                        <i class="fa-solid fa-shield"></i>
+                        Dados protegidos por workspace
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="lp-promo-right">
+                <div class="lp-promo-counter">
+                    {% if pricing_state.promo_active %}
+                    <div class="lp-muted small mb-1">Faltam para a promo&ccedil;&atilde;o acabar</div>
+                    <div class="promo-count" data-count="{{ pricing_state.promo_remaining }}">{{ pricing_state.promo_remaining }}</div>
+                    <div class="lp-muted small">pessoas</div>
+                    {% else %}
+                    <div class="lp-muted small mb-1">Pessoas que fazem parte da comunidade</div>
+                    <div class="promo-count" data-count="{{ pricing_state.total_users }}">{{ pricing_state.total_users }}</div>
+                    <div class="lp-muted small">com assinaturas ativas</div>
+                    {% endif %}
                 </div>
             </div>
-            {% endfor %}
         </div>
     </div>
 </section>
@@ -124,7 +274,7 @@
         <div class="row g-4 align-items-start">
             <div class="col-lg-6">
                 <h2 class="section-title mb-3">Planos</h2>
-                <p class="lp-muted mb-4">O dono paga o workspace; até 3 participantes inclusos. IA com contexto do seu ambiente.</p>
+                <p class="lp-muted mb-4">Escolha mensal ou anual. O dono paga o workspace; at&eacute; 3 convidados sem assinatura inclusos.</p>
                 <div class="row g-3">
                     {% for plan in pricing_plans %}
                     <div class="col-md-6">
@@ -134,7 +284,17 @@
                                 <span class="badge bg-primary-subtle text-primary">{{ plan.badge }}</span>
                             </div>
                             <p class="lp-muted small mb-2">{{ plan.subtitle }}</p>
-                            <h3 class="fw-bold mb-3">R$ {{ plan.price }}/mês</h3>
+                            <h3 class="fw-bold mb-1">R$ {{ plan.price|floatformat:2 }}/m&ecirc;s</h3>
+                            {% if pricing_state.promo_active %}
+                                <div class="lp-muted small mb-2">
+                                    De <span class="text-decoration-line-through">R$ {{ plan.regular_price|floatformat:2 }}</span>
+                                </div>
+                            {% endif %}
+                            {% if plan.name == 'Anual' %}
+                                <p class="lp-muted small mb-3">Total anual: R$ {{ plan.annual_total|floatformat:2 }}</p>
+                            {% else %}
+                                <p class="lp-muted small mb-3">Pagamento mensal recorrente</p>
+                            {% endif %}
                             <ul class="lp-muted small ps-3 mb-3">
                                 {% for f in plan.features %}
                                 <li class="mb-1">{{ f }}</li>
@@ -147,14 +307,38 @@
                 </div>
             </div>
             <div class="col-lg-6">
-                <h2 class="section-title mb-3">Como funciona</h2>
-                <div class="vstack gap-3">
-                    {% for step in steps %}
-                    <div class="lp-card lp-step">
-                        <h6 class="mb-1">{{ forloop.counter }}. {{ step.title }}</h6>
-                        <p class="lp-muted mb-0">{{ step.text }}</p>
+                <div class="lp-card h-100">
+                    <h2 class="section-title mb-3">Para quem &eacute;</h2>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Aut&ocirc;nomos</div>
+                                <div class="lp-number">Fluxo de caixa</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Equipes</div>
+                                <div class="lp-number">Tarefas em etapas</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Fam&iacute;lias</div>
+                                <div class="lp-number">Or&ccedil;amentos claros</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lp-stat">
+                                <div class="lp-muted small">Empresas</div>
+                                <div class="lp-number">Monitoramento central</div>
+                            </div>
+                        </div>
                     </div>
-                    {% endfor %}
+                    <div class="lp-highlight mt-3">
+                        <h6 class="fw-bold mb-2">Seguran&ccedil;a e privacidade</h6>
+                        <p class="lp-muted mb-0">Workspaces isolados, permiss&otilde;es por membro e controle total do owner.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -176,19 +360,43 @@
                 </div>
             </div>
             <div class="col-lg-6">
-                <div class="lp-card h-100 d-flex flex-column justify-content-between">
+                <div class="lp-cta h-100 d-flex flex-column justify-content-between">
                     <div>
-                        <p class="lp-muted small mb-1">Pronto para começar?</p>
+                        <p class="lp-muted small mb-1">Pronto para come&ccedil;ar?</p>
                         <h3 class="fw-bold mb-2">Migre seus dados e convide sua equipe agora.</h3>
-                        <p class="lp-muted">Entradas, saídas, categorias coloridas, subtarefas com responsáveis e IA conectada ao seu workspace.</p>
+                        <p class="lp-muted">
+                            Entradas, sa&iacute;das, categorias coloridas, alertas, subtarefas com respons&aacute;veis e IA conectada ao seu workspace.
+                        </p>
                     </div>
                     <div class="d-flex gap-2 flex-wrap">
                         <a class="btn btn-primary" href="{% url 'tracker:register' %}">Criar conta</a>
                         <a class="btn btn-outline-light" href="{% url 'tracker:login' %}">Entrar</a>
+                        <a class="btn btn-outline-light" href="{% url 'tracker:help' %}">Ver ajuda</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function() {
+        const counters = document.querySelectorAll('.promo-count[data-count]');
+        counters.forEach(counter => {
+            const target = parseInt(counter.dataset.count || '0', 10);
+            const duration = 900;
+            const start = performance.now();
+            const startVal = 0;
+            const step = now => {
+                const progress = Math.min((now - start) / duration, 1);
+                const value = Math.round(startVal + (target - startVal) * progress);
+                counter.textContent = value;
+                if (progress < 1) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+        });
+    })();
+</script>
 {% endblock %}

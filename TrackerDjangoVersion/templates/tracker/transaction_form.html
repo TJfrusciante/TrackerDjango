@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transação | Tracker{% endblock %}
+{% block title %}{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transa&ccedil;&atilde;o | iTracker{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,8 +8,8 @@
         <div class="glass-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                    <p class="text-secondary small mb-1">Finanças</p>
-                    <h1 class="h4 fw-bold mb-0">{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transação</h1>
+                    <p class="text-secondary small mb-1">Finan&ccedil;as</p>
+                    <h1 class="h4 fw-bold mb-0">{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transa&ccedil;&atilde;o</h1>
                 </div>
                 <a href="{% url 'tracker:transactions_list' %}" class="btn btn-outline-light">
                     <i class="fa-solid fa-arrow-left me-2"></i>Voltar
@@ -23,13 +23,41 @@
             <form method="post" class="row g-3">
                 {% csrf_token %}
                 <div class="col-12">
-                    <label class="form-label">Descrição</label>
+                    <label class="form-label">Descri&ccedil;&atilde;o</label>
                     {% if is_detail %}
                         <p class="form-control-plaintext fw-semibold">{{ form.instance.description }}</p>
                     {% else %}
                         {{ form.description }}{{ form.description.errors }}
                     {% endif %}
                 </div>
+                {% if not is_detail %}
+                <div class="col-12">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button class="btn btn-outline-light btn-sm" id="txVoiceBtn" type="button" formnovalidate>
+                            <i class="fa-solid fa-microphone me-1"></i>Falar
+                        </button>
+                        <span class="text-secondary small" id="txVoiceStatus">Fale a descri&ccedil;&atilde;o, valor e tipo (entrada/sa&iacute;da).</span>
+                        <div id="txVoicePreview" class="glass-card p-3 mt-2 d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Pr&eacute;-visualiza&ccedil;&atilde;o do ditado</h6>
+                                <span class="badge text-bg-secondary">Transa&ccedil;&atilde;o</span>
+                            </div>
+                            <div class="row g-2 small">
+                                <div class="col-12"><strong>Descri&ccedil;&atilde;o:</strong> <span id="txPrevDesc"></span></div>
+                                <div class="col-6"><strong>Data:</strong> <span id="txPrevDate"></span></div>
+                                <div class="col-6"><strong>Valor:</strong> <span id="txPrevValue"></span></div>
+                                <div class="col-6"><strong>Tipo:</strong> <span id="txPrevType"></span></div>
+                                <div class="col-6"><strong>Categoria:</strong> <span id="txPrevCategory"></span></div>
+                            </div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button class="btn btn-primary btn-sm" type="button" id="txVoiceApply">Aplicar</button>
+                                <button class="btn btn-outline-light btn-sm" type="button" id="txVoiceClear">Limpar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="col-md-4">
                     <label class="form-label">Data</label>
                     {% if is_detail %}
@@ -72,4 +100,332 @@
         </div>
     </div>
 </div>
+{% if not is_detail %}
+<script>
+    (function() {
+        const voiceBtn = document.getElementById('txVoiceBtn');
+        if (!voiceBtn) return;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const status = document.getElementById('txVoiceStatus');
+        const descInput = document.getElementById('id_description');
+        const valueInput = document.getElementById('id_value');
+        const typeInput = document.getElementById('id_type');
+        const dateInput = document.getElementById('id_date');
+        const categorySelect = document.getElementById('id_category');
+        const preview = document.getElementById('txVoicePreview');
+        const prevDesc = document.getElementById('txPrevDesc');
+        const prevDate = document.getElementById('txPrevDate');
+        const prevValue = document.getElementById('txPrevValue');
+        const prevType = document.getElementById('txPrevType');
+        const prevCategory = document.getElementById('txPrevCategory');
+        const applyBtn = document.getElementById('txVoiceApply');
+        const clearBtn = document.getElementById('txVoiceClear');
+        if (!SpeechRecognition) {
+            voiceBtn.disabled = true;
+            if (status) status.textContent = 'Ditado indispon\u00edvel neste navegador.';
+            return;
+        }
+
+        const rec = new SpeechRecognition();
+        rec.lang = 'pt-BR';
+        rec.interimResults = false;
+        rec.continuous = true;
+
+        let listening = false;
+        let buffer = '';
+        let parsedTx = null;
+        let manualDesc = descInput ? !!descInput.value.trim() : false;
+        let manualDate = dateInput ? !!dateInput.value.trim() : false;
+        let manualValue = valueInput ? !!valueInput.value.trim() : false;
+        let manualType = typeInput ? !!typeInput.value : false;
+        let manualCategory = categorySelect ? !!categorySelect.value : false;
+
+        const normalize = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const categorySynonyms = {
+            'aluguel': 'moradia',
+            'casa': 'moradia',
+            'condominio': 'moradia',
+            'supermercado': 'alimentacao',
+            'mercado': 'alimentacao',
+            'restaurante': 'alimentacao',
+            'comida': 'alimentacao',
+            'ifood': 'alimentacao',
+            'uber': 'transporte',
+            'gasolina': 'transporte',
+            'combustivel': 'transporte',
+            'energia': 'contas',
+            'luz': 'contas',
+            'agua': 'contas',
+            'internet': 'contas',
+            'cartao': 'cartao',
+            'fatura': 'cartao',
+            'salario': 'salario'
+        };
+
+        const numberWords = {
+            zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9,
+            dez: 10, onze: 11, doze: 12, treze: 13, quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19,
+            vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90,
+            cem: 100, cento: 100, duzentos: 200, trezentos: 300, quatrocentos: 400, quinhentos: 500, seiscentos: 600, setecentos: 700, oitocentos: 800, novecentos: 900
+        };
+
+        const parseNumberWords = (text) => {
+            const tokens = normalize(text)
+                .replace(/[-]/g, ' ')
+                .replace(/\be\b/g, ' ')
+                .split(/\s+/)
+                .filter(Boolean);
+            let total = 0;
+            let current = 0;
+            let found = false;
+            tokens.forEach(token => {
+                if (numberWords.hasOwnProperty(token)) {
+                    current += numberWords[token];
+                    found = true;
+                    return;
+                }
+                if (token === 'mil') {
+                    if (current === 0) current = 1;
+                    total += current * 1000;
+                    current = 0;
+                    found = true;
+                    return;
+                }
+                if (token === 'milhao' || token === 'milhoes') {
+                    if (current === 0) current = 1;
+                    total += current * 1000000;
+                    current = 0;
+                    found = true;
+                }
+            });
+            const result = total + current;
+            return found ? result : null;
+        };
+
+        const setButtonState = (active) => {
+            if (active) {
+                voiceBtn.innerHTML = '<i class="fa-solid fa-stop me-1"></i>Finalizar';
+            } else {
+                voiceBtn.innerHTML = '<i class="fa-solid fa-microphone me-1"></i>Falar';
+            }
+        };
+
+        const getCategories = () => {
+            if (!categorySelect) return [];
+            return Array.from(categorySelect.options)
+                .filter(opt => opt.value)
+                .map(opt => ({ id: opt.value, name: opt.textContent.trim() }));
+        };
+
+        const findCategory = (normalizedText, categories) => {
+            let best = null;
+            let bestLen = 0;
+            categories.forEach(cat => {
+                const nameNorm = normalize(cat.name);
+                if (nameNorm && normalizedText.includes(nameNorm) && nameNorm.length > bestLen) {
+                    best = cat;
+                    bestLen = nameNorm.length;
+                }
+            });
+            if (best) return best;
+            for (const [key, target] of Object.entries(categorySynonyms)) {
+                if (normalizedText.includes(key)) {
+                    const targetCat = categories.find(cat => normalize(cat.name).includes(target));
+                    if (targetCat) return targetCat;
+                }
+            }
+            return null;
+        };
+
+        const parseTranscript = (transcript) => {
+            if (!transcript) return null;
+            const normalized = normalize(transcript);
+            let desc = transcript;
+            let dateStr = '';
+
+            const dateMatch = normalized.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
+            if (dateMatch) {
+                const day = dateMatch[1].padStart(2, '0');
+                const month = dateMatch[2].padStart(2, '0');
+                let year = dateMatch[3] ? dateMatch[3] : String(new Date().getFullYear());
+                if (year.length === 2) year = `20${year}`;
+                dateStr = `${day}/${month}/${year}`;
+                desc = desc.replace(dateMatch[0], '');
+            }
+
+            let valueRaw = '';
+            const valueMatch = normalized.match(/valor\s*([0-9\.,]+)/i);
+            if (valueMatch) {
+                valueRaw = valueMatch[1];
+                desc = desc.replace(valueMatch[0], '');
+            }
+            if (!valueRaw) {
+                const cleaned = normalized.replace(dateMatch ? dateMatch[0] : '', '');
+                const numbers = cleaned.match(/-?\d+[\.,]?\d*/g);
+                if (numbers && numbers.length) {
+                    valueRaw = numbers[numbers.length - 1];
+                }
+            }
+
+            let valueNum = null;
+            let isNegative = false;
+            if (valueRaw) {
+                let sanitized = valueRaw.replace(/[^0-9,\.-]/g, '');
+                if (sanitized.startsWith('-')) {
+                    isNegative = true;
+                    sanitized = sanitized.slice(1);
+                }
+                if (sanitized.includes(',') && sanitized.includes('.')) {
+                    sanitized = sanitized.replace(/\./g, '').replace(',', '.');
+                } else if (sanitized.includes(',')) {
+                    sanitized = sanitized.replace(',', '.');
+                }
+                const parsed = parseFloat(sanitized);
+                if (!Number.isNaN(parsed)) {
+                    valueNum = parsed;
+                }
+            } else {
+                const wordValue = parseNumberWords(normalized);
+                if (wordValue) valueNum = wordValue;
+            }
+
+            const tipo = (/(saida|despesa|gasto|paguei)/i.test(normalized))
+                ? 'expense'
+                : (/(entrada|receita|salario)/i.test(normalized))
+                    ? 'income'
+                    : (isNegative ? 'expense' : (valueNum !== null ? 'income' : ''));
+
+            const categories = getCategories();
+            let category = null;
+            if (categorySelect && categories.length) {
+                category = findCategory(normalized, categories);
+                if (category) {
+                    const regex = new RegExp(escapeRegExp(category.name), 'i');
+                    desc = desc.replace(regex, '');
+                }
+            }
+
+            desc = desc.replace(/\b(valor|dia|data)\b/ig, '');
+            desc = desc.replace(/\b(entrada|saida|despesa|gasto|paguei)\b/ig, '');
+            desc = desc.replace(/\s{2,}/g, ' ').trim();
+            const finalDesc = desc || transcript;
+
+            return {
+                description: finalDesc,
+                date: dateStr,
+                value: valueNum,
+                type: tipo,
+                category: category
+            };
+        };
+
+        const updatePreview = (data) => {
+            if (!preview) return;
+            if (!data) {
+                preview.classList.add('d-none');
+                return;
+            }
+            preview.classList.remove('d-none');
+            if (prevDesc) prevDesc.textContent = data.description || '-';
+            if (prevDate) prevDate.textContent = data.date || '-';
+            if (prevValue) prevValue.textContent = data.value !== null ? `R$ ${data.value.toFixed(2)}` : '-';
+            if (prevType) prevType.textContent = data.type === 'income' ? 'Entrada' : data.type === 'expense' ? 'Sa\u00edda' : '-';
+            if (prevCategory) prevCategory.textContent = data.category ? data.category.name : '-';
+        };
+
+        const applyParsed = () => {
+            if (!parsedTx) return;
+            if (descInput && !manualDesc) descInput.value = parsedTx.description || '';
+            if (dateInput && parsedTx.date && !manualDate) dateInput.value = parsedTx.date;
+            if (valueInput && parsedTx.value !== null && !manualValue) valueInput.value = parsedTx.value.toFixed(2);
+            if (typeInput && parsedTx.type && !manualType) typeInput.value = parsedTx.type;
+            if (categorySelect && parsedTx.category && !manualCategory) categorySelect.value = parsedTx.category.id;
+            updatePreview(null);
+        };
+
+        rec.onstart = () => {
+            if (status) status.textContent = 'Ouvindo... clique em Finalizar para encerrar.';
+        };
+        rec.onend = () => {
+            if (listening) {
+                setTimeout(() => {
+                    try { rec.start(); } catch (err) { /* ignore */ }
+                }, 250);
+            } else {
+                if (status) status.textContent = 'Ditado finalizado.';
+                parsedTx = parseTranscript(buffer);
+                updatePreview(parsedTx);
+                buffer = '';
+            }
+        };
+        rec.onerror = () => {
+            if (status) status.textContent = 'N\u00e3o consegui acessar o microfone.';
+        };
+        rec.onresult = (ev) => {
+            const chunk = (ev.results[0][0].transcript || '').trim();
+            if (!chunk) return;
+            buffer = buffer ? `${buffer} ${chunk}` : chunk;
+            parsedTx = parseTranscript(buffer);
+            updatePreview(parsedTx);
+        };
+
+        voiceBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            if (listening) {
+                listening = false;
+                setButtonState(false);
+                if (status) status.textContent = 'Finalizando...';
+                rec.stop();
+                return;
+            }
+            buffer = '';
+            parsedTx = null;
+            updatePreview(null);
+            listening = true;
+            setButtonState(true);
+            try { rec.start(); } catch (err) { /* ignore */ }
+        });
+
+        if (descInput) {
+            descInput.addEventListener('input', () => {
+                manualDesc = !!descInput.value.trim();
+            });
+        }
+        if (dateInput) {
+            dateInput.addEventListener('input', () => {
+                manualDate = !!dateInput.value.trim();
+            });
+        }
+        if (valueInput) {
+            valueInput.addEventListener('input', () => {
+                manualValue = !!valueInput.value.trim();
+            });
+        }
+        if (typeInput) {
+            typeInput.addEventListener('change', () => {
+                manualType = !!typeInput.value;
+            });
+        }
+        if (categorySelect) {
+            categorySelect.addEventListener('change', () => {
+                manualCategory = !!categorySelect.value;
+            });
+        }
+
+        if (applyBtn) applyBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            applyParsed();
+        });
+        if (clearBtn) clearBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            parsedTx = null;
+            buffer = '';
+            updatePreview(null);
+        });
+    })();
+</script>
+{% endif %}
 {% endblock %}
+

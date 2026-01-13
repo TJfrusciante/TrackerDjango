@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .models import WorkspaceMembership, Workspace
+from .models import WorkspaceMembership, Workspace, Notification
 from django.core.files.storage import default_storage
 
 
@@ -30,6 +30,7 @@ def workspace_context(request):
         "current_workspace_role": getattr(request, "workspace_role", None),
         "user_avatar_url": _avatar_url(user),
         "user_is_guest": _is_guest(user),
+        "notifications_unread": _notification_unread_count(user),
     }
 
 
@@ -50,4 +51,10 @@ def _is_guest(user):
         return False
     profile = getattr(user, "profile", None)
     return bool(profile and profile.is_guest)
+
+
+def _notification_unread_count(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return 0
+    return Notification.objects.filter(user=user, read_at__isnull=True).count()
 

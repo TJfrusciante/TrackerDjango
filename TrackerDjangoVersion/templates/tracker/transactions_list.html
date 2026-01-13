@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}Transações | Tracker{% endblock %}
+{% block title %}Transa&ccedil;&otilde;es | iTracker{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -9,6 +9,22 @@
     }
     #tx-table tbody tr:last-child {
         border-bottom: none;
+    }
+    .tx-action-btn {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        padding: 0 !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        font-size: 0.9rem;
+        flex: 0 0 auto;
+    }
+    .tx-action-btn i {
+        line-height: 1;
     }
     .due-warning {
         background: rgba(245, 158, 11, 0.08);
@@ -19,20 +35,30 @@
 {% block content %}
 <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
     <div>
-        <p class="text-secondary small mb-1">Finanças</p>
-        <h1 class="h4 fw-bold mb-0">Transações</h1>
+        <p class="text-secondary small mb-1">Finan&ccedil;as</p>
+        <h1 class="h4 fw-bold mb-0">Transa&ccedil;&otilde;es</h1>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-primary" href="{% url 'tracker:transaction_create' %}" data-bs-toggle="tooltip" title="Criar nova transação">
-            <i class="fa-solid fa-plus me-2"></i>Nova transação
+        <a class="btn btn-primary page-action-btn" href="{% url 'tracker:transaction_create' %}" data-bs-toggle="tooltip" title="Criar nova transa&ccedil;&atilde;o">
+            <i class="fa-solid fa-plus me-2"></i>Nova transa&ccedil;&atilde;o
         </a>
-        <a class="btn btn-outline-light" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" title="Gerenciar categorias">
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" title="Gerenciar categorias">
             <i class="fa-solid fa-tags me-2"></i>Categorias
         </a>
-        <a class="btn btn-success" href="{% url 'tracker:transaction_import' %}" data-bs-toggle="tooltip" title="Importar extrato CSV e sugerir categorias">
+        <a class="btn btn-success page-action-btn" href="{% url 'tracker:transaction_import' %}" data-bs-toggle="tooltip" title="Importar extrato CSV e sugerir categorias">
             <i class="fa-solid fa-file-import me-2"></i>Importar CSV
         </a>
-        <a class="btn btn-warning" href="{% url 'tracker:transaction_import_pdf' %}" data-bs-toggle="tooltip" title="Importar extrato PDF e sugerir categorias">
+        <form method="get" class="d-inline-flex align-items-center">
+            {% for key, value in filters.items %}
+                {% if value %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+            <button class="btn btn-outline-light page-action-btn" type="submit" name="export" value="csv" data-bs-toggle="tooltip" title="Exportar transa&ccedil;&otilde;es em CSV">
+                <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
+            </button>
+        </form>
+        <a class="btn btn-warning page-action-btn" href="{% url 'tracker:transaction_import_pdf' %}" data-bs-toggle="tooltip" title="Importar extrato PDF e sugerir categorias">
             <i class="fa-solid fa-file-pdf me-2"></i>Importar PDF
         </a>
     </div>
@@ -42,7 +68,7 @@
     <div class="row g-3 align-items-end">
         <div class="col-md-3">
             <label class="form-label">Buscar</label>
-            <input aria-label="Buscar transação" type="text" name="q" value="{{ filters.q }}" placeholder="Descrição ou categoria" class="form-control">
+            <input aria-label="Buscar transa&ccedil;&atilde;o" type="text" name="q" value="{{ filters.q }}" placeholder="Descri&ccedil;&atilde;o ou categoria" class="form-control">
         </div>
         <div class="col-md-2">
             <label class="form-label">Tipo</label>
@@ -67,12 +93,12 @@
             <input id="txStartHidden" type="hidden" name="start" value="{{ filters.start }}">
         </div>
         <div class="col-md-2">
-            <label class="form-label">Até</label>
+            <label class="form-label">At&eacute;</label>
             <input aria-label="Data final" id="txEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
             <input id="txEndHidden" type="hidden" name="end" value="{{ filters.end }}">
         </div>
         <div class="col-md-1 d-flex gap-2">
-            <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transação">Filtrar</button>
+            <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transa&ccedil;&atilde;o">Filtrar</button>
         </div>
         <div class="col-12 d-flex justify-content-between mt-2">
             <div class="small text-secondary">
@@ -111,17 +137,6 @@
     })();
 </script>
 
-<form method="get" class="mb-3">
-    {% for key, value in filters.items %}
-        {% if value %}
-            <input type="hidden" name="{{ key }}" value="{{ value }}">
-        {% endif %}
-    {% endfor %}
-    <button class="btn btn-sm btn-outline-light" type="submit" name="export" value="csv" data-bs-toggle="tooltip" title="Exportar transações em CSV">
-        <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
-    </button>
-</form>
-
 <div class="row g-3 mb-4">
     <div class="col-md-4">
         <div class="glass-card p-3">
@@ -148,12 +163,12 @@
         <table id="tx-table" class="table table-borderless table-striped align-middle mb-0">
             <thead>
                 <tr class="text-secondary">
-                    <th>Descrição</th>
+                    <th>Descri&ccedil;&atilde;o</th>
                     <th>Categoria</th>
                     <th>Data</th>
                     <th class="text-end">Valor</th>
                     <th class="text-center">Tipo</th>
-                    <th class="text-end">Ações</th>
+                    <th class="text-end">A&ccedil;&otilde;es</th>
                 </tr>
             </thead>
             <tbody>
@@ -172,25 +187,25 @@
                             <div class="d-flex justify-content-end gap-2">
                                 <form method="post" action="{% url 'tracker:transaction_toggle_type' tx.id %}">
                                     {% csrf_token %}
-                                    <button class="btn btn-sm btn-outline-info" type="submit" aria-label="Alternar tipo" data-bs-toggle="tooltip" title="Converter entrada/saída">
+                                    <button class="btn btn-sm tx-action-btn btn-outline-info" type="submit" aria-label="Alternar tipo" data-bs-toggle="tooltip" title="Converter entrada/sa&iacute;da">
                                         <i class="fa-solid fa-arrows-rotate"></i>
                                     </button>
                                 </form>
                                 <form method="post" action="{% url 'tracker:transaction_toggle_selected' tx.id %}">
                                     {% csrf_token %}
-                                    <button class="btn btn-sm {% if tx.selected %}btn-warning{% else %}btn-outline-warning{% endif %}" type="submit" aria-label="Destacar transação" data-bs-toggle="tooltip" title="Marcar como destaque">
+                                    <button class="btn btn-sm tx-action-btn {% if tx.selected %}btn-warning{% else %}btn-outline-warning{% endif %}" type="submit" aria-label="Destacar transa&ccedil;&atilde;o" data-bs-toggle="tooltip" title="Marcar como destaque">
                                         <i class="fa-solid fa-star"></i>
                                     </button>
                                 </form>
-                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:transaction_update' tx.id %}?detail=1" aria-label="Detalhes" data-bs-toggle="tooltip" title="Ver detalhes da transação">
+                                <a class="btn btn-sm tx-action-btn btn-outline-secondary" href="{% url 'tracker:transaction_update' tx.id %}?detail=1" aria-label="Detalhes" data-bs-toggle="tooltip" title="Ver detalhes da transa&ccedil;&atilde;o">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
-                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:transaction_update' tx.id %}" aria-label="Editar" data-bs-toggle="tooltip" title="Editar transação">
+                                <a class="btn btn-sm tx-action-btn btn-outline-light" href="{% url 'tracker:transaction_update' tx.id %}" aria-label="Editar" data-bs-toggle="tooltip" title="Editar transa&ccedil;&atilde;o">
                                     <i class="fa-solid fa-pen"></i>
                                 </a>
-                                <form method="post" action="{% url 'tracker:transaction_delete' tx.id %}" onsubmit="return confirm('Excluir esta transação?');">
+                                <form method="post" action="{% url 'tracker:transaction_delete' tx.id %}" onsubmit="return confirm('Excluir esta transa&ccedil;&atilde;o?');">
                                     {% csrf_token %}
-                                    <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Excluir" data-bs-toggle="tooltip" title="Excluir transação">
+                                    <button class="btn btn-sm tx-action-btn btn-outline-danger" type="submit" aria-label="Excluir" data-bs-toggle="tooltip" title="Excluir transa&ccedil;&atilde;o">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
                                 </form>
@@ -199,7 +214,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6" class="text-secondary">Nenhuma transação registrada.</td>
+                        <td colspan="6" class="text-secondary">Nenhuma transa&ccedil;&atilde;o registrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -208,7 +223,7 @@
     {% if transactions_page.has_other_pages %}
     <div class="d-flex justify-content-between align-items-center mt-3">
         <div class="small text-secondary">
-            Pagina {{ transactions_page.number }} de {{ transactions_page.paginator.num_pages }}
+            P&aacute;gina {{ transactions_page.number }} de {{ transactions_page.paginator.num_pages }}
         </div>
         <nav>
             <ul class="pagination pagination-sm mb-0">
@@ -231,3 +246,8 @@
     {% endif %}
 </div>
 {% endblock %}
+
+
+
+
+

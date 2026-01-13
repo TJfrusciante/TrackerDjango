@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} tarefa | Tracker{% endblock %}
+{% block title %}{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} tarefa | iTracker{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -30,13 +30,42 @@
             <form method="post" class="row g-3">
                 {% csrf_token %}
                 <div class="col-12">
-                    <label class="form-label">Título</label>
+                    <label class="form-label">T&iacute;tulo</label>
                     {% if is_detail %}
                         <p class="form-control-plaintext fw-semibold">{{ form.instance.title }}</p>
                     {% else %}
                         {{ form.title }}{{ form.title.errors }}
                     {% endif %}
                 </div>
+                {% if not is_detail %}
+                <div class="col-12">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button class="btn btn-outline-light btn-sm" id="taskVoiceBtn" type="button" formnovalidate>
+                            <i class="fa-solid fa-microphone me-1"></i>Falar
+                        </button>
+                        <span class="text-secondary small" id="taskVoiceStatus">Fale o t&iacute;tulo e, se quiser, uma data (dd/mm/aaaa).</span>
+                        <div id="taskVoicePreview" class="glass-card p-3 mt-2 d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Pr&eacute;-visualiza&ccedil;&atilde;o do ditado</h6>
+                                <span class="badge text-bg-secondary">Tarefa</span>
+                            </div>
+                            <div class="small">
+                                <div><strong>T&iacute;tulo:</strong> <span id="taskPrevTitle"></span></div>
+                                <div><strong>Prazo:</strong> <span id="taskPrevDate"></span></div>
+                            </div>
+                            <div class="mt-2">
+                                <div class="text-secondary small mb-1">Etapas</div>
+                                <div id="taskPrevSteps" class="list-group list-group-flush"></div>
+                            </div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button class="btn btn-primary btn-sm" type="button" id="taskVoiceApply">Aplicar</button>
+                                <button class="btn btn-outline-light btn-sm" type="button" id="taskVoiceClear">Limpar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="col-md-4">
                     <label class="form-label">Prazo</label>
                     {% if is_detail %}
@@ -60,13 +89,13 @@
                         <div class="step-entry p-3 bg-dark bg-opacity-10 rounded">
                             <div class="row g-2">
                                 <div class="col-12">
-                                    <input class="form-control form-control-lg" name="step_title" type="text" placeholder="Descrição da etapa" aria-label="Descrição da etapa">
+                                    <input class="form-control form-control-lg" name="step_title" type="text" placeholder="Descri&ccedil;&atilde;o da etapa" aria-label="Descri&ccedil;&atilde;o da etapa">
                                 </div>
                                 <div class="col-12">
-                                    <input class="form-control form-control-lg" name="step_responsible" type="text" placeholder="Responsável da etapa" aria-label="Responsável da etapa">
+                                    <input class="form-control form-control-lg" name="step_responsible" type="text" placeholder="Respons&aacute;vel da etapa" aria-label="Respons&aacute;vel da etapa">
                                 </div>
                                 <div class="col-12">
-                                    <input class="form-control form-control-lg" name="step_responsible_email" type="email" placeholder="E-mail do responsável" aria-label="E-mail do responsável">
+                                    <input class="form-control form-control-lg" name="step_responsible_email" type="email" placeholder="E-mail do respons&aacute;vel" aria-label="E-mail do respons&aacute;vel">
                                 </div>
                             </div>
                         </div>
@@ -76,7 +105,7 @@
                             <i class="fa-solid fa-plus me-1"></i>Adicionar etapa
                         </button>
                     </div>
-                    <div class="form-text text-secondary">As etapas são ordenadas automaticamente conforme a criação.</div>
+                    <div class="form-text text-secondary">As etapas s&atilde;o ordenadas automaticamente conforme a cria&ccedil;&atilde;o.</div>
                 </div>
                 {% endif %}
                 <div class="col-12">
@@ -118,49 +147,91 @@
                     <div class="col-12">
                         {{ step_form.responsible_email }}
                     </div>
+                    <div class="col-12">
+                        <label class="form-label small text-secondary">Status</label>
+                        {{ step_form.status }}
+                    </div>
                     <div class="col-12 d-grid">
                         <button class="btn btn-primary w-100" type="submit" title="Adicionar nova etapa"><i class="fa-solid fa-plus me-1"></i>Adicionar etapa</button>
                     </div>
                 </form>
             {% endif %}
             {% if steps %}
-                <div class="list-group list-group-flush mt-3">
-                {% for step in steps %}
-                    <div class="list-group-item bg-transparent step-row">
-                        <div class="d-flex align-items-start justify-content-between">
-                            <div class="d-flex align-items-start gap-2">
-                                {% if not is_detail %}
-                                    <a class="btn btn-sm {% if step.done %}btn-success{% else %}btn-warning{% endif %}" href="{% url 'tracker:task_step_toggle' object.id step.id %}">
-                                        <i class="fa-solid {% if step.done %}fa-check-square{% else %}fa-square{% endif %}"></i>
-                                    </a>
-                                {% else %}
-                                    <span class="badge {% if step.done %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}">{{ step.done|yesno:"Feita,Pendente" }}</span>
-                                {% endif %}
-                                <div>
-                                    <div class="fw-semibold">{{ step.title }}</div>
-                                    <div class="text-secondary small">Etapa {{ step.order }}</div>
-                                    <div class="text-secondary small">
-                                        {% if step.responsible %}Responsável: {{ step.responsible }}{% endif %}
-                                        {% if step.responsible_email %}<br>Email: {{ step.responsible_email }}{% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            {% if not is_detail %}
-                            <form method="post" action="{% url 'tracker:task_step_delete' object.id step.id %}" onsubmit="return confirm('Excluir esta etapa?');">
-                                {% csrf_token %}
-                                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fa-solid fa-trash"></i></button>
-                            </form>
-                            {% endif %}
+    <div class="list-group list-group-flush mt-3">
+    {% for step in steps %}
+        <div class="list-group-item bg-transparent step-row">
+            <div class="d-flex align-items-start justify-content-between">
+                <div class="d-flex align-items-start gap-2">
+                    {% if not is_detail %}
+                        <form method="post" action="{% url 'tracker:task_step_toggle' object.id step.id %}">
+                            {% csrf_token %}
+                            <button class="btn btn-sm {% if step.status == 'done' %}btn-success{% elif step.status == 'cancelled' %}btn-outline-danger{% else %}btn-warning{% endif %}" type="submit" title="{% if step.status == 'done' %}Reabrir etapa{% elif step.status == 'cancelled' %}Reabrir etapa{% else %}Concluir etapa{% endif %}">
+                                <i class="fa-solid {% if step.status == 'done' %}fa-check-square{% elif step.status == 'cancelled' %}fa-ban{% else %}fa-circle{% endif %}"></i>
+                            </button>
+                        </form>
+                    {% else %}
+                        <span class="badge {% if step.status == 'done' %}bg-success-subtle text-success{% elif step.status == 'cancelled' %}bg-danger-subtle text-danger{% else %}bg-warning-subtle text-warning{% endif %}">
+                            {% if step.status == 'done' %}Conclu&iacute;da{% elif step.status == 'cancelled' %}Cancelada{% else %}Em andamento{% endif %}
+                        </span>
+                    {% endif %}
+                    <div>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="fw-semibold">{{ step.title }}</div>
+                            <span class="badge {% if step.status == 'done' %}bg-success-subtle text-success{% elif step.status == 'cancelled' %}bg-danger-subtle text-danger{% else %}bg-warning-subtle text-warning{% endif %}">
+                                {% if step.status == 'done' %}Conclu&iacute;da{% elif step.status == 'cancelled' %}Cancelada{% else %}Em andamento{% endif %}
+                            </span>
+                        </div>
+                        <div class="text-secondary small">Etapa {{ step.order }}</div>
+                        <div class="text-secondary small">
+                            {% if step.responsible %}Respons&aacute;vel: {{ step.responsible }}{% endif %}
+                            {% if step.responsible_email %}<br>Email: {{ step.responsible_email }}{% endif %}
                         </div>
                     </div>
-                {% endfor %}
                 </div>
-            {% else %}
-                <p class="text-secondary mb-0 mt-3">Nenhuma etapa cadastrada.</p>
+                {% if not is_detail %}
+                <div class="d-flex gap-2 align-items-start">
+                    <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#stepEdit{{ step.id }}" aria-expanded="false">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <form method="post" action="{% url 'tracker:task_step_delete' object.id step.id %}" onsubmit="return confirm('Excluir esta etapa?');">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fa-solid fa-trash"></i></button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            {% if not is_detail %}
+            <div class="collapse mt-2" id="stepEdit{{ step.id }}">
+                <form method="post" action="{% url 'tracker:task_step_update' object.id step.id %}" class="row g-2">
+                    {% csrf_token %}
+                    <div class="col-12">
+                        <input class="form-control" type="text" name="title" value="{{ step.title }}" placeholder="Descri&ccedil;&atilde;o da etapa" required>
+                    </div>
+                    <div class="col-12">
+                        <input class="form-control" type="text" name="responsible" value="{{ step.responsible }}" placeholder="Respons&aacute;vel da etapa">
+                    </div>
+                    <div class="col-12">
+                        <input class="form-control" type="email" name="responsible_email" value="{{ step.responsible_email }}" placeholder="E-mail do respons&aacute;vel">
+                    </div>
+                    <div class="col-12">
+                        <select class="form-select" name="status">
+                            <option value="ongoing" {% if step.status == 'ongoing' %}selected{% endif %}>Em andamento</option>
+                            <option value="done" {% if step.status == 'done' %}selected{% endif %}>Conclu&iacute;da</option>
+                            <option value="cancelled" {% if step.status == 'cancelled' %}selected{% endif %}>Cancelada</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button class="btn btn-outline-light btn-sm" type="submit">Salvar altera&ccedil;&otilde;es</button>
+                    </div>
+                </form>
+            </div>
             {% endif %}
         </div>
+    {% endfor %}
     </div>
-</div>
+{% else %}
+    <p class="text-secondary mb-0 mt-3">Nenhuma etapa cadastrada.</p>
+{% endif %}
 {% endif %}
 {% if not is_detail and not is_edit %}
 <script>
@@ -174,10 +245,292 @@
             const clone = template.cloneNode(true);
             clone.querySelectorAll('input').forEach(input => {
                 input.value = '';
+                delete input.dataset.manual;
             });
             container.appendChild(clone);
         });
     })();
 </script>
 {% endif %}
+{% if not is_detail %}
+<script>
+    (function() {
+        const voiceBtn = document.getElementById('taskVoiceBtn');
+        if (!voiceBtn) return;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const status = document.getElementById('taskVoiceStatus');
+        const titleInput = document.getElementById('id_title');
+        const dateInput = document.getElementById('id_due_date');
+        const stepContainer = document.getElementById('stepContainer');
+        const addBtn = document.getElementById('addStepRow');
+        const preview = document.getElementById('taskVoicePreview');
+        const prevTitle = document.getElementById('taskPrevTitle');
+        const prevDate = document.getElementById('taskPrevDate');
+        const prevSteps = document.getElementById('taskPrevSteps');
+        const applyBtn = document.getElementById('taskVoiceApply');
+        const clearBtn = document.getElementById('taskVoiceClear');
+        if (!SpeechRecognition) {
+            voiceBtn.disabled = true;
+            if (status) status.textContent = 'Ditado indispon\u00edvel neste navegador.';
+            return;
+        }
+
+        const rec = new SpeechRecognition();
+        rec.lang = 'pt-BR';
+        rec.interimResults = false;
+        rec.continuous = true;
+
+        let listening = false;
+        let buffer = '';
+        let parsedTask = null;
+        let manualTitle = titleInput ? !!titleInput.value.trim() : false;
+        let manualDate = dateInput ? !!dateInput.value.trim() : false;
+
+        const normalize = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+        const setButtonState = (active) => {
+            if (active) {
+                voiceBtn.innerHTML = '<i class="fa-solid fa-stop me-1"></i>Finalizar';
+            } else {
+                voiceBtn.innerHTML = '<i class="fa-solid fa-microphone me-1"></i>Falar';
+            }
+        };
+
+        const extractDate = (text) => {
+            if (!text) return { dateIso: '', cleaned: text };
+            let cleaned = text;
+            let dateIso = '';
+            let match = text.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
+            if (match) {
+                const day = match[1].padStart(2, '0');
+                const month = match[2].padStart(2, '0');
+                let year = match[3] ? match[3] : String(new Date().getFullYear());
+                if (year.length === 2) year = `20${year}`;
+                dateIso = `${year}-${month}-${day}`;
+                cleaned = cleaned.replace(match[0], '').trim();
+                return { dateIso, cleaned };
+            }
+            const monthMap = {
+                janeiro: '01',
+                fevereiro: '02',
+                marco: '03',
+                abril: '04',
+                maio: '05',
+                junho: '06',
+                julho: '07',
+                agosto: '08',
+                setembro: '09',
+                outubro: '10',
+                novembro: '11',
+                dezembro: '12'
+            };
+            match = text.match(/(?:dia\s*)?(\d{1,2})\s*(?:de)?\s*(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de)?\s*(\d{2,4})?/i);
+            if (match) {
+                const day = match[1].padStart(2, '0');
+                const monthKey = normalize(match[2]);
+                const month = monthMap[monthKey] || '01';
+                let year = match[3] ? match[3] : String(new Date().getFullYear());
+                if (year.length === 2) year = `20${year}`;
+                dateIso = `${year}-${month}-${day}`;
+                cleaned = cleaned.replace(match[0], '').trim();
+            }
+            return { dateIso, cleaned };
+        };
+
+        const parseStepSegment = (segment) => {
+            if (!segment) return null;
+            let working = segment.trim();
+            let email = '';
+            const emailMatch = working.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+            if (emailMatch) {
+                email = emailMatch[0];
+                working = working.replace(email, '');
+            }
+            let responsible = '';
+            const respMatch = working.match(/respons[a\u00e1]vel/i);
+            if (respMatch) {
+                const respIndex = respMatch.index || 0;
+                let after = working.slice(respIndex + respMatch[0].length);
+                after = after.replace(/^\s*[:\-]?\s*/, '');
+                const split = after.split(/\bemail\b|,|;|\./i);
+                responsible = (split[0] || '').trim();
+                working = working.slice(0, respIndex).trim();
+            }
+            let title = working.replace(/^[-:\s]+/, '').trim();
+            if (!title) title = segment.trim();
+            return { title, responsible, email };
+        };
+
+        const parseTranscript = (transcript) => {
+            if (!transcript) return null;
+            const dateData = extractDate(transcript);
+            let title = (dateData.cleaned || transcript).trim();
+            let dateIso = dateData.dateIso || '';
+            const steps = [];
+
+            const stepMatches = Array.from(transcript.matchAll(/(etapa|passo)\s*(\d+|um|dois|tres|quatro|cinco|seis|sete|oito|nove|dez)?/gi));
+            const stepsDetected = stepMatches.length > 0;
+            if (stepsDetected) {
+                const firstIndex = stepMatches[0].index || 0;
+                const taskTitle = transcript.slice(0, firstIndex).trim();
+                if (taskTitle) title = taskTitle;
+                stepMatches.forEach((match, idx) => {
+                    const start = (match.index || 0) + match[0].length;
+                    const end = idx + 1 < stepMatches.length ? stepMatches[idx + 1].index : transcript.length;
+                    const segment = transcript.slice(start, end).trim();
+                    const step = parseStepSegment(segment);
+                    if (step && step.title) steps.push(step);
+                });
+            }
+
+            if (!title && steps.length) {
+                title = steps[0].title;
+            }
+
+            return { title: title.trim(), dateIso, steps, stepsDetected };
+        };
+
+        const updatePreview = (data) => {
+            if (!preview) return;
+            if (!data) {
+                preview.classList.add('d-none');
+                return;
+            }
+            preview.classList.remove('d-none');
+            if (prevTitle) prevTitle.textContent = data.title || '-';
+            if (prevDate) prevDate.textContent = data.dateIso ? data.dateIso.split('-').reverse().join('/') : '-';
+            if (prevSteps) {
+                prevSteps.innerHTML = '';
+                if (data.steps.length) {
+                    data.steps.forEach((step) => {
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item bg-transparent px-0';
+                        item.innerHTML = `<div class=\"fw-semibold\">${step.title}</div>`
+                            + `<div class=\"small text-secondary\">${step.responsible ? `Respons\u00e1vel: ${step.responsible}` : 'Sem respons\u00e1vel'}${step.email ? ` &middot; ${step.email}` : ''}</div>`;
+                        prevSteps.appendChild(item);
+                    });
+                } else {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item bg-transparent px-0 text-secondary';
+                    item.textContent = 'Nenhuma etapa detectada.';
+                    prevSteps.appendChild(item);
+                }
+            }
+        };
+
+        const syncSteps = (steps) => {
+            if (!stepContainer || !steps.length) return;
+            const entries = Array.from(stepContainer.querySelectorAll('.step-entry'));
+            steps.forEach((step, idx) => {
+                let entry = entries[idx];
+                if (!entry && addBtn) {
+                    addBtn.click();
+                    entry = Array.from(stepContainer.querySelectorAll('.step-entry'))[idx];
+                }
+                if (!entry) return;
+                const titleField = entry.querySelector('input[name=\"step_title\"]');
+                const respField = entry.querySelector('input[name=\"step_responsible\"]');
+                const emailField = entry.querySelector('input[name=\"step_responsible_email\"]');
+                if (titleField && titleField.dataset.manual !== '1') titleField.value = step.title || '';
+                if (respField && respField.dataset.manual !== '1') respField.value = step.responsible || '';
+                if (emailField && emailField.dataset.manual !== '1') emailField.value = step.email || '';
+            });
+        };
+
+        const formatIsoToBr = (iso) => {
+            if (!iso) return '';
+            const parts = iso.split('-');
+            if (parts.length !== 3) return iso;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        };
+
+        const applyParsed = (data, options = {}) => {
+            if (!data) return;
+            if (titleInput && data.title && !manualTitle) titleInput.value = data.title || '';
+            if (dateInput && data.dateIso && !manualDate) dateInput.value = formatIsoToBr(data.dateIso);
+            if (data.stepsDetected) syncSteps(data.steps || []);
+            if (options.clearPreview) updatePreview(null);
+        };
+
+        rec.onstart = () => {
+            if (status) status.textContent = 'Ouvindo... clique em Finalizar para encerrar.';
+        };
+        rec.onend = () => {
+            if (listening) {
+                setTimeout(() => {
+                    try { rec.start(); } catch (err) { /* ignore */ }
+                }, 250);
+            } else {
+                if (status) status.textContent = 'Ditado finalizado.';
+                parsedTask = parseTranscript(buffer);
+                updatePreview(parsedTask);
+                applyParsed(parsedTask);
+                buffer = '';
+            }
+        };
+        rec.onerror = () => {
+            if (status) status.textContent = 'N\u00e3o consegui acessar o microfone.';
+        };
+        rec.onresult = (ev) => {
+            const chunk = (ev.results[0][0].transcript || '').trim();
+            if (!chunk) return;
+            buffer = buffer ? `${buffer} ${chunk}` : chunk;
+            parsedTask = parseTranscript(buffer);
+            updatePreview(parsedTask);
+            applyParsed(parsedTask);
+        };
+
+        voiceBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            if (listening) {
+                listening = false;
+                setButtonState(false);
+                if (status) status.textContent = 'Finalizando...';
+                rec.stop();
+                return;
+            }
+            buffer = '';
+            parsedTask = null;
+            updatePreview(null);
+            listening = true;
+            setButtonState(true);
+            try { rec.start(); } catch (err) { /* ignore */ }
+        });
+
+        if (titleInput) {
+            titleInput.addEventListener('input', () => {
+                manualTitle = !!titleInput.value.trim();
+            });
+        }
+        if (dateInput) {
+            dateInput.addEventListener('input', () => {
+                manualDate = !!dateInput.value.trim();
+            });
+        }
+        if (stepContainer) {
+            stepContainer.addEventListener('input', (ev) => {
+                const target = ev.target;
+                if (!target || !target.matches('input[name^=\"step_\"]')) return;
+                if (target.value.trim()) {
+                    target.dataset.manual = '1';
+                } else {
+                    delete target.dataset.manual;
+                }
+            });
+        }
+
+        if (applyBtn) applyBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            applyParsed(parsedTask, { clearPreview: true });
+        });
+        if (clearBtn) clearBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            parsedTask = null;
+            buffer = '';
+            updatePreview(null);
+        });
+    })();
+</script>
+{% endif %}
 {% endblock %}
+

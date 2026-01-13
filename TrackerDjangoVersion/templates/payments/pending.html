@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Pagamento pendente | iTracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 text-center">
+            <i class="fa-solid fa-hourglass-half text-warning fa-2x mb-3"></i>
+            <h1 class="h5 fw-bold mb-2">Pagamento pendente</h1>
+            <p class="text-secondary mb-3">Assim que a confirma&ccedil;&atilde;o ocorrer, sua conta ser&aacute; liberada.</p>
+            <a class="btn btn-outline-light" href="{% url 'tracker:dashboard' %}">Voltar</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

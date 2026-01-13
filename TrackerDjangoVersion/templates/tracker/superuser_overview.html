@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Vis&atilde;o geral | Tracker{% endblock %}
+{% block title %}Vis&atilde;o geral | iTracker{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
@@ -19,7 +19,7 @@
             </select>
             <button class="btn btn-sm btn-primary" type="submit">Filtrar</button>
         </form>
-        <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:dashboard' %}">Ir para dashboard</a>
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:dashboard' %}">Ir para dashboard</a>
     </div>
 </div>
 
@@ -104,6 +104,152 @@
     </div>
 </div>
 
+<div class="glass-card p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h5 class="mb-0">Promoções e preços</h5>
+            <p class="text-secondary small mb-0">Atualize os valores que aparecem na landing e no checkout.</p>
+        </div>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="pricing_form" value="1">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">{{ pricing_form.promo_active.label }}</label>
+                <div class="form-check form-switch">
+                    {{ pricing_form.promo_active }}
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ pricing_form.promo_limit.label }}</label>
+                {{ pricing_form.promo_limit }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">{{ pricing_form.promo_label.label }}</label>
+                {{ pricing_form.promo_label }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ pricing_form.promo_monthly_price.label }}</label>
+                {{ pricing_form.promo_monthly_price }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ pricing_form.promo_annual_price.label }}</label>
+                {{ pricing_form.promo_annual_price }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ pricing_form.regular_monthly_price.label }}</label>
+                {{ pricing_form.regular_monthly_price }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ pricing_form.regular_annual_price.label }}</label>
+                {{ pricing_form.regular_annual_price }}
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit">Salvar preços</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">IA: solicita&ccedil;&otilde;es</p>
+            <h4 class="mb-0">{{ ai_requests }}</h4>
+            <div class="text-secondary small mt-1">Chat: {{ ai_chat_tokens }} tokens</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">IA: tokens totais</p>
+            <h4 class="mb-0">{{ ai_tokens }}</h4>
+            <div class="text-secondary small mt-1">Importa&ccedil;&atilde;o: {{ ai_import_tokens }} tokens</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">IA: custo estimado (R$)</p>
+            <h4 class="mb-0">{{ ai_cost_brl|floatformat:2 }}</h4>
+            <div class="text-secondary small mt-1">USD {{ ai_cost_usd|floatformat:4 }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">IA: &uacute;ltimos 30 dias</p>
+            <h4 class="mb-0">{{ ai_last30_cost_brl|floatformat:2 }}</h4>
+            <div class="text-secondary small mt-1">{{ ai_last30_tokens }} tokens</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Logins (30d)</p>
+            <h4 class="mb-0">{{ login_success_30 }}</h4>
+            <div class="text-secondary small mt-1">Falhas: {{ login_failed_30 }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Logins bloqueados (30d)</p>
+            <h4 class="mb-0">{{ login_blocked_30 }}</h4>
+            <div class="text-secondary small mt-1">Rate limit</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Cadastros (30d)</p>
+            <h4 class="mb-0">{{ signup_30 }}</h4>
+            <div class="text-secondary small mt-1">Convites enviados: {{ invite_sent_30 }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Convites aceitos (30d)</p>
+            <h4 class="mb-0">{{ invite_accepted_30 }}</h4>
+            <div class="text-secondary small mt-1">Exporta&ccedil;&otilde;es: {{ data_export_30 }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Pagamentos (30d)</p>
+            <h4 class="mb-0">{{ payment_confirmed_30 }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Renova&ccedil;&otilde;es (30d)</p>
+            <h4 class="mb-0">{{ subscription_renewed_30 }}</h4>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Sa&uacute;de do produto</p>
+            <div class="text-secondary small">Use estes indicadores para monitorar convers&atilde;o, convites e engajamento de IA.</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-7">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-2">IA: tokens por dia (30d)</p>
+            <canvas id="aiTokensChart" height="160"></canvas>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-2">IA: distribui&ccedil;&atilde;o por recurso</p>
+            <canvas id="aiFeatureChart" height="160"></canvas>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3 mb-4">
     <div class="col-md-4">
         <div class="glass-card p-3 h-100">
@@ -150,31 +296,46 @@
 <div class="glass-card p-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Workspaces recentes</h5>
-        <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Gerenciar usu&aacute;rios</a>
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:user_admin_list' %}">Gerenciar usu&aacute;rios</a>
     </div>
-    <div class="table-responsive">
-        <table class="table align-middle mb-0 table-hover">
-            <thead>
-                <tr class="text-secondary">
-                    <th>Nome</th>
-                    <th>Slug</th>
-                    <th>Dono</th>
-                    <th>Criado em</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ws in recent_workspaces %}
-                <tr class="bg-dark bg-opacity-10">
-                    <td>{{ ws.name }}</td>
-                    <td>{{ ws.slug }}</td>
-                    <td>{{ ws.owner }}</td>
-                    <td>{{ ws.created_at|date:"d/m/Y" }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="4" class="text-secondary">Nenhum workspace.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="row g-3">
+        {% for ws in recent_workspaces %}
+        <div class="col-md-6">
+            <div class="glass-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <div class="fw-semibold">{{ ws.name }}</div>
+                        <div class="small text-secondary">{{ ws.slug }}</div>
+                    </div>
+                    {% if ws.is_active %}
+                        <span class="badge bg-success-subtle text-success">Ativo</span>
+                    {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary">Inativo</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex flex-wrap gap-3 small text-secondary">
+                    <span><i class="fa-solid fa-user me-1"></i>{{ ws.owner }}</span>
+                    <span><i class="fa-solid fa-users me-1"></i>{{ ws.member_count }} membros</span>
+                    <span><i class="fa-solid fa-coins me-1"></i>{{ ws.tx_count }} transa&ccedil;&otilde;es</span>
+                    <span><i class="fa-solid fa-list-check me-1"></i>{{ ws.task_count }} tarefas</span>
+                </div>
+                <div class="d-flex flex-wrap gap-3 mt-2 small">
+                    <span class="text-success">Entradas: R$ {{ ws.income_sum|default:0|floatformat:2 }}</span>
+                    <span class="text-danger">Sa&iacute;das: R$ {{ ws.expense_sum|default:0|floatformat:2 }}</span>
+                    <span class="text-info">Saldo: R$ {{ ws.net_sum|default:0|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex flex-wrap gap-3 mt-2 small text-secondary">
+                    <span><i class="fa-solid fa-calendar me-1"></i>Criado em {{ ws.created_at|date:"d/m/Y" }}</span>
+                    <span><i class="fa-solid fa-clock me-1"></i>&Uacute;ltima transa&ccedil;&atilde;o: {{ ws.last_tx_date|date:"d/m/Y"|default:"-" }}</span>
+                    <span><i class="fa-solid fa-pen me-1"></i>&Uacute;ltima tarefa: {{ ws.last_task_update|date:"d/m/Y"|default:"-" }}</span>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="glass-card p-3 text-secondary">Nenhum workspace.</div>
+        </div>
+        {% endfor %}
     </div>
 </div>
 
@@ -189,7 +350,7 @@
                 labels: {{ ws_labels|safe }},
                 datasets: [
                     {label: 'Entradas', data: {{ ws_income|safe }}, backgroundColor: '#22c55e'},
-                    {label: 'Sa&iacute;das', data: {{ ws_expense|safe }}, backgroundColor: '#ef4444'},
+                    {label: 'Sa\u00eddas', data: {{ ws_expense|safe }}, backgroundColor: '#ef4444'},
                 ]
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
@@ -202,10 +363,39 @@
             data: {
                 labels: {{ monthly_labels|safe }},
                 datasets: [
-                    {label: 'Saldo l&iacute;quido', data: {{ monthly_values|safe }}, borderColor: '#3b82f6', fill:false, tension:0.2}
+                    {label: 'Saldo l\u00edquido', data: {{ monthly_values|safe }}, borderColor: '#3b82f6', fill:false, tension:0.2}
                 ]
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
+        });
+    }
+
+    const aiTokensCtx = document.getElementById('aiTokensChart');
+    if (aiTokensCtx) {
+        new Chart(aiTokensCtx, {
+            type: 'line',
+            data: {
+                labels: {{ ai_daily_labels|safe }},
+                datasets: [
+                    {label: 'Tokens IA', data: {{ ai_daily_tokens|safe }}, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.2)', fill:true, tension:0.2},
+                    {label: 'Custo IA (R$)', data: {{ ai_daily_costs|safe }}, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.2)', fill:true, tension:0.2}
+                ]
+            },
+            options: {responsive: true, plugins:{legend:{display:true}}}
+        });
+    }
+
+    const aiFeatureCtx = document.getElementById('aiFeatureChart');
+    if (aiFeatureCtx) {
+        new Chart(aiFeatureCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ ai_feature_labels|safe }},
+                datasets: [
+                    {data: {{ ai_feature_tokens|safe }}, backgroundColor: ['#22c55e', '#3b82f6']}
+                ]
+            },
+            options: {responsive: true, plugins:{legend:{position:'bottom'}}}
         });
     }
 </script>

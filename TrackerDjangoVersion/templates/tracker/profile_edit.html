@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Perfil | Tracker{% endblock %}
+{% block title %}Perfil | iTracker{% endblock %}
 
 {% block content %}
 <div class="row g-4">
@@ -10,7 +10,7 @@
                 <div>
                     <p class="text-secondary small text-uppercase mb-1">Conta e identidade</p>
                     <h1 class="h5 fw-bold mb-0">Editar perfil</h1>
-                    <p class="text-secondary mb-0">Mantenha seus dados atualizados para convites e notificações.</p>
+                    <p class="text-secondary mb-0">Mantenha seus dados atualizados para convites e notifica&#231;&#245;es.</p>
                 </div>
                 <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:dashboard' %}">Voltar</a>
             </div>
@@ -31,41 +31,164 @@
                         {{ field }}
                     </div>
                 {% endfor %}
+                <div class="col-12">
+                    <div class="glass-card p-3 bg-dark bg-opacity-10">
+                        <h6 class="fw-bold mb-2">Notifica&ccedil;&otilde;es financeiras</h6>
+                        <div class="form-check mb-2">
+                            {{ pref_form.notify_balance_threshold }}
+                            <label class="form-check-label" for="{{ pref_form.notify_balance_threshold.id_for_label }}">
+                                {{ pref_form.notify_balance_threshold.label }}
+                            </label>
+                        </div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label small">{{ pref_form.balance_threshold.label }}</label>
+                                {{ pref_form.balance_threshold }}
+                                {% if pref_form.balance_threshold.help_text %}
+                                    <div class="form-text">{{ pref_form.balance_threshold.help_text }}</div>
+                                {% endif %}
+                                {{ pref_form.balance_threshold.errors }}
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            {{ pref_form.notify_budget_alerts }}
+                            <label class="form-check-label" for="{{ pref_form.notify_budget_alerts.id_for_label }}">
+                                {{ pref_form.notify_budget_alerts.label }}
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            {{ pref_form.notify_goal_alerts }}
+                            <label class="form-check-label" for="{{ pref_form.notify_goal_alerts.id_for_label }}">
+                                {{ pref_form.notify_goal_alerts.label }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="glass-card p-3 bg-dark bg-opacity-10">
+                        <h6 class="fw-bold mb-2">Notifica&ccedil;&otilde;es de tarefas</h6>
+                        <div class="form-check mb-2">
+                            {{ pref_form.notify_task_completed }}
+                            <label class="form-check-label" for="{{ pref_form.notify_task_completed.id_for_label }}">
+                                {{ pref_form.notify_task_completed.label }}
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            {{ pref_form.notify_step_completed }}
+                            <label class="form-check-label" for="{{ pref_form.notify_step_completed.id_for_label }}">
+                                {{ pref_form.notify_step_completed.label }}
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            {{ pref_form.notify_task_reminder }}
+                            <label class="form-check-label" for="{{ pref_form.notify_task_reminder.id_for_label }}">
+                                {{ pref_form.notify_task_reminder.label }}
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            {{ pref_form.notify_task_overdue }}
+                            <label class="form-check-label" for="{{ pref_form.notify_task_overdue.id_for_label }}">
+                                {{ pref_form.notify_task_overdue.label }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="glass-card p-3 bg-dark bg-opacity-10">
+                        <h6 class="fw-bold mb-2">Resumos autom&aacute;ticos</h6>
+                        <div class="form-check mb-2">
+                            {{ pref_form.digest_weekly }}
+                            <label class="form-check-label" for="{{ pref_form.digest_weekly.id_for_label }}">
+                                {{ pref_form.digest_weekly.label }}
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            {{ pref_form.digest_monthly }}
+                            <label class="form-check-label" for="{{ pref_form.digest_monthly.id_for_label }}">
+                                {{ pref_form.digest_monthly.label }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                {% if show_admin_prefs %}
+                <div class="col-12">
+                    <div class="glass-card p-3 border border-warning border-opacity-25">
+                        <h6 class="fw-bold mb-2">Alertas do admin</h6>
+                        <div class="form-check mb-2">
+                            {{ pref_form.notify_admin_new_account }}
+                            <label class="form-check-label" for="{{ pref_form.notify_admin_new_account.id_for_label }}">
+                                {{ pref_form.notify_admin_new_account.label }}
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            {{ pref_form.notify_admin_payment_request }}
+                            <label class="form-check-label" for="{{ pref_form.notify_admin_payment_request.id_for_label }}">
+                                {{ pref_form.notify_admin_payment_request.label }}
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            {{ pref_form.notify_admin_contact }}
+                            <label class="form-check-label" for="{{ pref_form.notify_admin_contact.id_for_label }}">
+                                {{ pref_form.notify_admin_contact.label }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <div class="col-12 d-flex gap-2">
                     <a class="btn btn-outline-light" href="{% url 'tracker:dashboard' %}">Cancelar</a>
-                    <button class="btn btn-primary" type="submit">Salvar alterações</button>
+                    <button class="btn btn-primary" type="submit">Salvar altera&#231;&#245;es</button>
                 </div>
             </form>
         </div>
     </div>
     <div class="col-lg-5">
         <div class="glass-card p-4 h-100">
-            <h2 class="h6 fw-bold mb-2">Resumo rápido</h2>
+            <h2 class="h6 fw-bold mb-2">Resumo r&#225;pido</h2>
             <ul class="list-unstyled mb-3">
                 <li class="d-flex align-items-start gap-2 mb-2">
                     <i class="fa-solid fa-envelope text-primary mt-1"></i>
                     <div>
                         <div class="fw-semibold">E-mail</div>
-                        <div class="text-secondary small">{{ request.user.email|default:"Não informado" }}</div>
+                        <div class="text-secondary small">{{ request.user.email|default:"N&#227;o informado" }}</div>
                     </div>
                 </li>
                 <li class="d-flex align-items-start gap-2 mb-2">
                     <i class="fa-solid fa-user-gear text-primary mt-1"></i>
                     <div>
-                        <div class="fw-semibold">Permissões</div>
-                        <div class="text-secondary small">O acesso é controlado por workspace; admins podem ajustar seu papel.</div>
+                        <div class="fw-semibold">Permiss&#245;es</div>
+                        <div class="text-secondary small">O acesso &#233; controlado por workspace; admins podem ajustar seu papel.</div>
                     </div>
                 </li>
                 <li class="d-flex align-items-start gap-2">
                     <i class="fa-solid fa-shield-halved text-primary mt-1"></i>
                     <div>
-                        <div class="fw-semibold">Segurança</div>
-                        <div class="text-secondary small">Use um e-mail válido para notificações e convites. Avatar ajuda a identificar você nas atividades.</div>
+                        <div class="fw-semibold">Seguran&#231;a</div>
+                        <div class="text-secondary small">Use um e-mail v&#225;lido para notifica&#231;&#245;es e convites. Avatar ajuda a identificar voc&#234; nas atividades.</div>
                     </div>
                 </li>
             </ul>
-            <div class="alert alert-info small mb-0">
-                Dica: personalize o avatar para diferenciar contas em múltiplos workspaces.
+            <div class="alert alert-info small mb-2">
+                Dica: personalize o avatar para diferenciar contas em m&uacute;ltiplos workspaces.
+            </div>
+            <a class="btn btn-outline-light page-action-btn w-100" href="{% url 'tracker:contact_admin' %}?topic=payment">
+                Avisar pagamento
+            </a>
+            <a class="btn btn-primary page-action-btn w-100 mt-2" href="{% url 'payments:subscription_start' %}">
+                Assinar com Mercado Pago
+            </a>
+            <div class="glass-card p-3 mt-3 bg-dark bg-opacity-10">
+                <h6 class="fw-bold mb-2">LGPD e dados</h6>
+                <p class="text-secondary small mb-2">Exporte seus dados pessoais ou solicite a exclus&atilde;o da conta.</p>
+                <a class="btn btn-outline-light page-action-btn w-100 mb-2" href="{% url 'tracker:export_my_data' %}">Exportar meus dados</a>
+                {% if profile.deletion_requested_at %}
+                    <div class="alert alert-warning small mb-0">Solicita&ccedil;&atilde;o enviada em {{ profile.deletion_requested_at|date:"d/m/Y H:i" }}.</div>
+                {% else %}
+                    <form method="post" action="{% url 'tracker:account_delete_request' %}" onsubmit="return confirm('Confirmar solicita\u00e7\u00e3o de exclus\u00e3o da conta?');">
+                        {% csrf_token %}
+                        <button class="btn btn-outline-danger page-action-btn w-100" type="submit">Solicitar exclus&atilde;o</button>
+                    </form>
+                {% endif %}
             </div>
         </div>
     </div>

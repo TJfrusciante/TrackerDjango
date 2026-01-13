@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Convites de assinatura | iTracker{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div>
+        <p class="text-secondary small text-uppercase mb-1">Admin</p>
+        <h1 class="h4 fw-bold mb-0">Convites de assinatura</h1>
+        <p class="text-secondary mb-0">Crie convites mensais ou anuais para liberar acesso sem pagamento.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:user_admin_list' %}">Usu&aacute;rios</a>
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:superuser_overview' %}">Vis&atilde;o geral</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="glass-card p-4">
+            <h2 class="h6 fw-bold mb-3">Novo convite</h2>
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
+                    </div>
+                {% endfor %}
+                <button class="btn btn-primary w-100" type="submit">Gerar convite</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="glass-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h6 fw-bold mb-0">Convites ativos</h2>
+                <span class="badge text-bg-secondary">{{ invites|length }}</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr class="text-secondary">
+                            <th>C&oacute;digo</th>
+                            <th>Plano</th>
+                            <th>Usos</th>
+                            <th>Status</th>
+                            <th>Expira</th>
+                            <th class="text-end">A&ccedil;&otilde;es</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invite in invites %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">{{ invite.code }}</div>
+                                    <div class="small text-secondary">Criado em {{ invite.created_at|date:"d/m/Y" }}</div>
+                                </td>
+                                <td>{{ invite.get_plan_cycle_display }}</td>
+                                <td>{{ invite.used_count }}/{{ invite.max_uses }}</td>
+                                <td>
+                                    {% if invite.is_active %}
+                                        <span class="badge bg-success-subtle text-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if invite.expires_at %}{{ invite.expires_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                                <td class="text-end">
+                                    <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                        <button class="btn btn-sm btn-outline-light copy-btn" type="button" data-code="{{ invite.code }}">Copiar</button>
+                                        <form method="post" action="{% url 'tracker:subscription_invite_action' invite.id 'toggle' %}">
+                                            {% csrf_token %}
+                                            <button class="btn btn-sm btn-outline-primary" type="submit">{% if invite.is_active %}Desativar{% else %}Ativar{% endif %}</button>
+                                        </form>
+                                        <form method="post" action="{% url 'tracker:subscription_invite_action' invite.id 'reset' %}">
+                                            {% csrf_token %}
+                                            <button class="btn btn-sm btn-outline-warning" type="submit">Resetar uso</button>
+                                        </form>
+                                        <form method="post" action="{% url 'tracker:subscription_invite_action' invite.id 'delete' %}" onsubmit="return confirm('Excluir este convite?');">
+                                            {% csrf_token %}
+                                            <button class="btn btn-sm btn-outline-danger" type="submit">Excluir</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="6" class="text-secondary">Nenhum convite criado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const code = btn.dataset.code || '';
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = 'Copiado';
+                setTimeout(() => (btn.textContent = 'Copiar'), 1500);
+            });
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}
