@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
+import urllib.error
 from typing import Any
 
 try:
@@ -28,15 +29,20 @@ def mp_request(method: str, path: str, payload: dict | None = None) -> dict:
     headers = _mp_headers()
     if requests is not None:
         resp = requests.request(method, url, headers=headers, json=payload, timeout=10)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            raise ValueError(f"MP {resp.status_code}: {resp.text}")
         return resp.json()
     data = json.dumps(payload or {}).encode('utf-8') if payload is not None else None
     req = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode('utf-8', errors='ignore')
+        raise ValueError(f"MP {exc.code}: {body}") from exc
 
 
-def build_preapproval_payload(*, reason: str, external_reference: str, back_urls: dict, plan_cycle: str, payer_email: str | None, amount: float) -> dict:
+def build_preapproval_payload(*, reason: str, external_reference: str, back_url: str, plan_cycle: str, payer_email: str | None, amount: float) -> dict:
     if plan_cycle == 'annual':
         frequency = 12
         frequency_type = 'months'
@@ -52,9 +58,11 @@ def build_preapproval_payload(*, reason: str, external_reference: str, back_urls
             'transaction_amount': float(amount),
             'currency_id': os.getenv('MP_CURRENCY', 'BRL'),
         },
-        'back_url': back_urls,
-        'status': 'pending',
+        'back_url': back_url,
     }
+    notification_url = os.getenv('MP_NOTIFICATION_URL', '').strip()
+    if notification_url:
+        payload['notification_url'] = notification_url
     if payer_email:
         payload['payer_email'] = payer_email
     return payload

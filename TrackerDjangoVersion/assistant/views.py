@@ -8,7 +8,7 @@ from django.db.models import Sum, Case, When, DecimalField, F
 from django.shortcuts import redirect, render
 from django.views.decorators.clickjacking import xframe_options_exempt
 
-from tracker.models import Transaction, Task
+from tracker.models import Category, Transaction, Task, TaskStep
 from tracker.metrics import record_metric
 from .models import ChatMessage, AiUsage
 from .services import llm_complete, estimate_costs
@@ -60,6 +60,17 @@ def _summarize(workspace, request):
         f"Tarefas em andamento: {open_tasks}",
         f"Tarefas conclu\u00eddas: {done_tasks}",
     ]
+    categories_qs = Category.objects.none()
+    if workspace:
+        categories_qs = Category.objects.filter(workspace=workspace)
+    elif request.user.is_superuser:
+        categories_qs = Category.objects.all()
+    category_names = list(categories_qs.values_list('name', flat=True).order_by('name'))
+    if category_names:
+        preview = ", ".join(category_names[:12])
+        if len(category_names) > 12:
+            preview = f"{preview}, ..."
+        summary_lines.append(f"Categorias dispon\u00edveis: {preview}")
     if per_category:
         top = per_category[:3]
         summary_lines.append(
@@ -69,11 +80,58 @@ def _summarize(workspace, request):
     return "\n".join(summary_lines)
 
 
+def _wants_task_details(message: str) -> bool:
+    msg = (message or '').lower()
+    if not msg:
+        return False
+    return 'tarefa' in msg or 'tarefas' in msg
+
+
+def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: int = 6) -> str:
+    tasks_qs = _tasks_queryset(request, workspace)
+    done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at')
+    total_done = done_tasks.count()
+    if total_done == 0:
+        return "Nenhuma tarefa conclu\u00edda no momento."
+
+    lines = [f"Tarefas conclu\u00eddas ({total_done}):"]
+    for idx, task in enumerate(done_tasks[:limit_tasks], start=1):
+        completed_date = task.completed_at.date() if task.completed_at else None
+        completed_label = completed_date.strftime('%d/%m/%Y') if completed_date else '-'
+        due_label = task.due_date.strftime('%d/%m/%Y') if task.due_date else '-'
+        status_label = 'no prazo'
+        if completed_date and task.due_date and completed_date > task.due_date:
+            status_label = 'com atraso'
+        lines.append(f"{idx}. {task.title}")
+        lines.append(f"   - Conclu\u00edda em: {completed_label}")
+        lines.append(f"   - Prazo: {due_label}")
+        lines.append(f"   - Status: {status_label}")
+        steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
+        if steps.exists():
+            lines.append("   - Etapas:")
+            for step in steps[:limit_steps]:
+                responsible = step.responsible or '-'
+                email = step.responsible_email or '-'
+                order_label = step.order if step.order else '?'
+                lines.append(
+                    f"     • Etapa {order_label}: {step.title} ({step.get_status_display()})"
+                )
+                lines.append(f"       Respons\u00e1vel: {responsible} | {email}")
+        else:
+            lines.append("   - Etapas: nenhuma cadastrada")
+    if total_done > limit_tasks:
+        lines.append(f"Mostrando {limit_tasks} de {total_done} tarefas conclu\u00eddas.")
+    return "\n".join(lines)
+
+
 def _assistant_reply(message, workspace, request, local_only: bool = False):
     """
     Usa LLM se configurado; fallback para resumo baseado em regras.
     Retorna (reply, usage, model_name).
     """
+    if _wants_task_details(message):
+        return _task_detail_summary(workspace, request), None, None
+
     summary = _summarize(workspace, request)
     today = datetime.date.today().strftime("%d/%m/%Y")
     ws_name = workspace.name if workspace else "global"

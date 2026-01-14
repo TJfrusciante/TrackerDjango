@@ -111,6 +111,7 @@
     }
     .chat-bubble.user .chat-meta { color: #e2e8f0 !important; opacity: 0.95; }
     .chat-text p { margin-bottom: 0.25rem; }
+    .chat-text { white-space: pre-line; }
 </style>
 {% endblock %}
 
@@ -169,7 +170,7 @@
     const assistantTexts = document.querySelectorAll('.chat-bubble.assistant .chat-text');
     if (assistantTexts.length) {
         const last = assistantTexts[assistantTexts.length - 1];
-        const raw = last.textContent || '';
+        const raw = last.innerText || '';
         last.innerHTML = '';
         let i = 0;
         const type = () => {

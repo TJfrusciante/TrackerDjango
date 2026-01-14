@@ -15,10 +15,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.conf import settings
-from django.conf.urls.static import static
-from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from django.views.static import serve as static_serve
+from django.contrib.staticfiles.views import serve as staticfiles_serve
+import sys
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,7 +28,13 @@ urlpatterns = [
     path('', include('tracker.urls', namespace='tracker')),
 ]
 
-if settings.SERVE_MEDIA:
-    urlpatterns = static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) + urlpatterns
-if settings.SERVE_STATIC and not settings.DEBUG:
-    urlpatterns += staticfiles_urlpatterns()
+serve_media = settings.SERVE_MEDIA or settings.DEBUG or ("runserver" in sys.argv)
+serve_static = settings.SERVE_STATIC or settings.DEBUG or ("runserver" in sys.argv)
+if serve_static:
+    urlpatterns = [
+        re_path(r"^static/(?P<path>.*)$", staticfiles_serve, {"insecure": True}),
+    ] + urlpatterns
+if serve_media:
+    urlpatterns = [
+        re_path(r"^media/(?P<path>.*)$", static_serve, {"document_root": settings.MEDIA_ROOT}),
+    ] + urlpatterns

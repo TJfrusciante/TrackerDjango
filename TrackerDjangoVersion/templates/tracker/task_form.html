@@ -81,6 +81,9 @@
                     {% else %}
                         {{ form.status }}{{ form.status.errors }}
                     {% endif %}
+                    {% if form.instance.status == 'done' and form.instance.completed_at %}
+                        <div class="small text-secondary mt-1">Conclu&iacute;da em {{ form.instance.completed_at|date:"d/m/Y" }}</div>
+                    {% endif %}
                 </div>
                 {% if not is_detail and not is_edit %}
                 <div class="col-12">
@@ -185,6 +188,9 @@
                         <div class="text-secondary small">
                             {% if step.responsible %}Respons&aacute;vel: {{ step.responsible }}{% endif %}
                             {% if step.responsible_email %}<br>Email: {{ step.responsible_email }}{% endif %}
+                            {% if step.status == 'done' and step.completed_at %}
+                                <br>Conclu&iacute;da em {{ step.completed_at|date:"d/m/Y" }}
+                            {% endif %}
                         </div>
                     </div>
                 </div>

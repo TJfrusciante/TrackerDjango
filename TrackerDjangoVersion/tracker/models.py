@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -93,6 +94,7 @@ class TaskStep(models.Model):
     responsible_email = models.EmailField(blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ongoing')
     done = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -103,6 +105,11 @@ class TaskStep(models.Model):
 
     def save(self, *args, **kwargs):
         self.done = self.status == 'done'
+        if self.status == 'done':
+            if not self.completed_at:
+                self.completed_at = timezone.now()
+        else:
+            self.completed_at = None
         super().save(*args, **kwargs)
 
 

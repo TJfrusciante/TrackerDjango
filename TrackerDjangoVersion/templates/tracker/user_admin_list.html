@@ -16,6 +16,42 @@
         border-radius: 50%;
         object-fit: cover;
     }
+    .admin-filter-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1rem 1.2rem;
+    }
+    .admin-user-table th {
+        font-size: .78rem;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+    }
+    .admin-user-table-wrap {
+        max-height: 640px;
+        overflow-y: auto;
+        overflow-x: visible;
+        border-radius: 16px;
+        position: relative;
+    }
+    .admin-user-table-wrap.dropdown-open {
+        overflow: visible;
+    }
+    .admin-user-table-wrap .table-responsive {
+        overflow: visible;
+    }
+    .admin-user-table-wrap .dropdown-menu {
+        z-index: 1055;
+    }
+    .admin-actions .dropdown-menu {
+        min-width: 230px;
+    }
+    .admin-actions form {
+        margin: 0;
+    }
+    .admin-actions .dropdown-item {
+        font-size: .9rem;
+    }
 </style>
 {% endblock %}
 
@@ -78,15 +114,68 @@
     </div>
 </div>
 
+<div class="admin-filter-card mb-3">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small">Buscar</label>
+            <input type="text" name="q" class="form-control" placeholder="Username, nome ou e-mail" value="{{ filters.q }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Status</label>
+            <select name="status" class="form-select">
+                <option value="">Todos</option>
+                <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Ativo</option>
+                <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pendente</option>
+                <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expirado</option>
+                <option value="suspended" {% if filters.status == 'suspended' %}selected{% endif %}>Suspenso</option>
+                <option value="guest" {% if filters.status == 'guest' %}selected{% endif %}>Convidado</option>
+                <option value="superuser" {% if filters.status == 'superuser' %}selected{% endif %}>Superuser</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Plano</label>
+            <select name="plan" class="form-select">
+                <option value="">Todos</option>
+                {% for key,label in plan_choices %}
+                    <option value="{{ key }}" {% if filters.plan == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Ciclo</label>
+            <select name="billing" class="form-select">
+                <option value="">Todos</option>
+                {% for key,label in billing_choices %}
+                    <option value="{{ key }}" {% if filters.billing == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Pagamento</label>
+            <select name="payment" class="form-select">
+                <option value="">Todos</option>
+                <option value="paid" {% if filters.payment == 'paid' %}selected{% endif %}>Pago</option>
+                <option value="unpaid" {% if filters.payment == 'unpaid' %}selected{% endif %}>Pendente</option>
+            </select>
+        </div>
+        <div class="col-md-12 d-flex justify-content-end gap-2">
+            <a class="btn btn-outline-light btn-sm" href="{% url 'tracker:user_admin_list' %}">Limpar</a>
+            <button class="btn btn-primary btn-sm" type="submit">Filtrar</button>
+        </div>
+    </form>
+</div>
+
 <div class="glass-card p-4">
-    <div class="table-responsive">
-        <table class="table align-middle mb-0 table-hover admin-user-table">
+    <div class="admin-user-table-wrap">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0 table-hover table-striped admin-user-table">
             <thead>
                 <tr class="text-secondary">
                     <th>Perfil</th>
                     <th>Contato</th>
                     <th>Status</th>
                     <th>Plano</th>
+                    <th>Ciclo</th>
                     <th>Pagamento</th>
                     <th>Expira</th>
                     <th>Workspaces</th>
@@ -96,7 +185,7 @@
             </thead>
             <tbody>
                 {% for u in users %}
-                    <tr class="bg-dark bg-opacity-10">
+                    <tr>
                         <td>
                             <div class="d-flex align-items-center gap-2">
                                 {% if u.profile_obj and u.profile_obj.avatar %}
@@ -135,6 +224,7 @@
                             {% endif %}
                         </td>
                         <td><span class="badge bg-info-subtle text-info">{{ u.plan_label|default:"-" }}</span></td>
+                        <td class="small text-secondary">{{ u.billing_cycle|default:"-" }}</td>
                         <td>
                             {% if u.approval_status == 'guest' %}
                                 <span class="badge bg-secondary-subtle text-secondary">N/A</span>
@@ -157,53 +247,84 @@
                         <td><span class="badge bg-secondary-subtle text-secondary">{{ u.workspace_count }}</span></td>
                         <td class="small text-secondary">{% if u.last_login_ts %}{{ u.last_login_ts|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
                         <td class="text-end">
-                            <div class="d-flex flex-wrap gap-2 justify-content-end">
-                                {% if not u.is_superuser and u.approval_status != 'guest' %}
-                                    <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="approve">
-                                        <button class="btn btn-sm btn-outline-success" type="submit">Aprovar</button>
-                                    </form>
-                                    <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="renew">
-                                        <button class="btn btn-sm btn-outline-primary" type="submit">Renovar 30d</button>
-                                    </form>
-                                    <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="renew_annual">
-                                        <button class="btn btn-sm btn-outline-primary" type="submit">Renovar 1 ano</button>
-                                    </form>
-                                    <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
-                                        {% csrf_token %}
-                                        {% if u.payment_confirmed %}
-                                            <input type="hidden" name="action" value="mark_unpaid">
-                                            <button class="btn btn-sm btn-outline-warning" type="submit">Marcar pendente</button>
-                                        {% else %}
-                                            <input type="hidden" name="action" value="mark_paid">
-                                            <button class="btn btn-sm btn-outline-success" type="submit">Marcar pago</button>
-                                        {% endif %}
-                                    </form>
-                                    <form method="post" action="{% url 'tracker:user_admin_status' u.id %}" onsubmit="return confirm('Suspender este usu&aacute;rio?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="suspend">
-                                        <button class="btn btn-sm btn-outline-warning" type="submit">Suspender</button>
-                                    </form>
-                                {% endif %}
-                                <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:user_admin_edit' u.id %}">Editar</a>
-                                <a class="btn btn-sm btn-outline-info" href="{% url 'tracker:superuser_overview' %}?user={{ u.id }}">Stats</a>
-                                <form method="post" action="{% url 'tracker:user_admin_delete' u.id %}" onsubmit="return confirm('Remover este usu&aacute;rio?');">
-                                    {% csrf_token %}
-                                    <button class="btn btn-sm btn-outline-danger" type="submit">Excluir</button>
-                                </form>
+                            <div class="dropdown admin-actions">
+                                <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    A&ccedil;&otilde;es
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="{% url 'tracker:user_admin_edit' u.id %}">Editar perfil</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'tracker:superuser_overview' %}?user={{ u.id }}">Ver estat&iacute;sticas</a></li>
+                                    {% if not u.is_superuser and u.approval_status != 'guest' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><h6 class="dropdown-header">Assinatura</h6></li>
+                                        <li>
+                                            <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="approve">
+                                                <button class="dropdown-item" type="submit">Aprovar</button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="renew">
+                                                <button class="dropdown-item" type="submit">Renovar 30 dias</button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="renew_annual">
+                                                <button class="dropdown-item" type="submit">Renovar 1 ano</button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <form method="post" action="{% url 'tracker:user_admin_status' u.id %}">
+                                                {% csrf_token %}
+                                                {% if u.payment_confirmed %}
+                                                    <input type="hidden" name="action" value="mark_unpaid">
+                                                    <button class="dropdown-item" type="submit">Marcar pendente</button>
+                                                {% else %}
+                                                    <input type="hidden" name="action" value="mark_paid">
+                                                    <button class="dropdown-item" type="submit">Marcar pago</button>
+                                                {% endif %}
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <form method="post" action="{% url 'tracker:user_admin_status' u.id %}" onsubmit="return confirm('Suspender este usu&aacute;rio?');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="suspend">
+                                                <button class="dropdown-item" type="submit">Suspender</button>
+                                            </form>
+                                        </li>
+                                    {% endif %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form method="post" action="{% url 'tracker:user_admin_delete' u.id %}" onsubmit="return confirm('Remover este usu&aacute;rio?');">
+                                            {% csrf_token %}
+                                            <button class="dropdown-item text-danger" type="submit">Excluir usu&aacute;rio</button>
+                                        </form>
+                                    </li>
+                                </ul>
                             </div>
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="9" class="text-secondary">Nenhum usu&aacute;rio.</td></tr>
+                    <tr><td colspan="10" class="text-secondary">Nenhum usu&aacute;rio.</td></tr>
                 {% endfor %}
             </tbody>
-        </table>
+            </table>
+        </div>
     </div>
 </div>
+<script>
+    (function () {
+        const wrap = document.querySelector('.admin-user-table-wrap');
+        if (!wrap) return;
+        document.querySelectorAll('.admin-actions .dropdown').forEach((dropdown) => {
+            dropdown.addEventListener('show.bs.dropdown', () => wrap.classList.add('dropdown-open'));
+            dropdown.addEventListener('hide.bs.dropdown', () => wrap.classList.remove('dropdown-open'));
+        });
+    })();
+</script>
 {% endblock %}

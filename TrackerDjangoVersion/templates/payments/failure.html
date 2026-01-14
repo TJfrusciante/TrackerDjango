@@ -9,8 +9,9 @@
             <i class="fa-solid fa-circle-xmark text-danger fa-2x mb-3"></i>
             <h1 class="h5 fw-bold mb-2">Pagamento n&atilde;o conclu&iacute;do</h1>
             <p class="text-secondary mb-3">Tente novamente ou atualize o m&eacute;todo de pagamento.</p>
-            <div class="d-flex justify-content-center gap-2">
-                <a class="btn btn-primary" href="{% url 'payments:subscription_start' %}">Tentar novamente</a>
+            <div class="d-flex flex-column gap-2">
+                <a class="btn btn-primary" href="{% url 'payments:subscription_start' %}?choose=1">Escolher plano novamente</a>
+                <a class="btn btn-outline-light" href="{% url 'tracker:contact_admin' %}?topic=payment">Falar com suporte</a>
                 <a class="btn btn-outline-light" href="{% url 'tracker:profile_edit' %}">Voltar ao perfil</a>
             </div>
         </div>

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Escolha seu plano | iTracker{% endblock %}
+
+{% block content %}
+<div class="row gy-4 align-items-stretch">
+    <div class="col-lg-7">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+                <div>
+                    <h1 class="h4 fw-bold mb-2">Escolha seu plano</h1>
+                    <p class="text-secondary mb-0">Selecione o ciclo e conclua o pagamento para liberar o iTracker.</p>
+                </div>
+                {% if pricing_state.promo_active %}
+                <span class="badge bg-warning text-dark align-self-md-center">{{ pricing_state.promo_label }}</span>
+                {% endif %}
+            </div>
+            <div class="row g-3">
+                {% for plan in pricing_plans %}
+                <div class="col-md-6">
+                    <div class="glass-card p-3 h-100 d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h2 class="h6 fw-bold mb-1">{{ plan.name }}</h2>
+                                <p class="text-secondary small mb-0">{{ plan.subtitle }}</p>
+                            </div>
+                            <span class="badge bg-primary">{{ plan.badge }}</span>
+                        </div>
+                        {% if pricing_state.promo_active %}
+                        <div class="text-secondary small text-decoration-line-through">
+                            R$ {{ plan.regular_price|floatformat:2 }}
+                        </div>
+                        {% endif %}
+                        <div class="display-6 fw-bold mb-3">R$ {{ plan.price|floatformat:2 }}</div>
+                        <ul class="list-unstyled small text-secondary mb-3">
+                            {% for feature in plan.features %}
+                            <li class="mb-1"><i class="fa-solid fa-check text-success me-2"></i>{{ feature }}</li>
+                            {% endfor %}
+                        </ul>
+                        <div class="mt-auto d-grid">
+                            <a class="btn btn-primary" href="{% url 'payments:subscription_start' %}?plan={{ plan.cycle }}">Assinar {{ plan.name }}</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="glass-card p-4 h-100 d-flex flex-column gap-3">
+            <div>
+                <h2 class="h6 fw-bold mb-2">Como funciona</h2>
+                <ul class="list-unstyled text-secondary small mb-0">
+                    <li class="mb-2">Pagamento seguro via Mercado Pago (Checkout Pro).</li>
+                    <li class="mb-2">Renova automaticamente at&eacute; o cancelamento.</li>
+                    <li class="mb-2">Voc&ecirc; tem 7 dias de car&ecirc;ncia ap&oacute;s vencimento.</li>
+                    <li class="mb-2">Planos anuais t&ecirc;m desconto permanente.</li>
+                </ul>
+            </div>
+            <div class="glass-card p-3 bg-dark bg-opacity-10">
+                <h3 class="h6 fw-bold mb-1">Acesso liberado ap&oacute;s o pagamento</h3>
+                <p class="text-secondary small mb-0">Sem confirma&ccedil;&atilde;o de pagamento, as telas ficam bloqueadas.</p>
+            </div>
+            <div class="mt-auto">
+                <a class="btn btn-outline-light w-100" href="{% url 'tracker:profile_edit' %}">Voltar ao perfil</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

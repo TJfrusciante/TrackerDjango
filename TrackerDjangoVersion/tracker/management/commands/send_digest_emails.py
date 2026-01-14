@@ -81,7 +81,8 @@ class Command(BaseCommand):
                 if last_sent and last_sent >= start:
                     continue
                 body = _build_digest(user, start, end)
-                subject = f'Resumo {\"semanal\" if kind == \"weekly\" else \"mensal\"}'
+                label = "semanal" if kind == "weekly" else "mensal"
+                subject = f"Resumo {label}"
                 send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
                 Notification.objects.create(
                     user=user,

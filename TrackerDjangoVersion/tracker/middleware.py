@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.utils.deprecation import MiddlewareMixin
 
-from .models import Workspace, WorkspaceMembership
+from .models import UserProfile, Workspace, WorkspaceMembership
 
 
 class WorkspaceMiddleware(MiddlewareMixin):
@@ -22,8 +22,29 @@ class WorkspaceMiddleware(MiddlewareMixin):
         "/help/",
         "/workspaces/select/",
         "/workspaces/create/",
+        "/pagamentos/",
         "/static/",
         "/media/",
+        "/password-reset/",
+        "/termos/",
+        "/privacidade/",
+        "/contato/",
+        "/perfil/",
+    )
+
+    PAYMENT_PREFIXES = (
+        "/pagamentos/",
+        "/logout/",
+        "/login/",
+        "/register/",
+        "/help/",
+        "/static/",
+        "/media/",
+        "/password-reset/",
+        "/termos/",
+        "/privacidade/",
+        "/contato/",
+        "/perfil/",
     )
 
     def process_request(self, request):
@@ -33,6 +54,16 @@ class WorkspaceMiddleware(MiddlewareMixin):
             return None
 
         path = request.path or ""
+
+        if not request.user.is_superuser:
+            profile = getattr(request.user, "profile", None)
+            if not profile:
+                profile, _ = UserProfile.objects.get_or_create(user=request.user)
+            if not profile.is_guest and not profile.payment_confirmed:
+                if not any(path.startswith(prefix) for prefix in self.PAYMENT_PREFIXES):
+                    messages.info(request, "Finalize a assinatura para liberar o acesso ao sistema.")
+                    return redirect("payments:subscription_start")
+
         if any(path.startswith(prefix) for prefix in self.PUBLIC_PREFIXES):
             return None
 

@@ -15,10 +15,14 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+dotenv_path = BASE_DIR / ".env"
+alt_dotenv_path = Path(__file__).resolve().parent / ".env"
+if not dotenv_path.exists() and alt_dotenv_path.exists():
+    dotenv_path = alt_dotenv_path
+load_dotenv(dotenv_path)
 
 
 # ------------------------------------------------------------------------------
@@ -212,9 +216,13 @@ MP_ACCESS_TOKEN = env("MP_ACCESS_TOKEN", "")
 MP_PUBLIC_KEY = env("MP_PUBLIC_KEY", "")
 MP_BASE_URL = env("MP_BASE_URL", "https://api.mercadopago.com")
 MP_CURRENCY = env("MP_CURRENCY", "BRL")
+MP_PAYER_EMAIL = env("MP_PAYER_EMAIL", "")
+MP_NOTIFICATION_URL = env("MP_NOTIFICATION_URL", "")
 MP_PLAN_MONTHLY_AMOUNT = env("MP_PLAN_MONTHLY_AMOUNT", "8.99")
 MP_PLAN_ANNUAL_AMOUNT = env("MP_PLAN_ANNUAL_AMOUNT", "71.88")
 SUBSCRIPTION_GRACE_DAYS = int(env("SUBSCRIPTION_GRACE_DAYS", "7"))
+REQUIRE_MANUAL_APPROVAL = env_bool("REQUIRE_MANUAL_APPROVAL", default=not bool(MP_ACCESS_TOKEN))
+MP_SIMULATE_PAYMENTS = env_bool("MP_SIMULATE_PAYMENTS", default=False)
 
 VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", "")

@@ -1840,6 +1840,8 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             profile = getattr(user, 'profile', None)
+            if not profile:
+                profile, _ = UserProfile.objects.get_or_create(user=user)
             if getattr(settings, 'EMAIL_CONFIRMATION_REQUIRED', False) and not user.is_superuser:
                 if not (profile and profile.email_verified):
                     messages.error(request, 'Confirme seu e-mail antes de entrar.')
@@ -1849,6 +1851,9 @@ def login_view(request):
             login(request, user)
             _clear_login_failures(request)
             record_metric('login_success', user=user, metadata={'ip': request.META.get('REMOTE_ADDR')})
+            if not user.is_superuser and not profile.is_guest and not profile.payment_confirmed:
+                messages.info(request, 'Finalize a assinatura para liberar o acesso ao sistema.')
+                return redirect('payments:subscription_start')
             if profile and profile.subscription_expires:
                 today = timezone.localdate()
                 grace_days = int(getattr(settings, 'SUBSCRIPTION_GRACE_DAYS', 7))
@@ -1885,9 +1890,8 @@ def register_view(request):
             user = form.save()
             ws_name = form.cleaned_data.get('workspace_name') or f"Workspace de {user.username}"
             slug = _ensure_unique_slug(ws_name)
-            ws_active = False
-            if invite:
-                ws_active = True
+            requires_manual = getattr(settings, 'REQUIRE_MANUAL_APPROVAL', True)
+            ws_active = bool(invite)
             ws = Workspace.objects.create(name=ws_name, slug=slug, owner=user, is_active=ws_active)
             WorkspaceMembership.objects.create(workspace=ws, user=user, role='owner')
             profile, _ = UserProfile.objects.get_or_create(user=user)
@@ -1916,6 +1920,12 @@ def register_view(request):
                 SubscriptionInviteUse.objects.create(invite=invite, user=user)
                 SubscriptionInvite.objects.filter(pk=invite.id).update(used_count=F('used_count') + 1)
                 record_metric('payment_confirmed', user=user, workspace=ws, metadata={'source': 'invite'})
+            if not invite and not requires_manual:
+                profile.is_approved = True
+                profile.approved_at = timezone.now()
+                profile.approved_by = None
+                profile.save(update_fields=['is_approved', 'approved_at', 'approved_by'])
+
             if getattr(settings, 'EMAIL_CONFIRMATION_REQUIRED', False):
                 profile.email_verified = False
                 profile.email_verified_at = None
@@ -1929,6 +1939,11 @@ def register_view(request):
         if invite:
             messages.success(request, 'Conta criada com convite. Voc\u00ea j\u00e1 pode acessar o sistema.')
         else:
+            if not requires_manual:
+                login(request, user)
+                messages.success(request, 'Conta criada. Conclua a assinatura para ativar todos os recursos.')
+                cycle = getattr(profile, 'billing_cycle', 'monthly')
+                return redirect(f"{reverse('payments:subscription_start')}?plan={cycle}")
             notify_new_account(user)
             messages.success(request, 'Cadastro enviado. Aguarde aprova\u00e7\u00e3o do administrador.')
         return redirect('tracker:login')
@@ -2103,17 +2118,22 @@ def workspace_members(request, slug=None):
         return redirect('tracker:workspace_select')
 
     is_owner = request.user.is_superuser or WorkspaceMembership.objects.filter(workspace=target_ws, user=request.user, role='owner').exists()
-    if not is_owner:
-        messages.error(request, 'Apenas owners podem gerenciar membros.')
-        return redirect('tracker:dashboard')
+    is_member = request.user.is_superuser or WorkspaceMembership.objects.filter(workspace=target_ws, user=request.user).exists()
+    if not is_member:
+        messages.error(request, 'Voc\u00ea n\u00e3o faz parte deste workspace.')
+        return redirect('tracker:workspace_select')
 
     memberships = WorkspaceMembership.objects.select_related('user').filter(workspace=target_ws)
-    invite_form = WorkspaceMemberInviteForm(request.POST or None)
-    invite_username_form = InviteByUsernameForm(request.POST or None, prefix='byuser')
-    pending_requests = WorkspaceAccessRequest.objects.filter(workspace=target_ws, status='pending')
-    pending_invites = WorkspaceInvite.objects.filter(workspace=target_ws, status='pending').select_related('invited_user')
+    can_manage = is_owner
+    invite_form = WorkspaceMemberInviteForm(request.POST or None) if can_manage else None
+    invite_username_form = InviteByUsernameForm(request.POST or None, prefix='byuser') if can_manage else None
+    pending_requests = WorkspaceAccessRequest.objects.filter(workspace=target_ws, status='pending') if can_manage else []
+    pending_invites = WorkspaceInvite.objects.filter(workspace=target_ws, status='pending').select_related('invited_user') if can_manage else []
 
     if request.method == 'POST':
+        if not can_manage:
+            messages.error(request, 'Voc\u00ea n\u00e3o tem permiss\u00e3o para alterar membros.')
+            return redirect('tracker:workspace_members', slug=target_ws.slug)
         action = request.POST.get('action')
         if action == 'invite_email' and invite_form.is_valid():
             email = invite_form.cleaned_data['email']
@@ -2206,6 +2226,7 @@ def workspace_members(request, slug=None):
             'invite_username_form': invite_username_form,
             'pending_requests': pending_requests,
             'pending_invites': pending_invites,
+            'can_manage': can_manage,
         },
     )
 
@@ -2527,6 +2548,25 @@ def account_delete_request(request):
 
 
 @login_required
+def account_delete_self(request):
+    if request.method != 'POST':
+        return redirect('tracker:profile_edit')
+    if request.user.is_superuser:
+        messages.error(request, 'Superuser n\u00e3o pode excluir a conta por aqui.')
+        return redirect('tracker:profile_edit')
+    user = request.user
+    username = user.username
+    try:
+        logout(request)
+        user.delete()
+        messages.success(request, f'Conta {username} exclu\u00edda com sucesso.')
+    except ProtectedError:
+        messages.error(request, 'N\u00e3o foi poss\u00edvel excluir a conta por depend\u00eancias.')
+        return redirect('tracker:profile_edit')
+    return redirect('tracker:login')
+
+
+@login_required
 def contact_admin(request):
     initial = {}
     if request.GET.get('topic') in ('general', 'payment', 'support'):
@@ -2588,6 +2628,13 @@ def notifications_mark_read(request, pk):
 def notifications_mark_all(request):
     if request.method == 'POST':
         Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    return redirect('tracker:notifications')
+
+
+@login_required
+def notifications_delete(request, pk):
+    if request.method == 'POST':
+        Notification.objects.filter(pk=pk, user=request.user).delete()
     return redirect('tracker:notifications')
 
 
@@ -3014,7 +3061,7 @@ def superuser_overview(request):
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def user_admin_list(request):
-    users = User.objects.select_related('profile').all().annotate(
+    base_qs = User.objects.select_related('profile').all().annotate(
         workspace_count=Count('workspace_memberships'),
         last_login_ts=F('last_login'),
     ).order_by('-date_joined')
@@ -3026,11 +3073,12 @@ def user_admin_list(request):
     guest_count = 0
     paid_count = 0
     unpaid_count = 0
-    for user in users:
+    for user in base_qs:
         profile = getattr(user, 'profile', None)
         user.profile_obj = profile
         user.subscription_expires = profile.subscription_expires if profile else None
         user.plan_label = profile.get_plan_display() if profile else 'B\u00e1sico'
+        user.billing_cycle = profile.billing_cycle if profile else None
         user.payment_confirmed = profile.payment_confirmed if profile else False
         user.payment_confirmed_at = profile.payment_confirmed_at if profile else None
         if user.is_superuser:
@@ -3061,8 +3109,80 @@ def user_admin_list(request):
         else:
             unpaid_count += 1
 
+    users = base_qs
+    search = (request.GET.get('q') or '').strip()
+    status_filter = request.GET.get('status') or ''
+    plan_filter = request.GET.get('plan') or ''
+    billing_filter = request.GET.get('billing') or ''
+    payment_filter = request.GET.get('payment') or ''
+    if search:
+        users = users.filter(
+            Q(username__icontains=search)
+            | Q(email__icontains=search)
+            | Q(first_name__icontains=search)
+            | Q(last_name__icontains=search)
+        )
+    if plan_filter:
+        users = users.filter(profile__plan=plan_filter)
+    if billing_filter:
+        users = users.filter(profile__billing_cycle=billing_filter)
+    if payment_filter == 'paid':
+        users = users.filter(profile__payment_confirmed=True)
+    elif payment_filter == 'unpaid':
+        users = users.filter(Q(profile__payment_confirmed=False) | Q(profile__isnull=True))
+    if status_filter:
+        if status_filter == 'superuser':
+            users = users.filter(is_superuser=True)
+        elif status_filter == 'guest':
+            users = users.filter(profile__is_guest=True)
+        elif status_filter == 'pending':
+            users = users.filter(Q(profile__isnull=True) | Q(profile__is_approved=False, profile__approved_at__isnull=True))
+        elif status_filter == 'suspended':
+            users = users.filter(profile__is_approved=False, profile__approved_at__isnull=False)
+        elif status_filter == 'expired':
+            users = users.filter(profile__subscription_expires__lt=today, profile__is_approved=True)
+        elif status_filter == 'active':
+            users = users.filter(profile__is_approved=True).exclude(profile__subscription_expires__lt=today)
+
+    users = list(users)
+    for user in users:
+        profile = getattr(user, 'profile', None)
+        user.profile_obj = profile
+        user.subscription_expires = profile.subscription_expires if profile else None
+        user.plan_label = profile.get_plan_display() if profile else 'B\u00e1sico'
+        user.billing_cycle = profile.billing_cycle if profile else None
+        user.payment_confirmed = profile.payment_confirmed if profile else False
+        user.payment_confirmed_at = profile.payment_confirmed_at if profile else None
+        if user.is_superuser:
+            user.approval_status = 'superuser'
+            user.plan_label = 'Superuser'
+            continue
+        if profile and profile.is_guest:
+            user.approval_status = 'guest'
+            user.plan_label = 'Convidado'
+            continue
+        if not profile or not profile.is_approved:
+            if profile and profile.approved_at:
+                user.approval_status = 'suspended'
+            else:
+                user.approval_status = 'pending'
+            continue
+        if profile.subscription_expires and profile.subscription_expires < today:
+            user.approval_status = 'expired'
+            continue
+        user.approval_status = 'active'
+
     context = {
         'users': users,
+        'filters': {
+            'q': search,
+            'status': status_filter,
+            'plan': plan_filter,
+            'billing': billing_filter,
+            'payment': payment_filter,
+        },
+        'plan_choices': UserProfile.PLAN_CHOICES,
+        'billing_choices': UserProfile.BILLING_CHOICES,
         'pending_count': pending_count,
         'active_count': active_count,
         'expired_count': expired_count,

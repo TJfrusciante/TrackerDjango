@@ -448,6 +448,7 @@ class ContactAdminForm(forms.Form):
         ('general', 'D\u00favida geral'),
         ('payment', 'Pagamento / assinatura'),
         ('support', 'Suporte t\u00e9cnico'),
+        ('improvement', 'Sugest\u00e3o de melhoria'),
     )
     topic = forms.ChoiceField(label='Assunto', choices=TOPIC_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
     subject = forms.CharField(label='T\u00edtulo', widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Resumo do contato'}))

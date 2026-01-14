@@ -159,6 +159,9 @@
                                 <span class="badge bg-success-subtle text-success ms-1">
                                     {% if task.completed_late %}Conclu&iacute;da com atraso{% else %}Conclu&iacute;da no prazo{% endif %}
                                 </span>
+                                {% if task.completed_at %}
+                                    <div class="small text-secondary mt-1">Conclu&iacute;da em {{ task.completed_at|date:"d/m/Y" }}</div>
+                                {% endif %}
                             {% else %}
                                 {% if task.due_date < today %}
                                     <span class="badge bg-danger-subtle text-danger ms-1">Atrasada</span>

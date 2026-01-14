@@ -1,11 +1,13 @@
 import json
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
@@ -22,6 +24,40 @@ def _parse_datetime(value: str | None):
         return datetime.fromisoformat(value.replace('Z', '+00:00'))
     except ValueError:
         return None
+
+
+def _build_pricing_plans(pricing_state):
+    annual_total = pricing_state.annual_price * Decimal("12")
+    return [
+        {
+            "name": "Mensal",
+            "cycle": "monthly",
+            "price": pricing_state.monthly_price,
+            "regular_price": pricing_state.regular_monthly_price,
+            "subtitle": f"R$ {pricing_state.monthly_price:.2f}/mês. Cancele quando quiser.",
+            "badge": "Promoção" if pricing_state.promo_active else "Flexível",
+            "features": [
+                "1 workspace + até 3 participantes",
+                "Dashboards financeiros e tarefas em etapas",
+                "Notificações, orçamentos e metas",
+                "Agente de IA com dados do workspace",
+            ],
+        },
+        {
+            "name": "Anual",
+            "cycle": "annual",
+            "price": pricing_state.annual_price,
+            "regular_price": pricing_state.regular_annual_price,
+            "subtitle": f"R$ {pricing_state.annual_price:.2f}/mês (R$ {annual_total:.2f}/ano).",
+            "badge": "Mais escolhido",
+            "features": [
+                "Tudo do Mensal",
+                "Resumos semanais e mensais",
+                "Uso de IA ampliado",
+                "Backups e histórico estendido",
+            ],
+        },
+    ]
 
 
 def _apply_subscription_to_profile(user, sub: MpSubscription, plan_cycle: str, status: str, next_payment_at):
@@ -62,36 +98,72 @@ def _apply_subscription_to_profile(user, sub: MpSubscription, plan_cycle: str, s
 @login_required
 def subscription_start(request):
     profile = getattr(request.user, 'profile', None)
+    if not profile:
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if profile and profile.is_guest and not request.user.is_superuser:
         messages.error(request, 'Conta convidada n\u00e3o pode assinar.')
         return redirect('tracker:profile_edit')
 
-    plan_cycle = request.GET.get('plan') or getattr(profile, 'billing_cycle', 'monthly') if profile else 'monthly'
+    plan_cycle = request.GET.get('plan')
+    force_choose = request.GET.get('choose') == '1'
+    pricing_state = get_pricing_state()
+    fallback_cycle = getattr(profile, 'billing_cycle', None) if profile else None
+    if not plan_cycle and fallback_cycle in ('monthly', 'annual') and not force_choose:
+        plan_cycle = fallback_cycle
+    if not plan_cycle:
+        pricing_plans = _build_pricing_plans(pricing_state)
+        return render(
+            request,
+            'payments/choose_plan.html',
+            {
+                'pricing_plans': pricing_plans,
+                'pricing_state': pricing_state,
+                'current_cycle': getattr(profile, 'billing_cycle', 'monthly') if profile else 'monthly',
+            },
+        )
+
+    plan_cycle = plan_cycle or (fallback_cycle or 'monthly')
     if plan_cycle not in ('monthly', 'annual'):
         plan_cycle = 'monthly'
 
-    pricing_state = get_pricing_state()
-    amount = pricing_state.annual_price if plan_cycle == 'annual' else pricing_state.monthly_price
+    if plan_cycle == 'annual':
+        amount = pricing_state.annual_price * 12
+    else:
+        amount = pricing_state.monthly_price
 
     reason = f'iTracker {plan_cycle}'
-    back_urls = {
-        'success': request.build_absolute_uri('/pagamentos/sucesso/'),
-        'failure': request.build_absolute_uri('/pagamentos/falha/'),
-        'pending': request.build_absolute_uri('/pagamentos/pendente/'),
-    }
+    back_url = request.build_absolute_uri('/pagamentos/sucesso/')
+    payer_email = getattr(settings, 'MP_PAYER_EMAIL', '') or request.user.email or ''
+    if not payer_email:
+        messages.error(request, 'Cadastre um e-mail válido para iniciar o pagamento.')
+        return redirect('tracker:profile_edit')
     payload = build_preapproval_payload(
         reason=reason,
         external_reference=str(request.user.id),
-        back_urls=back_urls,
+        back_url=back_url,
         plan_cycle=plan_cycle,
-        payer_email=request.user.email,
+        payer_email=payer_email,
         amount=float(amount),
     )
+    if getattr(settings, "MP_SIMULATE_PAYMENTS", False):
+        sub, _ = MpSubscription.objects.get_or_create(user=request.user)
+        sub.preapproval_id = f"simulated-{request.user.id}"
+        sub.status = "active"
+        sub.payer_email = payer_email
+        sub.reason = reason
+        sub.auto_recurring = payload.get("auto_recurring", {})
+        sub.last_payment_status = "approved"
+        sub.plan_cycle = plan_cycle
+        sub.init_point = ""
+        sub.save()
+        _apply_subscription_to_profile(request.user, sub, plan_cycle, "active", timezone.now() + timedelta(days=30))
+        messages.success(request, "Assinatura simulada aprovada.")
+        return redirect("tracker:dashboard")
     try:
         data = create_preapproval(payload)
     except Exception as exc:
         messages.error(request, f'Falha ao iniciar pagamento: {exc}')
-        return redirect('tracker:profile_edit')
+        return redirect(f"{reverse('payments:subscription_start')}?choose=1")
 
     sub, _ = MpSubscription.objects.get_or_create(user=request.user)
     fields = extract_preapproval_fields(data)
@@ -114,8 +186,18 @@ def subscription_start(request):
 def subscription_success(request):
     preapproval_id = request.GET.get('preapproval_id') or request.GET.get('preapproval')
     if not preapproval_id:
-        messages.info(request, 'Pagamento em processamento.')
-        return render(request, 'payments/success.html')
+        sub = (
+            MpSubscription.objects.filter(user=request.user)
+            .exclude(preapproval_id='')
+            .order_by('-updated_at', '-id')
+            .first()
+        )
+        if sub and sub.preapproval_id:
+            preapproval_id = sub.preapproval_id
+            messages.info(request, 'Pagamento em processamento. Verificando sua assinatura...')
+        else:
+            messages.info(request, 'Pagamento em processamento.')
+            return render(request, 'payments/pending.html')
     try:
         data = fetch_preapproval(preapproval_id)
     except Exception as exc:

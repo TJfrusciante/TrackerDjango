@@ -10,7 +10,9 @@
         <p class="text-secondary mb-0">Acesso e pap&eacute;is s&atilde;o isolados por workspace. Ajuste permiss&otilde;es rapidamente.</p>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:workspace_invite' workspace.slug %}">Convidar</a>
+        {% if can_manage %}
+            <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:workspace_invite' workspace.slug %}">Convidar</a>
+        {% endif %}
         <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
         {% if user.is_superuser or workspace.owner_id == user.id %}
             <form method="post" action="{% url 'tracker:workspace_delete' workspace.slug %}" onsubmit="return confirm('Excluir este workspace? Esta ação remove transações e tarefas associadas.');">
@@ -29,7 +31,11 @@
                     <span class="badge text-bg-dark">Membros</span>
                     <span class="text-secondary small">{{ memberships|length }} ativos</span>
                 </div>
-                <span class="badge text-bg-secondary">Solicita&ccedil;&otilde;es: {{ pending_requests|length }} &middot; Convites: {{ pending_invites|length }}</span>
+                {% if can_manage %}
+                    <span class="badge text-bg-secondary">Solicita&ccedil;&otilde;es: {{ pending_requests|length }} &middot; Convites: {{ pending_invites|length }}</span>
+                {% else %}
+                    <span class="badge text-bg-secondary">Visualiza&ccedil;&atilde;o somente</span>
+                {% endif %}
             </div>
             {% if memberships %}
             <div class="list-group">
@@ -40,27 +46,29 @@
                             <div class="small text-secondary">{{ member.user.email|default:"sem e-mail" }}</div>
                             <div class="small text-secondary">Papel: {{ member.role }} &middot; Edita tarefas: {% if member.can_edit_tasks %}Sim{% else %}N&atilde;o{% endif %}</div>
                         </div>
-                        {% if user.is_superuser or member.user_id != user.id %}
-                        <div class="d-flex flex-column gap-2 align-items-end">
-                            <form method="post" action="{% url 'tracker:workspace_member_update' workspace.slug member.id %}">
-                                {% csrf_token %}
-                                <div class="input-group input-group-sm">
-                                    <select name="role" class="form-select form-select-sm">
-                                        <option value="member" {% if member.role == 'member' %}selected{% endif %}>Membro</option>
-                                        <option value="owner" {% if member.role == 'owner' %}selected{% endif %}>Owner</option>
-                                    </select>
-                                    <button class="btn btn-outline-light" type="submit">Salvar</button>
-                                </div>
-                                <div class="form-check form-switch small mt-2">
-                                    <input class="form-check-input" type="checkbox" name="can_edit_tasks" id="edit_{{ member.id }}" {% if member.can_edit_tasks %}checked{% endif %}>
-                                    <label class="form-check-label" for="edit_{{ member.id }}">Pode editar tarefas</label>
-                                </div>
-                            </form>
-                            <form method="post" action="{% url 'tracker:workspace_member_remove' workspace.slug member.id %}" onsubmit="return confirm('Remover membro?');">
-                                {% csrf_token %}
-                                <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
-                            </form>
-                        </div>
+                        {% if can_manage %}
+                            {% if user.is_superuser or member.user_id != user.id %}
+                            <div class="d-flex flex-column gap-2 align-items-end">
+                                <form method="post" action="{% url 'tracker:workspace_member_update' workspace.slug member.id %}">
+                                    {% csrf_token %}
+                                    <div class="input-group input-group-sm">
+                                        <select name="role" class="form-select form-select-sm">
+                                            <option value="member" {% if member.role == 'member' %}selected{% endif %}>Membro</option>
+                                            <option value="owner" {% if member.role == 'owner' %}selected{% endif %}>Owner</option>
+                                        </select>
+                                        <button class="btn btn-outline-light" type="submit">Salvar</button>
+                                    </div>
+                                    <div class="form-check form-switch small mt-2">
+                                        <input class="form-check-input" type="checkbox" name="can_edit_tasks" id="edit_{{ member.id }}" {% if member.can_edit_tasks %}checked{% endif %}>
+                                        <label class="form-check-label" for="edit_{{ member.id }}">Pode editar tarefas</label>
+                                    </div>
+                                </form>
+                                <form method="post" action="{% url 'tracker:workspace_member_remove' workspace.slug member.id %}" onsubmit="return confirm('Remover membro?');">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                                </form>
+                            </div>
+                            {% endif %}
                         {% endif %}
                     </div>
                 {% endfor %}
@@ -71,6 +79,7 @@
             <div class="mt-3 text-secondary small">Dica: pap&eacute;is controlam finan&ccedil;as/tarefas; apenas owners e superusers podem remover.</div>
         </div>
     </div>
+    {% if can_manage %}
     <div class="col-lg-6">
         <div class="glass-card p-4 h-100">
             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -175,6 +184,14 @@
             {% endif %}
         </div>
     </div>
+    {% else %}
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <h3 class="h6 fw-bold mb-2">Permiss&otilde;es</h3>
+            <p class="text-secondary mb-0">Voc&ecirc; pode visualizar os membros deste workspace, mas somente o owner pode convidar ou alterar permiss&otilde;es.</p>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

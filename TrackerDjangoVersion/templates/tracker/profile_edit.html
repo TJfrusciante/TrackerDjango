@@ -174,7 +174,7 @@
             <a class="btn btn-outline-light page-action-btn w-100" href="{% url 'tracker:contact_admin' %}?topic=payment">
                 Avisar pagamento
             </a>
-            <a class="btn btn-primary page-action-btn w-100 mt-2" href="{% url 'payments:subscription_start' %}">
+            <a class="btn btn-primary page-action-btn w-100 mt-2" href="{% url 'payments:subscription_start' %}?plan={{ profile.billing_cycle|default:'monthly' }}">
                 Assinar com Mercado Pago
             </a>
             <div class="glass-card p-3 mt-3 bg-dark bg-opacity-10">
@@ -187,6 +187,12 @@
                     <form method="post" action="{% url 'tracker:account_delete_request' %}" onsubmit="return confirm('Confirmar solicita\u00e7\u00e3o de exclus\u00e3o da conta?');">
                         {% csrf_token %}
                         <button class="btn btn-outline-danger page-action-btn w-100" type="submit">Solicitar exclus&atilde;o</button>
+                    </form>
+                {% endif %}
+                {% if not user.is_superuser %}
+                    <form method="post" action="{% url 'tracker:account_delete_self' %}" class="mt-2" onsubmit="return confirm('Excluir sua conta agora? Esta a\u00e7\u00e3o \u00e9 irrevers\u00edvel.');">
+                        {% csrf_token %}
+                        <button class="btn btn-danger page-action-btn w-100" type="submit">Excluir conta agora</button>
                     </form>
                 {% endif %}
             </div>
