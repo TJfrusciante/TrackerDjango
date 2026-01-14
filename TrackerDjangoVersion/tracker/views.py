@@ -39,6 +39,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils import timezone
+from django.templatetags.static import static
 from django.utils.text import slugify
 from django.views.decorators.cache import cache_control
 
@@ -239,6 +240,46 @@ def _generate_invite_code() -> str:
     return secrets.token_urlsafe(8).replace('-', '').replace('_', '').upper()
 
 
+def _pretty_screenshot_label(filename: str) -> str:
+    base = os.path.splitext(filename)[0]
+    base = re.sub(r"^\d{1,3}[ _-]+", "", base)
+    base = base.replace("_", " ").replace("-", " ")
+    base = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", base)
+    base = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", base)
+    base = re.sub(r"\s+", " ", base).strip()
+
+    mode = None
+    if re.search(r"\bdark mode\b", base, re.IGNORECASE):
+        mode = "Modo escuro"
+        base = re.sub(r"(?i)\bdark mode\b", "", base)
+    if re.search(r"\blight mode\b", base, re.IGNORECASE):
+        mode = "Modo claro"
+        base = re.sub(r"(?i)\blight mode\b", "", base)
+
+    base = re.sub(r"\s+", " ", base).strip()
+    base = base.title()
+
+    replacements = {
+        "Ai Agent": "Agente de IA",
+        "Help Page": "P\u00e1gina de ajuda",
+        "Transactions": "Transa\u00e7\u00f5es",
+        "Dashboard": "Dashboard",
+        "Tarefas": "Tarefas",
+        "Embeded Button": "Bot\u00e3o embutido",
+        "Embedded Button": "Bot\u00e3o embutido",
+    }
+    for key, value in replacements.items():
+        base = re.sub(r"\b" + re.escape(key) + r"\b", value, base)
+    base = base.replace("Agente de IA Bot\u00e3o embutido", "Agente de IA - Bot\u00e3o embutido")
+    base = re.sub(r"\s+", " ", base).strip()
+
+    if mode:
+        if base:
+            return f"{base} - {mode}"
+        return mode
+    return base or "Screenshot"
+
+
 def _send_email_verification(request, user) -> None:
     if not user.email:
         return
@@ -282,6 +323,31 @@ def home(request):
         {"label": "Tarefas e etapas", "value": task_count, "suffix": ""},
         {"label": "Alertas inteligentes", "value": alert_count, "suffix": "ativos"},
     ]
+    landing_screenshots = []
+    media_root = getattr(settings, "MEDIA_ROOT", "")
+    if media_root:
+        screenshot_dir = os.path.join(media_root, "systemPrints")
+        if os.path.isdir(screenshot_dir):
+            all_shots = []
+            prefixed_shots = []
+            for filename in sorted(os.listdir(screenshot_dir)):
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in {".png", ".jpg", ".jpeg", ".webp"}:
+                    label = _pretty_screenshot_label(filename)
+                    shot = {"url": f"{settings.MEDIA_URL}systemPrints/{filename}", "label": label}
+                    all_shots.append(shot)
+                    prefix_match = re.match(r"^(\d{1,3})[ _-]", filename)
+                    if prefix_match:
+                        prefixed_shots.append((int(prefix_match.group(1)), shot))
+            if prefixed_shots:
+                landing_screenshots = [shot for _, shot in sorted(prefixed_shots, key=lambda item: item[0])]
+            else:
+                landing_screenshots = all_shots
+    if not landing_screenshots:
+        landing_screenshots = [
+            {"url": static("help/dashboard.png"), "label": "Dashboard"},
+            {"url": static("help/transaction_form.png"), "label": "Nova transa\u00e7\u00e3o"},
+        ]
     pricing_plans = [
         {
             "name": "Mensal",
@@ -365,6 +431,7 @@ def home(request):
         "pricing_plans": pricing_plans,
         "pricing_state": pricing_state,
         "landing_stats": landing_stats,
+        "landing_screenshots": landing_screenshots,
         "carousel_slides": carousel_slides,
         "feature_cards": feature_cards,
         "steps": steps,
@@ -1617,7 +1684,7 @@ def category_delete(request, pk):
             category.delete()
             messages.success(request, 'Categoria removida.')
         except ProtectedError:
-            messages.error(request, 'NÃo é possível remover: há transações vinculadas.')
+            messages.error(request, 'N\u00e3o \u00e9 poss\u00edvel remover: h\u00e1 transa\u00e7\u00f5es vinculadas.')
     return redirect('tracker:categories_list')
 
 

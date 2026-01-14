@@ -4,7 +4,7 @@
 {% block title %}iTracker | Finan&ccedil;as e tarefas em um s&oacute; lugar{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/landing.css' %}?v=4">
+<link rel="stylesheet" href="{% static 'css/landing.css' %}?v=5">
 {% endblock %}
 
 {% block content %}
@@ -92,6 +92,46 @@
         </div>
     </div>
 </section>
+
+{% if landing_screenshots %}
+<section class="py-5 lp-section lp-screenshot-section">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+            <h2 class="section-title mb-2">Veja o iTracker em a&ccedil;&atilde;o</h2>
+            <p class="lp-muted mb-0">Preview real das telas em modo dark e light.</p>
+        </div>
+        <div id="screenshotCarousel" class="carousel slide lp-screenshot-carousel" data-bs-ride="carousel" data-bs-interval="6500" data-bs-touch="true">
+            {% if landing_screenshots|length > 1 %}
+            <div class="carousel-indicators">
+                {% for shot in landing_screenshots %}
+                <button type="button" data-bs-target="#screenshotCarousel" data-bs-slide-to="{{ forloop.counter0 }}" class="{% if forloop.first %}active{% endif %}" aria-current="{% if forloop.first %}true{% endif %}" aria-label="Screenshot {{ forloop.counter }}"></button>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="carousel-inner">
+                {% for shot in landing_screenshots %}
+                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                    <div class="lp-card lp-screenshot-card">
+                        <img class="img-fluid lp-screenshot-img" src="{{ shot.url }}" alt="{{ shot.label }}">
+                        <div class="lp-screenshot-caption">{{ shot.label }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if landing_screenshots|length > 1 %}
+            <button class="carousel-control-prev" type="button" data-bs-target="#screenshotCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#screenshotCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Pr&oacute;ximo</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endif %}
 
 <section class="py-5 lp-carousel-section">
     <div class="container">

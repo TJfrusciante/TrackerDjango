@@ -2,6 +2,51 @@
 
 {% block title %}Criar conta | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    .password-rules {
+        background: rgba(148, 163, 184, 0.08);
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        padding: 0.75rem 0.9rem;
+        margin-top: 0.5rem;
+    }
+    .password-rules ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.35rem;
+    }
+    .password-rules li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+    }
+    .password-rules .rule-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--border);
+        display: inline-block;
+    }
+    .password-rules li.is-valid {
+        color: #22c55e;
+    }
+    .password-rules li.is-valid .rule-dot {
+        background: #22c55e;
+    }
+    .password-rules li.is-invalid {
+        color: #ef4444;
+    }
+    .password-rules li.is-invalid .rule-dot {
+        background: #ef4444;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row g-4 align-items-center">
     <div class="col-lg-6">
@@ -60,6 +105,18 @@
                         {% if field.errors %}
                             <div class="text-danger small">{{ field.errors|striptags }}</div>
                         {% endif %}
+                        {% if field.name == 'password1' %}
+                            <div class="password-rules" id="passwordRules" aria-live="polite">
+                                <div class="small fw-semibold text-secondary mb-2">Sua senha precisa:</div>
+                                <ul>
+                                    <li data-rule="length"><span class="rule-dot"></span><span>Conter pelo menos 8 caracteres.</span></li>
+                                    <li data-rule="similar"><span class="rule-dot"></span><span>N&atilde;o ser parecida com seus dados pessoais.</span></li>
+                                    <li data-rule="common"><span class="rule-dot"></span><span>N&atilde;o ser uma senha comumente utilizada.</span></li>
+                                    <li data-rule="numeric"><span class="rule-dot"></span><span>N&atilde;o ser inteiramente num&eacute;rica.</span></li>
+                                    <li data-rule="match"><span class="rule-dot"></span><span>Confirma&ccedil;&atilde;o igual &agrave; senha.</span></li>
+                                </ul>
+                            </div>
+                        {% endif %}
                     </div>
                 {% endfor %}
                 <div class="col-12 d-grid">
@@ -70,4 +127,82 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const pwd = document.getElementById('id_password1');
+        const confirm = document.getElementById('id_password2');
+        const username = document.getElementById('id_username');
+        const email = document.getElementById('id_email');
+        const firstName = document.getElementById('id_first_name');
+        const lastName = document.getElementById('id_last_name');
+        const rulesBox = document.getElementById('passwordRules');
+        if (!pwd || !rulesBox) return;
+
+        const commonList = new Set([
+            '12345678','123456789','1234567890','senha123','password','qwerty','admin123','iloveyou'
+        ]);
+
+        const ruleEls = {};
+        rulesBox.querySelectorAll('[data-rule]').forEach((el) => {
+            ruleEls[el.dataset.rule] = el;
+        });
+
+        function normalize(value) {
+            return (value || '').toLowerCase().trim();
+        }
+
+        function hasSimilarInfo(pass) {
+            const tokens = [];
+            [username, email, firstName, lastName].forEach((el) => {
+                if (!el || !el.value) return;
+                if (el === email) {
+                    tokens.push(el.value.split('@')[0]);
+                } else {
+                    tokens.push(el.value);
+                }
+            });
+            const cleaned = normalize(pass);
+            return tokens.some((token) => {
+                const t = normalize(token);
+                return t.length >= 3 && cleaned.includes(t);
+            });
+        }
+
+        function setRule(rule, passed, active) {
+            const el = ruleEls[rule];
+            if (!el) return;
+            el.classList.remove('is-valid', 'is-invalid');
+            if (!active) return;
+            el.classList.add(passed ? 'is-valid' : 'is-invalid');
+        }
+
+        function updateRules() {
+            const value = pwd.value || '';
+            const confirmValue = confirm ? confirm.value || '' : '';
+            const active = value.length > 0 || confirmValue.length > 0;
+
+            const lengthOk = value.length >= 8;
+            const numericOk = !/^\d+$/.test(value);
+            const similarOk = !hasSimilarInfo(value);
+            const commonOk = value.length ? !commonList.has(value.toLowerCase()) : false;
+            const matchOk = confirmValue.length ? value === confirmValue : false;
+
+            setRule('length', lengthOk, active);
+            setRule('numeric', numericOk, active);
+            setRule('similar', similarOk, active);
+            setRule('common', commonOk, active);
+            setRule('match', matchOk, confirmValue.length > 0);
+        }
+
+        pwd.addEventListener('input', updateRules);
+        if (confirm) confirm.addEventListener('input', updateRules);
+        if (username) username.addEventListener('input', updateRules);
+        if (email) email.addEventListener('input', updateRules);
+        if (firstName) firstName.addEventListener('input', updateRules);
+        if (lastName) lastName.addEventListener('input', updateRules);
+    })();
+</script>
 {% endblock %}

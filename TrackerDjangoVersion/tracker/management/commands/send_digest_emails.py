@@ -61,8 +61,16 @@ def _build_digest(user, start, end):
 class Command(BaseCommand):
     help = 'Send weekly/monthly digest emails based on user preferences.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--kind',
+            choices=('weekly', 'monthly'),
+            help='Envie apenas o resumo semanal ou mensal.',
+        )
+
     def handle(self, *args, **options):
         today = timezone.localdate()
+        kind_filter = options.get('kind')
         profiles = UserProfile.objects.select_related('user').filter(user__is_active=True, is_guest=False)
         total_sent = 0
 
@@ -74,6 +82,8 @@ class Command(BaseCommand):
                 ('weekly', profile.digest_weekly, 'digest_weekly_last_sent'),
                 ('monthly', profile.digest_monthly, 'digest_monthly_last_sent'),
             ):
+                if kind_filter and kind != kind_filter:
+                    continue
                 if not flag:
                     continue
                 last_sent = getattr(profile, last_field)
@@ -94,4 +104,8 @@ class Command(BaseCommand):
                 profile.save(update_fields=[last_field])
                 total_sent += 1
 
-        self.stdout.write(self.style.SUCCESS(f'Resumos enviados: {total_sent}'))
+        if kind_filter:
+            label = "semanal" if kind_filter == "weekly" else "mensal"
+            self.stdout.write(self.style.SUCCESS(f'Resumos {label} enviados: {total_sent}'))
+        else:
+            self.stdout.write(self.style.SUCCESS(f'Resumos enviados: {total_sent}'))

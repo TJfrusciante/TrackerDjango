@@ -299,3 +299,60 @@
     0%, 100% { transform: scale(1); opacity: 0.95; }
     50% { transform: scale(1.06); opacity: 1; }
 }
+
+.lp-screenshot-section .carousel {
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.02);
+}
+
+.lp-screenshot-card {
+    padding: 0;
+    overflow: hidden;
+    background: rgba(15,23,42,0.75);
+}
+
+[data-bs-theme="light"] .lp-screenshot-card {
+    background: #fff;
+}
+
+.lp-screenshot-img {
+    width: 100%;
+    height: auto;
+    max-height: 520px;
+    object-fit: contain;
+    display: block;
+}
+
+.lp-screenshot-caption {
+    padding: .75rem 1rem;
+    font-weight: 600;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    background: rgba(15,23,42,0.6);
+}
+
+[data-bs-theme="light"] .lp-screenshot-caption {
+    background: rgba(15,23,42,0.05);
+}
+
+.lp-screenshot-carousel .carousel-indicators {
+    bottom: -36px;
+}
+
+.lp-screenshot-carousel .carousel-indicators [data-bs-target] {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background-color: rgba(94, 234, 212, 0.5);
+}
+
+.lp-screenshot-carousel .carousel-indicators .active {
+    background-color: var(--primary-soft);
+}
+
+.lp-screenshot-carousel .carousel-control-prev,
+.lp-screenshot-carousel .carousel-control-next {
+    background: rgba(15, 118, 110, 0.95);
+}
