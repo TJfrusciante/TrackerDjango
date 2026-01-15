@@ -61,6 +61,12 @@
                                 {% if user.is_superuser or membership.role == 'owner' %}
                                     <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:workspace_invite' membership.workspace.slug %}">Convidar</a>
                                 {% endif %}
+                                {% if not user.is_superuser and membership.role != 'owner' %}
+                                    <form method="post" action="{% url 'tracker:workspace_leave' membership.workspace.slug %}" onsubmit="return confirm('Sair deste workspace?');">
+                                        {% csrf_token %}
+                                        <button class="btn btn-sm btn-outline-warning" type="submit">Sair</button>
+                                    </form>
+                                {% endif %}
                             </div>
                         </div>
                     {% endfor %}

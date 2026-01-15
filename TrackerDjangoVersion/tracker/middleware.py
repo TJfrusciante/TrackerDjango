@@ -20,6 +20,8 @@ class WorkspaceMiddleware(MiddlewareMixin):
         "/logout/",
         "/register/",
         "/help/",
+        "/workspaces/invites/",
+        "/workspaces/request/",
         "/workspaces/select/",
         "/workspaces/create/",
         "/pagamentos/",
@@ -38,6 +40,8 @@ class WorkspaceMiddleware(MiddlewareMixin):
         "/login/",
         "/register/",
         "/help/",
+        "/workspaces/invites/",
+        "/workspaces/request/",
         "/static/",
         "/media/",
         "/password-reset/",
@@ -86,7 +90,10 @@ class WorkspaceMiddleware(MiddlewareMixin):
             .order_by("id")
         )
         if not memberships.exists():
-            messages.error(request, "Você precisa escolher ou criar um workspace para continuar.")
+            messages.error(
+                request,
+                "Crie um workspace para poder adicionar dados ao sistema. Um workspace é seu espaço no sistema.",
+            )
             return redirect("tracker:workspace_select")
 
         slug = request.GET.get("workspace") or request.session.get("workspace_slug")

@@ -85,7 +85,7 @@
                     {{ form.non_field_errors|striptags }}
                 </div>
             {% endif %}
-            <form method="post" novalidate enctype="multipart/form-data" class="row g-3">
+            <form method="post" novalidate enctype="multipart/form-data" class="row g-3" onsubmit="return confirm('Conta de convidado acessa apenas tarefas dos workspaces em que for convidado. Transa&ccedil;&otilde;es e IA ficam bloqueadas.');">
                 {% csrf_token %}
                 {% for field in form %}
                     <div class="col-12">

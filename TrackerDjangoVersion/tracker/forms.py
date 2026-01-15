@@ -504,12 +504,5 @@ class PricingConfigForm(BaseStyledForm):
             'regular_monthly_price': 'Pre\u00e7o mensal padr\u00e3o',
             'regular_annual_price': 'Pre\u00e7o anual/m\u00eas padr\u00e3o',
         }
-        labels = {
-            'code': 'Código',
-            'plan_cycle': 'Plano',
-            'max_uses': 'Uso máximo',
-            'expires_at': 'Expira em',
-            'is_active': 'Ativo',
-        }
 
 

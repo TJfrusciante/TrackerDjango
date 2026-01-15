@@ -44,6 +44,15 @@
     .password-rules li.is-invalid .rule-dot {
         background: #ef4444;
     }
+    .invite-highlight {
+        border: 1px dashed rgba(34, 197, 94, 0.65);
+        background: rgba(34, 197, 94, 0.08);
+        border-radius: 12px;
+        padding: 0.75rem;
+    }
+    .invite-highlight .form-label {
+        margin-bottom: 0.35rem;
+    }
 </style>
 {% endblock %}
 
@@ -87,7 +96,7 @@
                 <div class="d-flex gap-2">
                     <a class="small" href="{% url 'tracker:login' %}">J&aacute; tem login? Entrar</a>
                     <span class="text-secondary small">&middot;</span>
-                    <a class="small" href="{% url 'tracker:register_guest' %}">Sou convidado</a>
+                    <a class="small" href="{% url 'tracker:register_guest' %}" onclick="return confirm('Conta de convidado acessa apenas tarefas dos workspaces em que for convidado. Transa&ccedil;&otilde;es e IA ficam bloqueadas.');">Sou convidado</a>
                 </div>
             </div>
             {% if form.non_field_errors %}
@@ -98,26 +107,44 @@
             <form method="post" novalidate enctype="multipart/form-data" class="row g-3">
                 {% csrf_token %}
                 {% for field in form %}
-                    <div class="col-12">
-                        <label class="form-label">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                        {% if field.errors %}
-                            <div class="text-danger small">{{ field.errors|striptags }}</div>
-                        {% endif %}
-                        {% if field.name == 'password1' %}
-                            <div class="password-rules" id="passwordRules" aria-live="polite">
-                                <div class="small fw-semibold text-secondary mb-2">Sua senha precisa:</div>
-                                <ul>
-                                    <li data-rule="length"><span class="rule-dot"></span><span>Conter pelo menos 8 caracteres.</span></li>
-                                    <li data-rule="similar"><span class="rule-dot"></span><span>N&atilde;o ser parecida com seus dados pessoais.</span></li>
-                                    <li data-rule="common"><span class="rule-dot"></span><span>N&atilde;o ser uma senha comumente utilizada.</span></li>
-                                    <li data-rule="numeric"><span class="rule-dot"></span><span>N&atilde;o ser inteiramente num&eacute;rica.</span></li>
-                                    <li data-rule="match"><span class="rule-dot"></span><span>Confirma&ccedil;&atilde;o igual &agrave; senha.</span></li>
-                                </ul>
+                    {% if field.name == 'invite_code' %}
+                        <div class="col-12 invite-highlight">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label">{{ field.label }}</label>
+                                <span class="badge text-bg-success">C&oacute;digo de convite</span>
                             </div>
-                        {% endif %}
-                    </div>
+                            {{ field }}
+                            <div class="form-text">Tem um c&oacute;digo? Cole aqui para ativar a assinatura sem pagamento imediato.</div>
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="col-12">
+                            <label class="form-label">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.name == 'email' %}
+                                <div class="form-text">Use um e-mail válido para iniciar o pagamento da assinatura.</div>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                            {% endif %}
+                            {% if field.name == 'password1' %}
+                                <div class="password-rules" id="passwordRules" aria-live="polite">
+                                    <div class="small fw-semibold text-secondary mb-2">Sua senha precisa:</div>
+                                    <ul>
+                                        <li data-rule="length"><span class="rule-dot"></span><span>Conter pelo menos 8 caracteres.</span></li>
+                                        <li data-rule="similar"><span class="rule-dot"></span><span>N&atilde;o ser parecida com seus dados pessoais.</span></li>
+                                        <li data-rule="common"><span class="rule-dot"></span><span>N&atilde;o ser uma senha comumente utilizada.</span></li>
+                                        <li data-rule="numeric"><span class="rule-dot"></span><span>N&atilde;o ser inteiramente num&eacute;rica.</span></li>
+                                        <li data-rule="match"><span class="rule-dot"></span><span>Confirma&ccedil;&atilde;o igual &agrave; senha.</span></li>
+                                    </ul>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
                 {% endfor %}
                 <div class="col-12 d-grid">
                     <button class="btn btn-primary" type="submit">Criar conta</button>

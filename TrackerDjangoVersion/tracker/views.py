@@ -746,8 +746,6 @@ def transaction_create(request):
         obj = form.save(commit=False)
         if workspace:
             obj.workspace = workspace
-        if obj.status == 'done':
-            obj.completed_at = timezone.now()
         obj.save()
         if workspace:
             notify_balance_threshold(workspace.owner, workspace)
@@ -2096,6 +2094,15 @@ def workspace_select(request):
     pending_invites = WorkspaceInvite.objects.select_related('workspace', 'invited_by').filter(invited_user=request.user, status='pending')
     create_form = WorkspaceForm(prefix='create')
     slug_form = WorkspaceSlugForm(prefix='slug')
+    accepted_workspace = None
+    accepted_slug = request.session.pop('invite_flash_workspace', None)
+    if accepted_slug:
+        if request.user.is_superuser:
+            accepted_workspace = Workspace.objects.filter(slug=accepted_slug, is_active=True).first()
+        else:
+            membership = memberships.filter(workspace__slug=accepted_slug).first()
+            if membership:
+                accepted_workspace = membership.workspace
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -2145,6 +2152,7 @@ def workspace_select(request):
             'all_workspaces': all_workspaces,
             'is_guest': is_guest,
             'can_create': not is_guest,
+            'accepted_workspace': accepted_workspace,
         },
     )
 
@@ -2481,6 +2489,7 @@ def workspace_invite_action(request, invite_id, decision):
         record_metric('invite_accepted', user=request.user, workspace=invite.workspace)
         request.session['workspace_slug'] = invite.workspace.slug
         request.session['workspace_global'] = False
+        request.session['invite_flash_workspace'] = invite.workspace.slug
         messages.success(request, 'Convite aceito. Workspace selecionado.')
     elif decision == 'decline':
         invite.status = 'declined'
@@ -2859,6 +2868,32 @@ def workspace_member_update(request, slug, member_id):
         membership.save(update_fields=['role', 'can_edit_tasks', 'updated_at'])
         messages.success(request, 'Permissões atualizadas.')
     return redirect('tracker:workspace_members', slug=slug)
+
+
+@login_required
+def workspace_leave(request, slug):
+    workspace = Workspace.objects.filter(slug=slug).first()
+    if not workspace:
+        messages.error(request, 'Workspace não encontrado.')
+        return redirect('tracker:workspace_select')
+    membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
+    if not membership:
+        messages.error(request, 'Você não faz parte deste workspace.')
+        return redirect('tracker:workspace_select')
+    if request.user.is_superuser:
+        messages.error(request, 'Superuser não pode sair de workspaces. Use o modo global.')
+        return redirect('tracker:workspace_members', slug=slug)
+    if workspace.owner_id == request.user.id or membership.role == 'owner':
+        messages.error(request, 'Owner não pode sair do próprio workspace.')
+        return redirect('tracker:workspace_members', slug=slug)
+    if request.method != 'POST':
+        messages.error(request, 'Ação inválida.')
+        return redirect('tracker:workspace_members', slug=slug)
+    membership.delete()
+    if request.session.get('workspace_slug') == workspace.slug:
+        request.session.pop('workspace_slug', None)
+    messages.success(request, 'Você saiu do workspace.')
+    return redirect('tracker:workspace_select')
 
 
 # ---------- Subscription invites ----------
@@ -3296,14 +3331,14 @@ def user_admin_form(request, pk=None):
 def user_admin_status(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
     if request.method != 'POST':
-        messages.error(request, 'Requisi??o inv?lida.')
+        messages.error(request, 'Requisição inválida.')
         return redirect('tracker:user_admin_list')
 
     action = request.POST.get('action')
     profile, _ = UserProfile.objects.get_or_create(user=user_obj)
     today = timezone.localdate()
     if profile.is_guest:
-        messages.error(request, 'Conta de convidado n?o requer aprova??o.')
+        messages.error(request, 'Conta de convidado não requer aprovação.')
         return redirect('tracker:user_admin_list')
 
     if action == 'approve':
@@ -3343,57 +3378,6 @@ def user_admin_status(request, pk):
         messages.success(request, 'Cadastro renovado por 1 ano.')
     elif action == 'suspend':
         if request.user == user_obj:
-            messages.error(request, 'Voc? n?o pode suspender a si mesmo.')
-            return redirect('tracker:user_admin_list')
-        profile.is_approved = False
-        profile.save(update_fields=['is_approved'])
-        Workspace.objects.filter(owner=user_obj).update(is_active=False)
-        messages.success(request, 'Cadastro suspenso.')
-    elif action == 'mark_paid':
-        profile.payment_confirmed = True
-        profile.payment_confirmed_at = timezone.now()
-        profile.save(update_fields=['payment_confirmed', 'payment_confirmed_at'])
-        record_metric('payment_confirmed', user=user_obj, metadata={'source': 'admin'})
-        messages.success(request, 'Pagamento marcado como confirmado.')
-    elif action == 'mark_unpaid':
-        profile.payment_confirmed = False
-        profile.payment_confirmed_at = None
-        profile.save(update_fields=['payment_confirmed', 'payment_confirmed_at'])
-        messages.success(request, 'Pagamento marcado como pendente.')
-    else:
-        messages.error(request, 'A??o inv?lida.')
-
-    return redirect('tracker:user_admin_list')
-
-    action = request.POST.get('action')
-    profile, _ = UserProfile.objects.get_or_create(user=user_obj)
-    today = timezone.localdate()
-    if profile.is_guest:
-        messages.error(request, 'Conta de convidado não requer aprovação.')
-        return redirect('tracker:user_admin_list')
-
-    if action == 'approve':
-        profile.is_approved = True
-        profile.approved_at = timezone.now()
-        profile.approved_by = request.user
-        if not profile.subscription_expires or profile.subscription_expires < today:
-            profile.subscription_expires = today + datetime.timedelta(days=30)
-        profile.save(update_fields=['is_approved', 'approved_at', 'approved_by', 'subscription_expires'])
-        Workspace.objects.filter(owner=user_obj).update(is_active=True)
-        messages.success(request, 'Cadastro aprovado.')
-    elif action == 'renew':
-        base_date = profile.subscription_expires or today
-        if base_date < today:
-            base_date = today
-        profile.subscription_expires = base_date + datetime.timedelta(days=30)
-        profile.is_approved = True
-        if not profile.approved_at:
-            profile.approved_at = timezone.now()
-        profile.save(update_fields=['subscription_expires', 'is_approved', 'approved_at'])
-        Workspace.objects.filter(owner=user_obj).update(is_active=True)
-        messages.success(request, 'Cadastro renovado por 30 dias.')
-    elif action == 'suspend':
-        if request.user == user_obj:
             messages.error(request, 'Você não pode suspender a si mesmo.')
             return redirect('tracker:user_admin_list')
         profile.is_approved = False
@@ -3404,6 +3388,7 @@ def user_admin_status(request, pk):
         profile.payment_confirmed = True
         profile.payment_confirmed_at = timezone.now()
         profile.save(update_fields=['payment_confirmed', 'payment_confirmed_at'])
+        record_metric('payment_confirmed', user=user_obj, metadata={'source': 'admin'})
         messages.success(request, 'Pagamento marcado como confirmado.')
     elif action == 'mark_unpaid':
         profile.payment_confirmed = False

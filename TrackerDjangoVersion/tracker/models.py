@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
@@ -75,6 +76,12 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f'{self.description} ({self.date})'
+
+    def clean(self):
+        super().clean()
+        if self.workspace_id and self.category_id:
+            if self.category.workspace_id != self.workspace_id:
+                raise ValidationError({'category': 'Categoria não pertence ao workspace selecionado.'})
 
     @property
     def signed_amount(self):

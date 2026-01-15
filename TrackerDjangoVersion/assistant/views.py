@@ -27,9 +27,13 @@ def _finance_queryset(request, workspace):
 
 def _tasks_queryset(request, workspace):
     qs = Task.objects.all()
-    if workspace and not request.user.is_superuser:
-        qs = qs.filter(workspace=workspace)
-    return qs
+    if workspace:
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(workspace=workspace)
+    if request.user.is_superuser:
+        return qs
+    return Task.objects.none()
 
 
 def _summarize(workspace, request):

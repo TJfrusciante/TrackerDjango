@@ -232,6 +232,8 @@ def subscription_pending(request):
 
 @csrf_exempt
 def mp_webhook(request):
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
     try:
         payload = json.loads(request.body.decode('utf-8')) if request.body else {}
     except json.JSONDecodeError:
@@ -249,6 +251,18 @@ def mp_webhook(request):
 
     try:
         data = fetch_preapproval(str(mp_id))
+        collector_expected = (getattr(settings, 'MP_COLLECTOR_ID', '') or '').strip()
+        app_expected = (getattr(settings, 'MP_APP_ID', '') or '').strip()
+        if collector_expected and str(data.get('collector_id', '')) != collector_expected:
+            event.status = 'ignored'
+            event.processed_at = timezone.now()
+            event.save(update_fields=['status', 'processed_at'])
+            return JsonResponse({'ok': True})
+        if app_expected and str(data.get('application_id', '')) != app_expected:
+            event.status = 'ignored'
+            event.processed_at = timezone.now()
+            event.save(update_fields=['status', 'processed_at'])
+            return JsonResponse({'ok': True})
         fields = extract_preapproval_fields(data)
         preapproval_id = fields['preapproval_id']
         sub = MpSubscription.objects.filter(preapproval_id=preapproval_id).first()

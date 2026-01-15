@@ -56,6 +56,7 @@ urlpatterns = [
     path('workspaces/convites/', views.workspace_invite, name='workspace_invite_current'),
     path('workspaces/<slug:slug>/convites/', views.workspace_invite, name='workspace_invite'),
     path('workspaces/<slug:slug>/excluir/', views.workspace_delete, name='workspace_delete'),
+    path('workspaces/<slug:slug>/sair/', views.workspace_leave, name='workspace_leave'),
     path('workspaces/<slug:slug>/members/<int:member_id>/remove/', views.workspace_member_remove, name='workspace_member_remove'),
     path('workspaces/<slug:slug>/members/<int:member_id>/update/', views.workspace_member_update, name='workspace_member_update'),
     path('workspaces/<slug:slug>/requests/<int:req_id>/<str:decision>/', views.workspace_request_action, name='workspace_request_action'),
