@@ -171,6 +171,17 @@
             <div class="alert alert-info small mb-2">
                 Dica: personalize o avatar para diferenciar contas em m&uacute;ltiplos workspaces.
             </div>
+            {% if trial.expires_at %}
+            <div class="glass-card p-3 bg-dark bg-opacity-10 mb-2">
+                <h6 class="fw-bold mb-1">Per&iacute;odo de teste</h6>
+                {% if trial.active %}
+                    <div class="text-secondary small">Ativo &middot; termina em {{ trial.expires_at|date:"d/m/Y" }}</div>
+                    <div class="text-secondary small">Restam {{ trial.remaining }} dia(s).</div>
+                {% else %}
+                    <div class="text-secondary small">Finalizado em {{ trial.expires_at|date:"d/m/Y" }}.</div>
+                {% endif %}
+            </div>
+            {% endif %}
             <div class="glass-card p-3 bg-dark bg-opacity-10 mb-2">
                 <h6 class="fw-bold mb-2">Uso de IA</h6>
                 {% if ai_usage.unlimited %}

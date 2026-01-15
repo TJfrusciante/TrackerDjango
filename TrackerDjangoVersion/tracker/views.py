@@ -133,26 +133,41 @@ def _is_paid_user(user) -> bool:
         return False
     if profile.is_guest:
         return False
+    if profile.trial_active():
+        return True
     return bool(profile.payment_confirmed)
 
 
 def _workspace_unpaid_count(workspace) -> int:
+    now = timezone.now()
     return WorkspaceMembership.objects.filter(workspace=workspace).exclude(
         role='owner'
     ).exclude(
         user__is_superuser=True
     ).filter(
-        Q(user__profile__isnull=True) | Q(user__profile__is_guest=True) | Q(user__profile__payment_confirmed=False)
+        Q(user__profile__isnull=True)
+        | Q(user__profile__is_guest=True)
+        | (
+            Q(user__profile__payment_confirmed=False)
+            & (Q(user__profile__trial_expires_at__isnull=True) | Q(user__profile__trial_expires_at__lt=now))
+        )
     ).count()
 
 
 def _workspace_unpaid_invite_count(workspace) -> int:
+    now = timezone.now()
     return WorkspaceInvite.objects.filter(workspace=workspace, status='pending').exclude(
         invited_user__is_superuser=True
     ).filter(
         Q(invited_user__profile__isnull=True)
         | Q(invited_user__profile__is_guest=True)
-        | Q(invited_user__profile__payment_confirmed=False)
+        | (
+            Q(invited_user__profile__payment_confirmed=False)
+            & (
+                Q(invited_user__profile__trial_expires_at__isnull=True)
+                | Q(invited_user__profile__trial_expires_at__lt=now)
+            )
+        )
     ).count()
 
 
@@ -527,6 +542,12 @@ def dashboard(request):
     workspace = getattr(request, "workspace", None)
     can_finance = _user_can_view_finance(request, workspace)
     last30_start = today - datetime.timedelta(days=30)
+    profile = getattr(request.user, "profile", None)
+    trial_active = bool(profile and profile.trial_active())
+    trial_expires_at = profile.trial_expires_at if profile else None
+    trial_remaining = None
+    if trial_expires_at:
+        trial_remaining = max((trial_expires_at.date() - today).days, 0)
 
     def shift_months(date_obj: datetime.date, months: int) -> datetime.date:
         year = date_obj.year + ((date_obj.month - 1 + months) // 12)
@@ -667,6 +688,11 @@ def dashboard(request):
         'net_30': net_30,
         'avg_daily_expense': avg_daily_expense,
         'category_count': category_count,
+        'trial': {
+            'active': trial_active,
+            'expires_at': trial_expires_at,
+            'remaining': trial_remaining,
+        },
     }
     return render(request, 'tracker/dashboard.html', context)
 
@@ -1929,8 +1955,14 @@ def login_view(request):
             _clear_login_failures(request)
             record_metric('login_success', user=user, metadata={'ip': request.META.get('REMOTE_ADDR')})
             if not user.is_superuser and not profile.is_guest and not profile.payment_confirmed:
-                messages.info(request, 'Finalize a assinatura para liberar o acesso ao sistema.')
-                return redirect('payments:subscription_start')
+                if profile and profile.trial_active():
+                    today = timezone.localdate()
+                    remaining = (profile.trial_expires_at.date() - today).days if profile.trial_expires_at else 0
+                    remaining = max(remaining, 0)
+                    messages.info(request, f'Per\u00edodo de teste ativo. Restam {remaining} dia(s).')
+                else:
+                    messages.info(request, 'Finalize a assinatura para liberar o acesso ao sistema.')
+                    return redirect('payments:subscription_start')
             if profile and profile.subscription_expires:
                 today = timezone.localdate()
                 grace_days = int(getattr(settings, 'SUBSCRIPTION_GRACE_DAYS', 7))
@@ -1956,6 +1988,7 @@ def register_view(request):
         return redirect('tracker:dashboard')
     form = SignupForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
+        trial_days = int(getattr(settings, 'TRIAL_DAYS', 7))
         invite_code = (form.cleaned_data.get('invite_code') or '').strip()
         invite = None
         if invite_code:
@@ -1968,7 +2001,8 @@ def register_view(request):
             ws_name = form.cleaned_data.get('workspace_name') or f"Workspace de {user.username}"
             slug = _ensure_unique_slug(ws_name)
             requires_manual = getattr(settings, 'REQUIRE_MANUAL_APPROVAL', True)
-            ws_active = bool(invite)
+            trial_active = bool(trial_days and not invite)
+            ws_active = bool(invite) or trial_active
             ws = Workspace.objects.create(name=ws_name, slug=slug, owner=user, is_active=ws_active)
             WorkspaceMembership.objects.create(workspace=ws, user=user, role='owner')
             profile, _ = UserProfile.objects.get_or_create(user=user)
@@ -1997,7 +2031,15 @@ def register_view(request):
                 SubscriptionInviteUse.objects.create(invite=invite, user=user)
                 SubscriptionInvite.objects.filter(pk=invite.id).update(used_count=F('used_count') + 1)
                 record_metric('payment_confirmed', user=user, workspace=ws, metadata={'source': 'invite'})
-            if not invite and not requires_manual:
+            if trial_active:
+                now = timezone.now()
+                profile.trial_started_at = now
+                profile.trial_expires_at = now + datetime.timedelta(days=trial_days)
+                profile.is_approved = True
+                profile.approved_at = timezone.now()
+                profile.approved_by = None
+                profile.save(update_fields=['trial_started_at', 'trial_expires_at', 'is_approved', 'approved_at', 'approved_by'])
+            elif not invite and not requires_manual:
                 profile.is_approved = True
                 profile.approved_at = timezone.now()
                 profile.approved_by = None
@@ -2016,6 +2058,10 @@ def register_view(request):
         if invite:
             messages.success(request, 'Conta criada com convite. Voc\u00ea j\u00e1 pode acessar o sistema.')
         else:
+            if trial_active:
+                login(request, user)
+                messages.success(request, f'Conta criada. Voc\u00ea tem {trial_days} dias de teste.')
+                return redirect('tracker:workspace_select')
             if not requires_manual:
                 login(request, user)
                 messages.success(request, 'Conta criada. Conclua a assinatura para ativar todos os recursos.')
@@ -2216,10 +2262,20 @@ def workspace_members(request, slug=None):
     invite_username_form = InviteByUsernameForm(request.POST or None, prefix='byuser') if can_manage else None
     pending_requests = WorkspaceAccessRequest.objects.filter(workspace=target_ws, status='pending') if can_manage else []
     pending_invites = WorkspaceInvite.objects.filter(workspace=target_ws, status='pending').select_related('invited_user') if can_manage else []
+    owner_profile = getattr(request.user, "profile", None)
+    trial_blocked = bool(
+        owner_profile
+        and owner_profile.trial_active()
+        and not owner_profile.payment_confirmed
+        and not request.user.is_superuser
+    )
 
     if request.method == 'POST':
         if not can_manage:
             messages.error(request, 'Voc\u00ea n\u00e3o tem permiss\u00e3o para alterar membros.')
+            return redirect('tracker:workspace_members', slug=target_ws.slug)
+        if trial_blocked:
+            messages.error(request, 'Per\u00edodo de teste n\u00e3o permite convites. Conclua a assinatura para liberar.')
             return redirect('tracker:workspace_members', slug=target_ws.slug)
         action = request.POST.get('action')
         if action == 'invite_email' and invite_form.is_valid():
@@ -2314,6 +2370,7 @@ def workspace_members(request, slug=None):
             'pending_requests': pending_requests,
             'pending_invites': pending_invites,
             'can_manage': can_manage,
+            'trial_blocked': trial_blocked,
         },
     )
 
@@ -2338,6 +2395,11 @@ def workspace_invite(request, slug=None):
     if not is_owner:
         messages.error(request, 'Apenas owners podem convidar membros.')
         return redirect('tracker:dashboard')
+
+    owner_profile = getattr(request.user, "profile", None)
+    if owner_profile and owner_profile.trial_active() and not owner_profile.payment_confirmed and not request.user.is_superuser:
+        messages.error(request, 'Per\u00edodo de teste n\u00e3o permite convites. Conclua a assinatura para liberar.')
+        return redirect('tracker:workspace_members', slug=target_ws.slug)
 
     invite_form = InviteByUsernameForm(request.POST or None)
     pending_invites = WorkspaceInvite.objects.filter(
@@ -2529,6 +2591,11 @@ def profile_edit(request):
     ai_limit = quota.get("limit") or 0
     ai_remaining = quota.get("remaining")
     ai_next_reset = quota.get("next_reset")
+    trial_expires_at = profile.trial_expires_at
+    trial_remaining = None
+    if trial_expires_at:
+        trial_remaining = (trial_expires_at.date() - timezone.localdate()).days
+        trial_remaining = max(trial_remaining, 0)
     if request.method == 'POST' and form.is_valid() and avatar_form.is_valid() and pref_form.is_valid():
         form.save()
         avatar_form.save()
@@ -2552,6 +2619,11 @@ def profile_edit(request):
                 'window_days': quota.get("window_days") or 30,
                 'next_reset': ai_next_reset,
                 'unlimited': not ai_limit,
+            },
+            'trial': {
+                'active': bool(profile.trial_active()),
+                'expires_at': trial_expires_at,
+                'remaining': trial_remaining,
             },
         },
     )

@@ -63,7 +63,8 @@ class WorkspaceMiddleware(MiddlewareMixin):
             profile = getattr(request.user, "profile", None)
             if not profile:
                 profile, _ = UserProfile.objects.get_or_create(user=request.user)
-            if not profile.is_guest and not profile.payment_confirmed:
+            trial_active = profile.trial_active() if profile else False
+            if not profile.is_guest and not profile.payment_confirmed and not trial_active:
                 if not any(path.startswith(prefix) for prefix in self.PAYMENT_PREFIXES):
                     messages.info(request, "Finalize a assinatura para liberar o acesso ao sistema.")
                     return redirect("payments:subscription_start")

@@ -31,6 +31,30 @@
         </div>
     </div>
 
+    {% if trial.expires_at %}
+    <div class="col-12">
+        <div class="glass-card p-3">
+            {% if trial.active %}
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                    <div>
+                        <strong>Per&iacute;odo de teste ativo</strong>
+                        <div class="text-secondary small">Restam {{ trial.remaining }} dia(s). Termina em {{ trial.expires_at|date:"d/m/Y" }}.</div>
+                    </div>
+                    <a class="btn btn-outline-light btn-sm" href="{% url 'payments:subscription_start' %}">Assinar agora</a>
+                </div>
+            {% else %}
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                    <div>
+                        <strong>Teste encerrado</strong>
+                        <div class="text-secondary small">Finalize a assinatura para continuar usando o iTracker.</div>
+                    </div>
+                    <a class="btn btn-primary btn-sm" href="{% url 'payments:subscription_start' %}">Assinar</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-3">

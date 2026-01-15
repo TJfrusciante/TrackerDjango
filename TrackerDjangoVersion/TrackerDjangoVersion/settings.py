@@ -226,6 +226,7 @@ MP_WEBHOOK_TOKEN = env("MP_WEBHOOK_TOKEN", "")
 SUBSCRIPTION_GRACE_DAYS = int(env("SUBSCRIPTION_GRACE_DAYS", "7"))
 REQUIRE_MANUAL_APPROVAL = env_bool("REQUIRE_MANUAL_APPROVAL", default=not bool(MP_ACCESS_TOKEN))
 MP_SIMULATE_PAYMENTS = env_bool("MP_SIMULATE_PAYMENTS", default=False)
+TRIAL_DAYS = int(env("TRIAL_DAYS", "7"))
 
 # ------------------------------------------------------------------
 # AI quota

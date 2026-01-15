@@ -213,10 +213,17 @@ class UserProfile(models.Model):
     email_verified = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     deletion_requested_at = models.DateTimeField(null=True, blank=True)
+    trial_started_at = models.DateTimeField(null=True, blank=True)
+    trial_expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f'Perfil de {self.user}'
+
+    def trial_active(self) -> bool:
+        if not self.trial_expires_at:
+            return False
+        return timezone.now() <= self.trial_expires_at
 
 
 class PricingConfig(models.Model):
