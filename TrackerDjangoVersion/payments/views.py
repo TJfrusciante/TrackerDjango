@@ -276,9 +276,14 @@ def mp_webhook(request):
             _apply_subscription_to_profile(sub.user, sub, sub.plan_cycle, fields['status'], next_payment_at)
         event.status = 'processed'
     except Exception as exc:
-        event.status = f'error:{exc}'
+        event.status = 'error'
+        if isinstance(event.payload, dict):
+            event.payload = {**event.payload, 'error': str(exc)}
     event.processed_at = timezone.now()
-    event.save(update_fields=['status', 'processed_at'])
+    update_fields = ['status', 'processed_at']
+    if isinstance(event.payload, dict):
+        update_fields.append('payload')
+    event.save(update_fields=update_fields)
     return JsonResponse({'ok': True})
 
 # Create your views here.
