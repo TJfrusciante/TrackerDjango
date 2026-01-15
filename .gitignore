@@ -1,7 +1,3 @@
-**/venv/
-**/TemplatesExamples/
-*.log
-*.env
-.env
-.env.local
-secrets.json
+__pycache__/
+*.py[cod]
+*$py.class
