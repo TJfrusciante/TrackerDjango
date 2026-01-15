@@ -69,6 +69,11 @@
                 <div class="small text-secondary">Contexto: {{ current_workspace.name|default:"Global" }}</div>
             </div>
         </div>
+        {% if ai_quota_label %}
+        <div class="small mb-2 {% if ai_quota_blocked %}text-warning{% else %}text-secondary{% endif %}">
+            {{ ai_quota_label }}
+        </div>
+        {% endif %}
         <div id="chatBox" class="chat-box mb-3">
             {% for msg in history %}
                 <div class="d-flex {% if msg.role == 'user' %}justify-content-end{% else %}justify-content-start{% endif %} mb-3">

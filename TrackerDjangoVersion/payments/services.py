@@ -76,6 +76,10 @@ def fetch_preapproval(preapproval_id: str) -> dict:
     return mp_request('GET', f'/preapproval/{preapproval_id}')
 
 
+def cancel_preapproval(preapproval_id: str) -> dict:
+    return mp_request('PUT', f'/preapproval/{preapproval_id}', {'status': 'cancelled'})
+
+
 def extract_preapproval_fields(data: dict[str, Any]) -> dict[str, Any]:
     auto_recurring = data.get('auto_recurring') or {}
     next_payment = auto_recurring.get('next_payment_date')
@@ -83,6 +87,7 @@ def extract_preapproval_fields(data: dict[str, Any]) -> dict[str, Any]:
     return {
         'preapproval_id': data.get('id', ''),
         'status': status,
+        'external_reference': data.get('external_reference', ''),
         'payer_email': (data.get('payer') or {}).get('email', ''),
         'reason': data.get('reason', ''),
         'auto_recurring': auto_recurring,

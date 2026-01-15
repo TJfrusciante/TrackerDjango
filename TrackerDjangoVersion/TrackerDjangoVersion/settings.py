@@ -222,9 +222,21 @@ MP_PLAN_MONTHLY_AMOUNT = env("MP_PLAN_MONTHLY_AMOUNT", "8.99")
 MP_PLAN_ANNUAL_AMOUNT = env("MP_PLAN_ANNUAL_AMOUNT", "71.88")
 MP_COLLECTOR_ID = env("MP_COLLECTOR_ID", "")
 MP_APP_ID = env("MP_APP_ID", "")
+MP_WEBHOOK_TOKEN = env("MP_WEBHOOK_TOKEN", "")
 SUBSCRIPTION_GRACE_DAYS = int(env("SUBSCRIPTION_GRACE_DAYS", "7"))
 REQUIRE_MANUAL_APPROVAL = env_bool("REQUIRE_MANUAL_APPROVAL", default=not bool(MP_ACCESS_TOKEN))
 MP_SIMULATE_PAYMENTS = env_bool("MP_SIMULATE_PAYMENTS", default=False)
+
+# ------------------------------------------------------------------
+# AI quota
+# ------------------------------------------------------------------
+
+AI_PLAN_TOKEN_LIMITS = {
+    "starter": int(env("AI_STARTER_TOKEN_LIMIT", "20000")),
+    "pro": int(env("AI_PRO_TOKEN_LIMIT", "80000")),
+    "team": int(env("AI_TEAM_TOKEN_LIMIT", "200000")),
+}
+AI_USAGE_WINDOW_DAYS = int(env("AI_USAGE_WINDOW_DAYS", "30"))
 
 VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", "")

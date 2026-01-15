@@ -51,6 +51,23 @@
                     <button class="btn btn-primary" type="submit">Salvar</button>
                 </div>
             </form>
+            {% if ai_usage %}
+            <div class="glass-card p-3 mt-4 bg-dark bg-opacity-10">
+                <h6 class="mb-2">Uso de IA ({{ ai_usage.window_days }} dias)</h6>
+                {% if ai_usage.unlimited %}
+                    <div class="text-secondary small">Uso ilimitado.</div>
+                {% else %}
+                    <div class="text-secondary small">
+                        Tokens usados: {{ ai_usage.used }} &middot; Limite: {{ ai_usage.limit }}
+                    </div>
+                    <div class="text-secondary small">Restante: {{ ai_usage.remaining }}</div>
+                    {% if ai_usage.next_reset %}
+                        <div class="text-secondary small">Renova em {{ ai_usage.next_reset|date:"d/m/Y H:i" }}</div>
+                    {% endif %}
+                {% endif %}
+                <div class="text-secondary small">Custo estimado (R$): {{ ai_usage.cost|floatformat:2 }}</div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

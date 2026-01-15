@@ -6,11 +6,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Case, When, DecimalField, F
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 from tracker.models import Category, Transaction, Task, TaskStep
 from tracker.metrics import record_metric
 from .models import ChatMessage, AiUsage
+from .limits import get_ai_quota
 from .services import llm_complete, estimate_costs
 
 logger = logging.getLogger(__name__)
@@ -91,6 +93,79 @@ def _wants_task_details(message: str) -> bool:
     return 'tarefa' in msg or 'tarefas' in msg
 
 
+def _help_response(message: str) -> str | None:
+    msg = (message or '').lower()
+    if not msg:
+        return None
+
+    def has_any(values: list[str]) -> bool:
+        return any(v in msg for v in values)
+
+    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'faço', 'fazer', 'adicionar', 'lançar', 'lancar'])
+    if not wants_howto:
+        return None
+
+    if has_any(['transa', 'lanç', 'lanc', 'entrada', 'saída', 'saida', 'despesa', 'receita']):
+        return (
+            "Para lançar transações: vá em Transações > Nova. Informe descrição, data, valor, categoria e tipo "
+            "(entrada/saída) e salve. Você também pode usar o botão Falar para preencher por voz. "
+            "Para importar em lote, use Transações > Importar CSV."
+        )
+
+    if has_any(['tarefa', 'etapa', 'subtarefa', 'todo']):
+        return (
+            "Para criar tarefas: vá em Tarefas > Nova, defina título e prazo. "
+            "Você pode adicionar etapas no mesmo formulário e depois editar/atualizar o status. "
+            "O botão Falar ajuda a preencher a tarefa e as etapas."
+        )
+
+    if has_any(['workspace', 'membro', 'membros', 'convidar', 'convite', 'participante']):
+        return (
+            "Para convidar pessoas: abra o painel de Workspaces e clique em Convites. "
+            "Informe o username e defina se pode editar tarefas. "
+            "O convidado aceita na tela de Workspaces (Convites pendentes)."
+        )
+
+    if has_any(['categoria', 'categorias', 'cor']):
+        return (
+            "Para cadastrar categorias: acesse Categorias > Nova. "
+            "A cor escolhida aparece nos gráficos do dashboard."
+        )
+
+    if has_any(['exportar', 'csv', 'pdf', 'importar']):
+        return (
+            "Exportação: nas listas de Transações ou Tarefas, use o botão Exportar CSV. "
+            "Importação: use Transações > Importar CSV ou Importar PDF."
+        )
+
+    if has_any(['notifica', 'email', 'alerta', 'resumo']):
+        return (
+            "Notificações e resumos ficam no Perfil. "
+            "Marque as opções de alertas, tarefas e resumos semanais/mensais e salve."
+        )
+
+    if has_any(['ia', 'assistente', 'agente']):
+        return (
+            "O agente de IA responde com base no workspace atual. "
+            "Use perguntas como 'saldo', 'tarefas em andamento' ou 'top categorias'. "
+            "Você pode ativar o modo 'resumo local' se quiser evitar chamadas externas."
+        )
+
+    if has_any(['plano', 'assinatura', 'mensal', 'anual', 'pagamento']):
+        return (
+            "Para assinar, acesse seu Perfil e clique em 'Assinar com Mercado Pago'. "
+            "Escolha mensal ou anual e conclua o pagamento para liberar o acesso completo."
+        )
+
+    if has_any(['voz', 'ditado', 'falar', 'microfone']):
+        return (
+            "Use o botão Falar nos formulários ou no chat do agente. "
+            "Fale normalmente e finalize para preencher os campos automaticamente."
+        )
+
+    return "Você pode consultar a página Ajuda no menu para um passo a passo completo."
+
+
 def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: int = 6) -> str:
     tasks_qs = _tasks_queryset(request, workspace)
     done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at')
@@ -128,11 +203,15 @@ def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: 
     return "\n".join(lines)
 
 
-def _assistant_reply(message, workspace, request, local_only: bool = False):
+def _assistant_reply(message, workspace, request, local_only: bool = False, fallback_reason: str | None = None):
     """
     Usa LLM se configurado; fallback para resumo baseado em regras.
     Retorna (reply, usage, model_name).
     """
+    help_text = _help_response(message)
+    if help_text:
+        return help_text, None, None
+
     if _wants_task_details(message):
         return _task_detail_summary(workspace, request), None, None
 
@@ -153,7 +232,8 @@ def _assistant_reply(message, workspace, request, local_only: bool = False):
         if reply:
             return reply, usage, model_name
     logger.info("LLM fallback usado (local_only=%s)", local_only)
-    return f"N\u00e3o consegui consultar o modelo agora. Aqui vai um resumo r\u00e1pido:\n{summary}", None, None
+    prefix = fallback_reason or "N\u00e3o consegui consultar o modelo agora. Aqui vai um resumo r\u00e1pido:"
+    return f"{prefix}\n{summary}", None, None
 
 
 def _record_usage(user, workspace, feature, usage, model_name):
@@ -178,6 +258,33 @@ def _record_usage(user, workspace, feature, usage, model_name):
     )
 
 
+def _format_quota_label(quota: dict | None) -> str | None:
+    if not quota:
+        return None
+    limit = int(quota.get("limit") or 0)
+    if limit <= 0 or quota.get("remaining") is None:
+        return "Uso IA: ilimitado"
+    used = int(quota.get("used") or 0)
+    window_days = int(quota.get("window_days") or 30)
+    used_label = f"{used:,}".replace(",", ".")
+    limit_label = f"{limit:,}".replace(",", ".")
+    label = f"Uso IA: {used_label} / {limit_label} tokens ({window_days} dias)"
+    if not quota.get("allowed", True):
+        next_reset = quota.get("next_reset")
+        if next_reset:
+            next_reset = timezone.localtime(next_reset)
+            label = f"{label} \u2022 renova em {next_reset:%d/%m/%Y %H:%M}"
+    return label
+
+def _history_for_workspace(user, workspace, limit: int):
+    qs = ChatMessage.objects.filter(user=user)
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    else:
+        qs = qs.filter(workspace__isnull=True)
+    return qs.order_by('-created_at')[:limit][::-1]
+
+
 @login_required
 def chat(request):
     workspace = getattr(request, "workspace", None)
@@ -185,25 +292,43 @@ def chat(request):
     if profile and profile.is_guest and not request.user.is_superuser:
         messages.error(request, "Conta de convidado n\u00e3o tem acesso ao agente de IA.")
         return redirect('tracker:tasks_list')
+    quota = get_ai_quota(request.user)
+    quota_label = _format_quota_label(quota)
+    quota_blocked = not quota.get("allowed", True)
     if request.user.is_superuser and workspace is None:
         # se superuser estiver em modo global, nao mostrar historico para evitar volume; nao bloqueia
         pass
-    history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:30][::-1]
+    history = _history_for_workspace(request.user, workspace, 30)
 
     if request.method == 'POST':
         content = (request.POST.get('message') or '').strip()
-        local_only = request.POST.get('local_only') == 'on' or not os.getenv("OPENAI_API_KEY")
+        local_only = request.POST.get('local_only') == 'on' or not os.getenv("OPENAI_API_KEY") or quota_blocked
+        fallback_reason = None
+        if quota_blocked:
+            fallback_reason = (
+                f"Limite de IA do seu plano ({quota.get('limit')} tokens/{quota.get('window_days')}d) atingido. "
+                "Resumo local:"
+            )
         if content:
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
-            reply, usage, model_name = _assistant_reply(content, workspace, request, local_only=local_only)
+            reply, usage, model_name = _assistant_reply(
+                content,
+                workspace,
+                request,
+                local_only=local_only,
+                fallback_reason=fallback_reason,
+            )
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
             _record_usage(request.user, workspace, 'chat', usage, model_name)
             record_metric('ai_request', user=request.user, workspace=workspace, metadata={'local_only': local_only})
-        history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:30][::-1]
+        history = _history_for_workspace(request.user, workspace, 30)
 
     return render(request, 'assistant/chat.html', {
         'history': history,
         'local_only_default': not os.getenv("OPENAI_API_KEY"),
+        'ai_quota_label': quota_label,
+        'ai_quota_blocked': quota_blocked,
+        'current_workspace': workspace,
     })
 
 
@@ -214,17 +339,37 @@ def chat_embed(request):
     profile = getattr(request.user, "profile", None)
     if profile and profile.is_guest and not request.user.is_superuser:
         return render(request, 'assistant/embed.html', {'history': [], 'guest_blocked': True})
-    history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:20][::-1]
+    quota = get_ai_quota(request.user)
+    quota_label = _format_quota_label(quota)
+    quota_blocked = not quota.get("allowed", True)
+    history = _history_for_workspace(request.user, workspace, 20)
 
     if request.method == 'POST':
         content = (request.POST.get('message') or '').strip()
-        local_only = not os.getenv("OPENAI_API_KEY")
+        local_only = not os.getenv("OPENAI_API_KEY") or quota_blocked
+        fallback_reason = None
+        if quota_blocked:
+            fallback_reason = (
+                f"Limite de IA do seu plano ({quota.get('limit')} tokens/{quota.get('window_days')}d) atingido. "
+                "Resumo local:"
+            )
         if content:
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
-            reply, usage, model_name = _assistant_reply(content, workspace, request, local_only=local_only)
+            reply, usage, model_name = _assistant_reply(
+                content,
+                workspace,
+                request,
+                local_only=local_only,
+                fallback_reason=fallback_reason,
+            )
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
             _record_usage(request.user, workspace, 'chat', usage, model_name)
             record_metric('ai_request', user=request.user, workspace=workspace, metadata={'local_only': local_only})
-        history = ChatMessage.objects.filter(user=request.user).order_by('-created_at')[:20][::-1]
+        history = _history_for_workspace(request.user, workspace, 20)
 
-    return render(request, 'assistant/embed.html', {'history': history, 'current_workspace': workspace})
+    return render(request, 'assistant/embed.html', {
+        'history': history,
+        'current_workspace': workspace,
+        'ai_quota_label': quota_label,
+        'ai_quota_blocked': quota_blocked,
+    })

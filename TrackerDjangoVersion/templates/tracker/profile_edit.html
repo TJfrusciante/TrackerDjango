@@ -171,6 +171,27 @@
             <div class="alert alert-info small mb-2">
                 Dica: personalize o avatar para diferenciar contas em m&uacute;ltiplos workspaces.
             </div>
+            <div class="glass-card p-3 bg-dark bg-opacity-10 mb-2">
+                <h6 class="fw-bold mb-2">Uso de IA</h6>
+                {% if ai_usage.unlimited %}
+                    <div class="text-secondary small">Uso ilimitado para este plano.</div>
+                {% else %}
+                    <div class="text-secondary small">
+                        Tokens usados ({{ ai_usage.window_days }} dias): {{ ai_usage.used }}
+                    </div>
+                    <div class="text-secondary small">
+                        Limite: {{ ai_usage.limit }} &middot; Restante: {{ ai_usage.remaining }}
+                    </div>
+                    {% if ai_usage.next_reset %}
+                        <div class="text-secondary small">
+                            Renova em {{ ai_usage.next_reset|date:"d/m/Y H:i" }}
+                        </div>
+                    {% endif %}
+                {% endif %}
+                <div class="text-secondary small">
+                    Custo estimado (R$): {{ ai_usage.cost|floatformat:2 }}
+                </div>
+            </div>
             <a class="btn btn-outline-light page-action-btn w-100" href="{% url 'tracker:contact_admin' %}?topic=payment">
                 Avisar pagamento
             </a>

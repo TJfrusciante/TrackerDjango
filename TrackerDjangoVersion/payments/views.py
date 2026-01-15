@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -15,6 +16,8 @@ from tracker.models import UserProfile, Workspace
 from tracker.pricing import get_pricing_state
 from .models import MpSubscription, MpWebhookEvent
 from .services import build_preapproval_payload, create_preapproval, extract_preapproval_fields, fetch_preapproval
+
+User = get_user_model()
 
 
 def _parse_datetime(value: str | None):
@@ -239,6 +242,17 @@ def mp_webhook(request):
     except json.JSONDecodeError:
         payload = {}
 
+    token_expected = (getattr(settings, 'MP_WEBHOOK_TOKEN', '') or '').strip()
+    if token_expected:
+        token_received = (
+            request.GET.get('token')
+            or request.headers.get('X-MP-Token')
+            or payload.get('token')
+            or ''
+        )
+        if token_received != token_expected:
+            return JsonResponse({'detail': 'Unauthorized.'}, status=403)
+
     topic = request.GET.get('topic') or payload.get('type') or payload.get('topic', '')
     mp_id = request.GET.get('id') or (payload.get('data') or {}).get('id') or payload.get('id') or ''
 
@@ -266,6 +280,19 @@ def mp_webhook(request):
         fields = extract_preapproval_fields(data)
         preapproval_id = fields['preapproval_id']
         sub = MpSubscription.objects.filter(preapproval_id=preapproval_id).first()
+        if not sub:
+            ext_ref = (fields.get('external_reference') or '').strip()
+            if ext_ref:
+                user = User.objects.filter(id=ext_ref).first()
+                if user:
+                    sub, _ = MpSubscription.objects.get_or_create(user=user)
+                    sub.preapproval_id = preapproval_id
+                    sub.save(update_fields=['preapproval_id', 'updated_at'])
+        if not sub:
+            event.status = 'ignored'
+            event.processed_at = timezone.now()
+            event.save(update_fields=['status', 'processed_at'])
+            return JsonResponse({'ok': True})
         if sub:
             sub.payer_email = fields['payer_email']
             sub.reason = fields['reason']
@@ -273,7 +300,18 @@ def mp_webhook(request):
             sub.last_payment_status = fields['last_payment_status']
             sub.last_event_at = timezone.now()
             next_payment_at = _parse_datetime(fields['next_payment_at'])
-            _apply_subscription_to_profile(sub.user, sub, sub.plan_cycle, fields['status'], next_payment_at)
+            plan_cycle = sub.plan_cycle
+            auto_recurring = fields.get('auto_recurring') or {}
+            if auto_recurring.get('frequency_type') == 'months':
+                try:
+                    freq = int(auto_recurring.get('frequency') or 0)
+                except (TypeError, ValueError):
+                    freq = 0
+                if freq >= 12:
+                    plan_cycle = 'annual'
+                elif freq >= 1:
+                    plan_cycle = 'monthly'
+            _apply_subscription_to_profile(sub.user, sub, plan_cycle, fields['status'], next_payment_at)
         event.status = 'processed'
     except Exception as exc:
         event.status = 'error'

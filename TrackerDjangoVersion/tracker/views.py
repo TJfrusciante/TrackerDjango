@@ -102,6 +102,8 @@ from .metrics import record_metric
 from .pricing import get_pricing_state
 from assistant.services import llm_complete, estimate_costs
 from assistant.models import AiUsage
+from assistant.limits import get_ai_quota
+from payments.models import MpSubscription, MpWebhookEvent
 
 User = get_user_model()
 
@@ -192,6 +194,12 @@ def _record_ai_usage(user, workspace, feature, usage, model_name):
         cost_usd=cost_usd,
         cost_brl=cost_brl,
     )
+
+def _format_int(value: int | float | None) -> str:
+    try:
+        return f"{int(value):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "0"
 
 
 def _login_rate_limit_key(request) -> str:
@@ -1138,6 +1146,10 @@ def _suggest_category_for_desc(desc: str, cat_hint: str, categories, user=None, 
 
     # IA opcional
     if os.getenv("OPENAI_API_KEY"):
+        if user:
+            quota = get_ai_quota(user)
+            if not quota.get('allowed', True):
+                return categories[0], 'heuristic', 'Limite de IA atingido para o plano'
         names = [cat.name for cat in categories]
         sys_prompt = (
             "Voc\u00ea \u00e9 um classificador de categorias. Escolha uma das categorias existentes para a descri\u00e7\u00e3o fornecida. "
@@ -2506,6 +2518,17 @@ def profile_edit(request):
     form = ProfileForm(request.POST or None, instance=user)
     avatar_form = ProfileAvatarForm(request.POST or None, request.FILES or None, instance=profile)
     pref_form = NotificationPreferencesForm(request.POST or None, instance=profile, user=request.user)
+    quota = get_ai_quota(user)
+    ai_since = timezone.now() - datetime.timedelta(days=int(quota.get("window_days") or 30))
+    ai_totals = AiUsage.objects.filter(user=user, created_at__gte=ai_since).aggregate(
+        tokens=Sum('total_tokens'),
+        cost=Sum('cost_brl'),
+    )
+    ai_used = ai_totals.get('tokens') or 0
+    ai_cost = ai_totals.get('cost') or 0
+    ai_limit = quota.get("limit") or 0
+    ai_remaining = quota.get("remaining")
+    ai_next_reset = quota.get("next_reset")
     if request.method == 'POST' and form.is_valid() and avatar_form.is_valid() and pref_form.is_valid():
         form.save()
         avatar_form.save()
@@ -2521,6 +2544,15 @@ def profile_edit(request):
             'pref_form': pref_form,
             'show_admin_prefs': request.user.is_superuser,
             'profile': profile,
+            'ai_usage': {
+                'used': _format_int(ai_used),
+                'limit': _format_int(ai_limit) if ai_limit else None,
+                'remaining': _format_int(ai_remaining) if ai_remaining is not None else None,
+                'cost': ai_cost,
+                'window_days': quota.get("window_days") or 30,
+                'next_reset': ai_next_reset,
+                'unlimited': not ai_limit,
+            },
         },
     )
 
@@ -3107,6 +3139,12 @@ def superuser_overview(request):
             .order_by('-total')[:5]
         )
 
+    recent_webhooks = MpWebhookEvent.objects.order_by('-created_at')[:10]
+    recent_subscriptions = MpSubscription.objects.select_related('user')
+    if selected_user:
+        recent_subscriptions = recent_subscriptions.filter(user=selected_user)
+    recent_subscriptions = recent_subscriptions.order_by('-updated_at')[:10]
+
     context = {
         'total_users': total_users,
         'total_workspaces': total_workspaces,
@@ -3156,6 +3194,8 @@ def superuser_overview(request):
         'data_export_30': data_export_30,
         'pricing_form': pricing_form,
         'pricing_config': pricing_config,
+        'recent_webhooks': recent_webhooks,
+        'recent_subscriptions': recent_subscriptions,
     }
     return render(request, 'tracker/superuser_overview.html', context)
 
@@ -3308,6 +3348,27 @@ def user_admin_form(request, pk=None):
     if user_obj:
         profile_instance, _ = UserProfile.objects.get_or_create(user=user_obj)
     profile_form = UserProfileAdminForm(request.POST or None, instance=profile_instance)
+    ai_usage = None
+    if user_obj:
+        quota = get_ai_quota(user_obj)
+        ai_since = timezone.now() - datetime.timedelta(days=int(quota.get("window_days") or 30))
+        ai_totals = AiUsage.objects.filter(user=user_obj, created_at__gte=ai_since).aggregate(
+            tokens=Sum('total_tokens'),
+            cost=Sum('cost_brl'),
+        )
+        ai_used = ai_totals.get('tokens') or 0
+        ai_cost = ai_totals.get('cost') or 0
+        ai_limit = quota.get("limit") or 0
+        ai_remaining = quota.get("remaining")
+        ai_usage = {
+            'used': _format_int(ai_used),
+            'limit': _format_int(ai_limit) if ai_limit else None,
+            'remaining': _format_int(ai_remaining) if ai_remaining is not None else None,
+            'cost': ai_cost,
+            'window_days': quota.get("window_days") or 30,
+            'next_reset': quota.get("next_reset"),
+            'unlimited': not ai_limit,
+        }
     if request.method == 'POST' and form.is_valid() and profile_form.is_valid():
         saved_user = form.save()
         profile = profile_form.save(commit=False)
@@ -3322,7 +3383,7 @@ def user_admin_form(request, pk=None):
     return render(
         request,
         'tracker/user_admin_form.html',
-        {'form': form, 'profile_form': profile_form, 'object': user_obj},
+        {'form': form, 'profile_form': profile_form, 'object': user_obj, 'ai_usage': ai_usage},
     )
 
 
