@@ -443,17 +443,10 @@
             });
         };
 
-        const formatIsoToBr = (iso) => {
-            if (!iso) return '';
-            const parts = iso.split('-');
-            if (parts.length !== 3) return iso;
-            return `${parts[2]}/${parts[1]}/${parts[0]}`;
-        };
-
         const applyParsed = (data, options = {}) => {
             if (!data) return;
             if (titleInput && data.title && !manualTitle) titleInput.value = data.title || '';
-            if (dateInput && data.dateIso && !manualDate) dateInput.value = formatIsoToBr(data.dateIso);
+            if (dateInput && data.dateIso && !manualDate) dateInput.value = data.dateIso;
             if (data.stepsDetected) syncSteps(data.steps || []);
             if (options.clearPreview) updatePreview(null);
         };

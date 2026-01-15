@@ -239,11 +239,19 @@
             return null;
         };
 
+        const formatIsoToBr = (iso) => {
+            if (!iso) return '';
+            const parts = iso.split('-');
+            if (parts.length !== 3) return iso;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        };
+
         const parseTranscript = (transcript) => {
             if (!transcript) return null;
             const normalized = normalize(transcript);
             let desc = transcript;
-            let dateStr = '';
+            let dateIso = '';
+            let dateDisplay = '';
 
             const dateMatch = normalized.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
             if (dateMatch) {
@@ -251,7 +259,8 @@
                 const month = dateMatch[2].padStart(2, '0');
                 let year = dateMatch[3] ? dateMatch[3] : String(new Date().getFullYear());
                 if (year.length === 2) year = `20${year}`;
-                dateStr = `${day}/${month}/${year}`;
+                dateIso = `${year}-${month}-${day}`;
+                dateDisplay = `${day}/${month}/${year}`;
                 desc = desc.replace(dateMatch[0], '');
             }
 
@@ -314,7 +323,8 @@
 
             return {
                 description: finalDesc,
-                date: dateStr,
+                dateIso,
+                dateDisplay: dateDisplay || (dateIso ? formatIsoToBr(dateIso) : ''),
                 value: valueNum,
                 type: tipo,
                 category: category
@@ -329,7 +339,7 @@
             }
             preview.classList.remove('d-none');
             if (prevDesc) prevDesc.textContent = data.description || '-';
-            if (prevDate) prevDate.textContent = data.date || '-';
+            if (prevDate) prevDate.textContent = data.dateDisplay || '-';
             if (prevValue) prevValue.textContent = data.value !== null ? `R$ ${data.value.toFixed(2)}` : '-';
             if (prevType) prevType.textContent = data.type === 'income' ? 'Entrada' : data.type === 'expense' ? 'Sa\u00edda' : '-';
             if (prevCategory) prevCategory.textContent = data.category ? data.category.name : '-';
@@ -338,7 +348,7 @@
         const applyParsed = () => {
             if (!parsedTx) return;
             if (descInput && !manualDesc) descInput.value = parsedTx.description || '';
-            if (dateInput && parsedTx.date && !manualDate) dateInput.value = parsedTx.date;
+            if (dateInput && parsedTx.dateIso && !manualDate) dateInput.value = parsedTx.dateIso;
             if (valueInput && parsedTx.value !== null && !manualValue) valueInput.value = parsedTx.value.toFixed(2);
             if (typeInput && parsedTx.type && !manualType) typeInput.value = parsedTx.type;
             if (categorySelect && parsedTx.category && !manualCategory) categorySelect.value = parsedTx.category.id;
