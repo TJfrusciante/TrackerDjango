@@ -2340,16 +2340,19 @@ def chart_data(request):
         )
         .order_by('date')
     )
+    daily_map = {item['date']: float(item['net'] or 0) for item in daily}
     daily_labels = [item['date'].strftime('%d/%m/%Y') for item in daily]
     daily_values = [float(item['net'] or 0) for item in daily]
 
     running_labels = []
     running_values = []
     running_total = 0
-    for item in daily:
-        running_total += float(item['net'] or 0)
-        running_labels.append(item['date'].strftime('%d/%m/%Y'))
+    cursor = start_date
+    while cursor <= end_date:
+        running_total += daily_map.get(cursor, 0.0)
+        running_labels.append(cursor.strftime('%d/%m/%Y'))
         running_values.append(running_total)
+        cursor += datetime.timedelta(days=1)
 
     return JsonResponse({
         'labels': labels,

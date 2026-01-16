@@ -248,6 +248,35 @@ def _wants_task_details(message: str) -> bool:
     return 'tarefa' in msg or 'tarefas' in msg
 
 
+def _task_list_summary(workspace, request, status: str | None = None, limit_tasks: int = 6, limit_steps: int = 6) -> str:
+    tasks_qs = _tasks_queryset(request, workspace).order_by('-due_date', '-created_at')
+    status_label = None
+    if status:
+        tasks_qs = tasks_qs.filter(status=status)
+        status_label = 'em andamento' if status == 'ongoing' else 'concluídas'
+    total = tasks_qs.count()
+    if total == 0:
+        if status_label:
+            return f"Nenhuma tarefa {status_label} no momento."
+        return "Nenhuma tarefa encontrada no momento."
+
+    header = f"Tarefas {status_label} ({total}):" if status_label else f"Tarefas ({total}):"
+    lines = [header]
+    for idx, task in enumerate(tasks_qs[:limit_tasks], start=1):
+        due_label = task.due_date.strftime('%d/%m/%Y') if task.due_date else '-'
+        lines.append(f"{idx}. {task.title} (prazo {due_label})")
+        steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
+        if steps.exists():
+            lines.append("   - Etapas:")
+            for step in steps[:limit_steps]:
+                lines.append(f"     - {step.title} ({step.get_status_display()})")
+        else:
+            lines.append("   - Etapas: nenhuma cadastrada")
+    if total > limit_tasks:
+        lines.append(f"Mostrando {limit_tasks} de {total} tarefas.")
+    return "\n".join(lines)
+
+
 def _help_response(message: str) -> str | None:
     normalized = _normalize_text(message or '')
     if not normalized:
@@ -354,6 +383,16 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
     msg_norm = _normalize_text(message or '')
     period_range = _parse_month_range(message)
     year_range = _parse_year_range(message) if not period_range else None
+
+    wants_tasks = 'tarefa' in msg_norm or 'tarefas' in msg_norm
+    wants_steps = 'etapa' in msg_norm or 'etapas' in msg_norm
+    wants_ongoing = any(key in msg_norm for key in ['em andamento', 'andamento', 'pendente', 'pendentes', 'aberta', 'abertas'])
+    wants_done = any(key in msg_norm for key in ['concluida', 'concluidas', 'finalizada', 'finalizadas'])
+
+    if wants_tasks and (wants_ongoing or wants_steps):
+        return _task_list_summary(workspace, request, status='ongoing'), None, None
+    if wants_tasks and wants_done:
+        return _task_list_summary(workspace, request, status='done'), None, None
 
     if any(key in msg_norm for key in ['maior gasto', 'maior despesa', 'maior saida']):
         finance_qs = _finance_queryset(request, workspace)
