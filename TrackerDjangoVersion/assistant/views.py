@@ -1,5 +1,6 @@
 import calendar
 import datetime
+import calendar
 import logging
 import os
 import re
@@ -12,7 +13,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_exempt
 
-from tracker.models import Category, Transaction, Task, TaskStep
+from tracker.models import Category, Transaction, Task, TaskStep, WorkspaceMembership
 from tracker.metrics import record_metric
 from .models import ChatMessage, AiUsage
 from .limits import get_ai_quota
@@ -41,6 +42,27 @@ def _normalize_text(value: str) -> str:
         ch for ch in unicodedata.normalize('NFD', value.lower())
         if unicodedata.category(ch) != 'Mn'
     )
+
+
+def _finance_queryset(request, workspace):
+    qs = Transaction.objects.select_related('category')
+    if workspace:
+        if request.user.is_superuser or workspace.owner_id == request.user.id:
+            return qs.filter(workspace=workspace)
+        return qs.none()
+    if request.user.is_superuser:
+        return qs
+    return qs.none()
+
+
+def _tasks_queryset(request, workspace):
+    qs = Task.objects.all()
+    if workspace:
+        return qs.filter(workspace=workspace)
+    if request.user.is_superuser:
+        return qs
+    workspace_ids = WorkspaceMembership.objects.filter(user=request.user).values_list('workspace_id', flat=True)
+    return qs.filter(workspace_id__in=workspace_ids)
 
 
 def _parse_month_range(message: str):
@@ -96,6 +118,19 @@ def _parse_month_range(message: str):
     end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
     label = f'{month:02d}/{year}'
     return start_date, end_date, label
+
+
+def _parse_year_range(message: str):
+    if not message:
+        return None
+    normalized = _normalize_text(message)
+    match = re.search(r'\b(20\d{2})\b', normalized)
+    if not match:
+        return None
+    year = int(match.group(1))
+    start_date = datetime.date(year, 1, 1)
+    end_date = datetime.date(year, 12, 31)
+    return start_date, end_date, str(year)
 
 
 def _summarize_period(workspace, request, start_date, end_date, label: str, include_tasks: bool, include_finance: bool) -> str:
@@ -318,6 +353,7 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
     """
     msg_norm = _normalize_text(message or '')
     period_range = _parse_month_range(message)
+    year_range = _parse_year_range(message) if not period_range else None
 
     if any(key in msg_norm for key in ['maior gasto', 'maior despesa', 'maior saida']):
         finance_qs = _finance_queryset(request, workspace)
@@ -345,8 +381,11 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
         period_label = f" no per\u00edodo {label}" if period_range else ""
         return f"Sua maior receita{period_label} foi em {name}: R$ {total:.2f}.", None, None
 
-    if period_range:
-        start_date, end_date, label = period_range
+    if period_range or year_range:
+        if period_range:
+            start_date, end_date, label = period_range
+        else:
+            start_date, end_date, label = year_range
         wants_tasks = 'tarefa' in msg_norm
         wants_finance = any(
             key in msg_norm for key in ['transa', 'financ', 'saldo', 'entrada', 'saida', 'despesa', 'receita']
@@ -459,13 +498,21 @@ def chat(request):
             )
         if content:
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
-            reply, usage, model_name = _assistant_reply(
-                content,
-                workspace,
-                request,
-                local_only=local_only,
-                fallback_reason=fallback_reason,
-            )
+            try:
+                reply, usage, model_name = _assistant_reply(
+                    content,
+                    workspace,
+                    request,
+                    local_only=local_only,
+                    fallback_reason=fallback_reason,
+                )
+            except Exception:
+                logger.exception("Erro ao gerar resposta do assistente")
+                reply, usage, model_name = (
+                    "Tive um problema ao gerar a resposta agora. Tente novamente em instantes.",
+                    None,
+                    None,
+                )
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
             _record_usage(request.user, workspace, 'chat', usage, model_name)
             record_metric('ai_request', user=request.user, workspace=workspace, metadata={'local_only': local_only})
@@ -503,13 +550,21 @@ def chat_embed(request):
             )
         if content:
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
-            reply, usage, model_name = _assistant_reply(
-                content,
-                workspace,
-                request,
-                local_only=local_only,
-                fallback_reason=fallback_reason,
-            )
+            try:
+                reply, usage, model_name = _assistant_reply(
+                    content,
+                    workspace,
+                    request,
+                    local_only=local_only,
+                    fallback_reason=fallback_reason,
+                )
+            except Exception:
+                logger.exception("Erro ao gerar resposta do assistente (embed)")
+                reply, usage, model_name = (
+                    "Tive um problema ao gerar a resposta agora. Tente novamente em instantes.",
+                    None,
+                    None,
+                )
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
             _record_usage(request.user, workspace, 'chat', usage, model_name)
             record_metric('ai_request', user=request.user, workspace=workspace, metadata={'local_only': local_only})
