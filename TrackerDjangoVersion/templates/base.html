@@ -94,6 +94,16 @@
                     </ul>
                     <div class="d-flex align-items-center gap-2">
                         {% if user.is_authenticated %}
+                            <div class="d-none d-lg-flex gap-2">
+                                {% if not user_is_guest %}
+                                <a class="btn btn-outline-light icon-pill" href="{% url 'tracker:transaction_create' %}" data-bs-toggle="tooltip" data-bs-title="Nova transação" aria-label="Nova transação">
+                                    <i class="fa-solid fa-plus"></i>
+                                </a>
+                                {% endif %}
+                                <a class="btn btn-outline-light icon-pill" href="{% url 'tracker:task_create' %}" data-bs-toggle="tooltip" data-bs-title="Nova tarefa" aria-label="Nova tarefa">
+                                    <i class="fa-solid fa-list-check"></i>
+                                </a>
+                            </div>
                             <div class="dropdown">
                                 <button class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
                                     {% if current_workspace %}
@@ -173,6 +183,34 @@
             {% block content %}{% endblock %}
         </div>
     </main>
+    {% if undo_tx or undo_task %}
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        {% if undo_tx %}
+        <div class="toast undo-toast text-bg-dark border-0 mb-2" role="alert" aria-live="polite" aria-atomic="true">
+            <div class="d-flex align-items-center gap-2">
+                <div class="toast-body">Transa&ccedil;&atilde;o exclu&iacute;da.</div>
+                <form method="post" action="{% url 'tracker:transaction_undo_delete' %}" class="d-inline-flex">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-light" type="submit">Desfazer</button>
+                </form>
+                <button type="button" class="btn-close btn-close-white ms-auto me-2" data-bs-dismiss="toast" aria-label="Fechar"></button>
+            </div>
+        </div>
+        {% endif %}
+        {% if undo_task %}
+        <div class="toast undo-toast text-bg-dark border-0" role="alert" aria-live="polite" aria-atomic="true">
+            <div class="d-flex align-items-center gap-2">
+                <div class="toast-body">Tarefa exclu&iacute;da.</div>
+                <form method="post" action="{% url 'tracker:task_undo_delete' %}" class="d-inline-flex">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-light" type="submit">Desfazer</button>
+                </form>
+                <button type="button" class="btn-close btn-close-white ms-auto me-2" data-bs-dismiss="toast" aria-label="Fechar"></button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <button id="scrollTopBtn" class="nav-fab nav-top" type="button" aria-label="Ir para o topo">
         <i class="fa-solid fa-arrow-up"></i>
@@ -216,6 +254,10 @@
     <script>
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
             new bootstrap.Tooltip(el);
+        });
+        document.querySelectorAll('.undo-toast').forEach(el => {
+            const toast = new bootstrap.Toast(el, { delay: 6000 });
+            toast.show();
         });
     </script>
     {% block extra_js %}{% endblock %}

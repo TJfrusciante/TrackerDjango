@@ -146,5 +146,10 @@ Mapa rapido (onde mexer)
 - Ditado: preview de tarefas agora mostra categoria detectada; tooltips com exemplos nos botoes de voz (transacoes/tarefas).
 - Ditado: aplicar nao trava data com valor inicial (manualDate agora so ativa apos edicao do usuario).
 - Formularios: inputs date ocultos configurados no backend (forms) para evitar erro de template com as_widget(attrs).
+- IA: agente reconhece consultas por mes/ano e gera resumo financeiro/tarefas do periodo (assistant/views.py).
 
 
+- Onboarding: labels corrigidos ("Criar primeira categoria", "Lançar primeira transação" com unicode escapes), e convite marcado como opcional para não bloquear checklist.
+- Categorias: edição agora recebe paleta de cores (30 swatches) igual à lista; template `TrackerDjangoVersion/templates/tracker/category_form.html` usa palette + JS para selecionar cor.
+- Categorias: mensagem de permissão no delete normalizada (unicode escapes) para evitar mojibake.
+- Assistente: `assistant/views.py` com tabs convertidos para espaços para evitar `IndentationError`.

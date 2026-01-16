@@ -182,6 +182,19 @@ def _apply_workspace_filter(queryset, workspace, user):
     return queryset
 
 
+def _build_filter_chips(request, items):
+    chips = []
+    for key, label, value in items:
+        if value in (None, '', []):
+            continue
+        query = request.GET.copy()
+        query.pop(key, None)
+        query.pop('page', None)
+        url = f"?{query.urlencode()}" if query else ""
+        chips.append({'label': f"{label}: {value}", 'url': url})
+    return chips
+
+
 def _ensure_unique_slug(base: str) -> str:
     slug = slugify(base) or "workspace"
     base_slug = slug
@@ -707,6 +720,36 @@ def dashboard(request):
     tasks_progress_pct = round((tasks_done / tasks_total) * 100, 1) if tasks_total else 100
     categories_qs = _apply_workspace_filter(Category.objects.all(), workspace, request.user)
     category_count = categories_qs.count()
+    total_transactions = 0
+    if can_finance:
+        total_transactions = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user).count()
+
+    onboarding_items = []
+    if can_finance:
+        onboarding_items.append({
+            'label': 'Criar primeira categoria',
+            'done': category_count > 0,
+            'url': reverse('tracker:categories_list'),
+        })
+        onboarding_items.append({
+            'label': 'Lan\u00e7ar primeira transa\u00e7\u00e3o',
+            'done': total_transactions > 0,
+            'url': reverse('tracker:transaction_create'),
+        })
+    onboarding_items.append({
+        'label': 'Criar primeira tarefa',
+        'done': tasks_total > 0,
+        'url': reverse('tracker:task_create'),
+    })
+    if workspace and (request.user.is_superuser or workspace.owner_id == request.user.id):
+        has_members = WorkspaceMembership.objects.filter(workspace=workspace).exclude(role='owner').exists()
+        onboarding_items.append({
+            'label': 'Convidar membro para seu workspace (opcional)',
+            'done': has_members,
+            'url': reverse('tracker:workspace_invite', args=[workspace.slug]),
+            'optional': True,
+        })
+    show_onboarding = any(not item['done'] and not item.get('optional') for item in onboarding_items)
     latest_tasks = list(tasks_qs.order_by('-created_at')[:5])
     for task in latest_tasks:
         completed_late = False
@@ -748,6 +791,10 @@ def dashboard(request):
             'expires_at': trial_expires_at,
             'remaining': trial_remaining,
         },
+        'onboarding': {
+            'show': show_onboarding,
+            'items': onboarding_items,
+        },
     }
     return render(request, 'tracker/dashboard.html', context)
 
@@ -758,7 +805,7 @@ def dashboard(request):
 def transactions_list(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não pode ver finanças deste workspace.')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
         return redirect('tracker:dashboard')
 
     transactions_qs = _apply_workspace_filter(Transaction.objects.select_related('category'), workspace, request.user)
@@ -798,6 +845,22 @@ def transactions_list(request):
         except Exception:
             return val or ''
 
+    category_label = ''
+    if category_id:
+        category_obj = Category.objects.filter(id=category_id).first()
+        category_label = category_obj.name if category_obj else str(category_id)
+    type_label = {'income': 'Entrada', 'expense': 'Sa\u00edda'}.get(tx_type, '')
+    filter_chips = _build_filter_chips(
+        request,
+        [
+            ('q', 'Busca', search),
+            ('type', 'Tipo', type_label),
+            ('category', 'Categoria', category_label),
+            ('start', 'De', fmt(start)),
+            ('end', 'At\u00e9', fmt(end)),
+        ],
+    )
+
     context = {
         'transactions_page': page_obj,
         'transactions_total': paginator.count,
@@ -818,7 +881,8 @@ def transactions_list(request):
         'filters_display': {
             'start': fmt(start),
             'end': fmt(end),
-        }
+        },
+        'filter_chips': filter_chips,
     }
     return render(request, 'tracker/transactions_list.html', context)
 
@@ -869,7 +933,7 @@ def transactions_bulk_update(request):
 def transaction_create(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não pode lançar finanças neste workspace.')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
         return redirect('tracker:dashboard')
     form = TransactionForm(request.POST or None, initial={'date': timezone.now().date()})
     if workspace:
@@ -894,7 +958,7 @@ def transaction_create(request):
 def transaction_update(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não pode editar finanças neste workspace.')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
         return redirect('tracker:dashboard')
     qs = Transaction.objects.all()
     if workspace:
@@ -917,10 +981,12 @@ def transaction_update(request, pk):
 
 
 @login_required
+
+@login_required
 def transaction_delete(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não pode remover finanças deste workspace.')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
         return redirect('tracker:dashboard')
     qs = Transaction.objects.all()
     if workspace:
@@ -929,16 +995,78 @@ def transaction_delete(request, pk):
         qs = qs.none()
     transaction = get_object_or_404(qs, pk=pk)
     if request.method == 'POST':
+        request.session['undo_tx'] = {
+            'description': transaction.description,
+            'date': transaction.date.isoformat(),
+            'value': str(transaction.value),
+            'type': transaction.type,
+            'category_id': transaction.category_id,
+            'workspace_id': transaction.workspace_id,
+            'selected': transaction.selected,
+        }
+        request.session['undo_tx_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         transaction.delete()
-        messages.success(request, 'Transação removida.')
+        messages.success(request, 'Transa\u00e7\u00e3o removida. Voc\u00ea pode desfazer a a\u00e7\u00e3o.')
     return redirect('tracker:transactions_list')
 
 
 @login_required
+def transaction_undo_delete(request):
+    if request.method != 'POST':
+        return redirect('tracker:transactions_list')
+    payload = request.session.get('undo_tx')
+    expires = request.session.get('undo_tx_expires')
+    if not payload:
+        messages.error(request, 'Nada para desfazer.')
+        return redirect('tracker:transactions_list')
+    if expires:
+        try:
+            expires_at = datetime.datetime.fromisoformat(expires)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                request.session.pop('undo_tx', None)
+                request.session.pop('undo_tx_expires', None)
+                messages.error(request, 'O tempo para desfazer expirou.')
+                return redirect('tracker:transactions_list')
+        except Exception:
+            pass
+    category = Category.objects.filter(id=payload.get('category_id')).first()
+    if not category:
+        messages.error(request, 'Categoria da transa\u00e7\u00e3o n\u00e3o est\u00e1 mais dispon\u00edvel.')
+        return redirect('tracker:transactions_list')
+    date_val = payload.get('date')
+    value_val = payload.get('value')
+    if date_val:
+        try:
+            date_val = datetime.date.fromisoformat(date_val)
+        except Exception:
+            pass
+    if value_val is not None:
+        try:
+            value_val = Decimal(str(value_val))
+        except Exception:
+            value_val = 0
+    tx = Transaction(
+        description=payload.get('description', ''),
+        date=date_val,
+        value=value_val,
+        type=payload.get('type', 'expense'),
+        category=category,
+        workspace_id=payload.get('workspace_id'),
+        selected=bool(payload.get('selected')),
+    )
+    tx.save()
+    request.session.pop('undo_tx', None)
+    request.session.pop('undo_tx_expires', None)
+    messages.success(request, 'Transa\u00e7\u00e3o restaurada.')
+    return redirect('tracker:transactions_list')
+
+
 def transaction_toggle_selected(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não pode editar finanças deste workspace.')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
         return redirect('tracker:dashboard')
 
     qs = Transaction.objects.all()
@@ -957,7 +1085,7 @@ def transaction_toggle_selected(request, pk):
 def transaction_toggle_type(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não pode editar finanças deste workspace.')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
         return redirect('tracker:dashboard')
 
     qs = Transaction.objects.all()
@@ -980,23 +1108,30 @@ def _parse_statement_rows(text: str, categories_qs):
     except Exception:
         delimiter = ','
 
-    lines = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+    try:
+        lines = list(csv.reader(io.StringIO(text, newline=''), delimiter=delimiter))
+    except csv.Error:
+        lines = [
+            row
+            for row in (line.split(delimiter) for line in text.splitlines())
+            if any(cell.strip() for cell in row)
+        ]
     if not lines:
         return []
 
     header = [c.strip().lower() for c in lines[0]]
-    has_keywords = any(k in header for k in ('description', 'descrição', 'valor', 'value', 'data', 'date'))
+    has_keywords = any(k in header for k in ('description', 'descrição', 'descrição', 'valor', 'value', 'data', 'date'))
 
     # Se tiver header, usa DictReader normalmente
     if has_keywords:
         key_map = {
-            'descricao': 'description', 'descrição': 'description', 'description': 'description',
+            'descrição': 'description', 'descrição': 'description', 'description': 'description',
             'data': 'date', 'date': 'date',
             'valor': 'value', 'value': 'value',
             'tipo': 'type', 'type': 'type',
             'categoria': 'category', 'category': 'category',
         }
-        reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+        reader = csv.DictReader(io.StringIO(text, newline=''), delimiter=delimiter)
         mapped_rows = []
         for row in reader:
             mapped = {}
@@ -1304,7 +1439,7 @@ def _suggest_category_for_desc(desc: str, cat_hint: str, categories, user=None, 
 def transaction_import(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não pode importar finanças neste workspace.')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
         return redirect('tracker:dashboard')
 
     categories = list(Category.objects.filter(workspace=workspace) if workspace else Category.objects.all())
@@ -1450,6 +1585,18 @@ def tasks_list(request):
         except Exception:
             return val or ''
 
+    status_label = {'ongoing': 'Em andamento', 'done': 'Finalizada'}.get(status, '')
+    filter_chips = _build_filter_chips(
+        request,
+        [
+            ('q', 'Busca', search),
+            ('status', 'Status', status_label),
+            ('category', 'Categoria', category),
+            ('start', 'De', fmt(start)),
+            ('end', 'Até', fmt(end)),
+        ],
+    )
+
     context = {
         'tasks_page': page_obj,
         'tasks_total': paginator.count,
@@ -1470,7 +1617,8 @@ def tasks_list(request):
         'filters_display': {
             'start': fmt(start),
             'end': fmt(end),
-        }
+        },
+        'filter_chips': filter_chips,
     }
     return render(request, 'tracker/tasks_list.html', context)
 
@@ -1787,26 +1935,121 @@ def _update_task_progress(task: Task):
 
 
 @login_required
+
+@login_required
 def task_delete(request, pk):
     workspace = getattr(request, "workspace", None)
-    qs = Task.objects.all()
+    qs = Task.objects.prefetch_related('steps')
     if workspace:
         qs = qs.filter(workspace=workspace)
     elif not request.user.is_superuser:
         qs = qs.none()
     task = get_object_or_404(qs, pk=pk)
-    if workspace and not request.user.is_superuser:
-        membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
-        if membership and not membership.can_edit_tasks:
-            messages.error(request, 'Você não pode excluir tarefas neste workspace.')
-            return redirect('tracker:tasks_list')
     if request.method == 'POST':
+        steps_payload = []
+        for step in task.steps.all():
+            steps_payload.append({
+                'title': step.title,
+                'order': step.order,
+                'responsible': step.responsible,
+                'responsible_email': step.responsible_email,
+                'status': step.status,
+                'completed_at': step.completed_at.isoformat() if step.completed_at else '',
+            })
+        request.session['undo_task'] = {
+            'title': task.title,
+            'category': task.category,
+            'due_date': task.due_date.isoformat(),
+            'status': task.status,
+            'selected': task.selected,
+            'responsible': task.responsible,
+            'responsible_email': task.responsible_email,
+            'progress': str(task.progress),
+            'completed_at': task.completed_at.isoformat() if task.completed_at else '',
+            'workspace_id': task.workspace_id,
+            'steps': steps_payload,
+        }
+        request.session['undo_task_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         task.delete()
-        messages.success(request, 'Tarefa removida.')
+        messages.success(request, 'Tarefa removida. Você pode desfazer a ação.')
     return redirect('tracker:tasks_list')
 
 
 @login_required
+def task_undo_delete(request):
+    if request.method != 'POST':
+        return redirect('tracker:tasks_list')
+    payload = request.session.get('undo_task')
+    expires = request.session.get('undo_task_expires')
+    if not payload:
+        messages.error(request, 'Nada para desfazer.')
+        return redirect('tracker:tasks_list')
+    if expires:
+        try:
+            expires_at = datetime.datetime.fromisoformat(expires)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                request.session.pop('undo_task', None)
+                request.session.pop('undo_task_expires', None)
+                messages.error(request, 'O tempo para desfazer expirou.')
+                return redirect('tracker:tasks_list')
+        except Exception:
+            pass
+    due_date_val = payload.get('due_date')
+    completed_at_val = payload.get('completed_at') or None
+    if due_date_val:
+        try:
+            due_date_val = datetime.date.fromisoformat(due_date_val)
+        except Exception:
+            pass
+    if completed_at_val:
+        try:
+            completed_at_val = datetime.datetime.fromisoformat(completed_at_val)
+            if timezone.is_naive(completed_at_val):
+                completed_at_val = timezone.make_aware(completed_at_val)
+        except Exception:
+            completed_at_val = None
+
+    task = Task(
+        title=payload.get('title', ''),
+        category=payload.get('category', ''),
+        due_date=due_date_val,
+        status=payload.get('status', 'ongoing'),
+        selected=bool(payload.get('selected')),
+        responsible=payload.get('responsible', ''),
+        responsible_email=payload.get('responsible_email', ''),
+        progress=payload.get('progress') or 0,
+        completed_at=completed_at_val,
+        workspace_id=payload.get('workspace_id'),
+    )
+    task.save()
+    steps_payload = payload.get('steps') or []
+    for step in steps_payload:
+        step_completed = step.get('completed_at') or None
+        if step_completed:
+            try:
+                step_completed = datetime.datetime.fromisoformat(step_completed)
+                if timezone.is_naive(step_completed):
+                    step_completed = timezone.make_aware(step_completed)
+            except Exception:
+                step_completed = None
+        TaskStep.objects.create(
+            task=task,
+            title=step.get('title', ''),
+            order=step.get('order') or 0,
+            responsible=step.get('responsible', ''),
+            responsible_email=step.get('responsible_email', ''),
+            status=step.get('status', 'ongoing'),
+            completed_at=step_completed,
+        )
+    _update_task_progress(task)
+    request.session.pop('undo_task', None)
+    request.session.pop('undo_task_expires', None)
+    messages.success(request, 'Tarefa restaurada.')
+    return redirect('tracker:tasks_list')
+
+
 def task_toggle_status(request, pk):
     workspace = getattr(request, "workspace", None)
     qs = Task.objects.prefetch_related('steps')
@@ -1876,7 +2119,7 @@ def task_toggle_selected(request, pk):
 def categories_list(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não tem permissão para ver categorias.')
+        messages.error(request, 'Voc\u00ea n\u00e3o tem permiss\u00e3o para ver categorias.')
         return redirect('tracker:dashboard')
     qs = Category.objects.all()
     if workspace:
@@ -1923,14 +2166,25 @@ def category_edit(request, pk):
         form.save()
         messages.success(request, 'Categoria atualizada.')
         return redirect('tracker:categories_list')
-    return render(request, 'tracker/category_form.html', {'form': form, 'category': category})
+    color_palette = [
+        '#0f172a', '#1e3a8a', '#2563eb', '#0ea5e9', '#14b8a6', '#10b981',
+        '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#f97316', '#ef4444',
+        '#dc2626', '#be123c', '#db2777', '#c026d3', '#9333ea', '#6366f1',
+        '#64748b', '#475569', '#334155', '#1f2937', '#111827', '#7c3aed',
+        '#8b5cf6', '#a855f7', '#f472b6', '#fb7185', '#f43f5e', '#06b6d4',
+    ]
+    return render(
+        request,
+        'tracker/category_form.html',
+        {'form': form, 'category': category, 'color_palette': color_palette},
+    )
 
 
 @login_required
 def category_delete(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Você não tem permissão para ver categorias.')
+        messages.error(request, 'Voc\u00ea n\u00e3o tem permiss\u00e3o para ver categorias.')
         return redirect('tracker:dashboard')
     qs = Category.objects.all()
     if workspace:
@@ -2124,7 +2378,7 @@ def _export_transactions_csv(queryset):
     response['Content-Disposition'] = 'attachment; filename="transacoes.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)
-    writer.writerow(['descricao', 'categoria', 'data', 'tipo', 'valor'])
+    writer.writerow(['descrição', 'categoria', 'data', 'tipo', 'valor'])
     for tx in queryset:
         writer.writerow([
             tx.description,
@@ -3392,6 +3646,68 @@ def superuser_overview(request):
     subscription_renewed_30 = metric_counts.get('subscription_renewed', 0)
     data_export_30 = metric_counts.get('data_export', 0)
 
+    now = timezone.now()
+    today = timezone.localdate()
+    profile_qs = UserProfile.objects.select_related('user')
+    if selected_user:
+        profile_qs = profile_qs.filter(user=selected_user)
+    else:
+        profile_qs = profile_qs.exclude(user__is_superuser=True)
+    profile_qs = profile_qs.filter(is_guest=False)
+
+    funnel_signups = profile_qs.count()
+    funnel_trials = profile_qs.filter(trial_expires_at__gte=now, payment_confirmed=False).count()
+    funnel_active = profile_qs.filter(payment_confirmed=True, subscription_expires__gte=today).count()
+
+    subs_qs = MpSubscription.objects.all()
+    if selected_user:
+        subs_qs = subs_qs.filter(user=selected_user)
+    active_subs = subs_qs.filter(status__in=['active', 'authorized'])
+    cancelled_30 = subs_qs.filter(status='cancelled', updated_at__date__gte=last30).count()
+    pending_subs = subs_qs.filter(status__in=['pending', 'rejected']).count()
+    conversion_rate = (funnel_active / funnel_signups * 100) if funnel_signups else 0
+
+    def _subscription_amount(sub):
+        auto = sub.auto_recurring or {}
+        amount = auto.get('transaction_amount')
+        if amount:
+            try:
+                return Decimal(str(amount))
+            except Exception:
+                pass
+        if sub.plan_cycle == 'annual':
+            return Decimal(str(pricing_config.regular_annual_price)) * Decimal('12')
+        return Decimal(str(pricing_config.regular_monthly_price))
+
+    mrr = Decimal('0')
+    for sub in active_subs:
+        amount = _subscription_amount(sub)
+        if sub.plan_cycle == 'annual':
+            mrr += (amount / Decimal('12'))
+        else:
+            mrr += amount
+    arr = mrr * Decimal('12')
+
+    revenue_30 = Decimal('0')
+    recent_payments = metric_last30.filter(event_type='payment_confirmed')
+    for event in recent_payments.select_related('user'):
+        sub = MpSubscription.objects.filter(user=event.user).first()
+        if sub:
+            revenue_30 += _subscription_amount(sub)
+    churn_rate = (cancelled_30 / funnel_active * 100) if funnel_active else 0
+
+    dau = metric_qs.filter(event_type='login_success', created_at__date=today).values('user').distinct().count()
+    wau = metric_qs.filter(event_type='login_success', created_at__gte=now - datetime.timedelta(days=7)).values('user').distinct().count()
+    mau = metric_qs.filter(event_type='login_success', created_at__gte=now - datetime.timedelta(days=30)).values('user').distinct().count()
+
+    webhook_errors_30 = MpWebhookEvent.objects.filter(status='error', created_at__date__gte=last30).count()
+
+    ai_top_users = (
+        ai_qs.values('user__username')
+        .annotate(tokens=Sum('total_tokens'), cost=Sum('cost_brl'))
+        .order_by('-tokens')[:5]
+    )
+
     # Global finance stats
     income_total = tx_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
     expense_total = tx_qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
@@ -3492,6 +3808,21 @@ def superuser_overview(request):
         'pricing_config': pricing_config,
         'recent_webhooks': recent_webhooks,
         'recent_subscriptions': recent_subscriptions,
+        'funnel_signups': funnel_signups,
+        'funnel_trials': funnel_trials,
+        'funnel_active': funnel_active,
+        'funnel_cancelled_30': cancelled_30,
+        'conversion_rate': conversion_rate,
+        'mrr': mrr,
+        'arr': arr,
+        'revenue_30': revenue_30,
+        'churn_rate': churn_rate,
+        'dau': dau,
+        'wau': wau,
+        'mau': mau,
+        'pending_subs': pending_subs,
+        'webhook_errors_30': webhook_errors_30,
+        'ai_top_users': ai_top_users,
     }
     return render(request, 'tracker/superuser_overview.html', context)
 
@@ -3879,6 +4210,8 @@ def user_admin_delete(request, pk):
     else:
         messages.error(request, 'Requisição inválida.')
     return redirect('tracker:user_admin_list')
+
+
 
 
 

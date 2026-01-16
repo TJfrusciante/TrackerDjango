@@ -1,6 +1,9 @@
-﻿import datetime
+import calendar
+import datetime
 import logging
 import os
+import re
+import unicodedata
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,25 +20,129 @@ from .services import llm_complete, estimate_costs
 
 logger = logging.getLogger(__name__)
 
+MONTHS_PT = {
+    'janeiro': 1,
+    'fevereiro': 2,
+    'marco': 3,
+    'abril': 4,
+    'maio': 5,
+    'junho': 6,
+    'julho': 7,
+    'agosto': 8,
+    'setembro': 9,
+    'outubro': 10,
+    'novembro': 11,
+    'dezembro': 12,
+}
 
-def _finance_queryset(request, workspace):
-    qs = Transaction.objects.all()
-    if workspace:
-        qs = qs.filter(workspace=workspace)
-    elif not request.user.is_superuser:
-        return Transaction.objects.none()
-    return qs
+
+def _normalize_text(value: str) -> str:
+    return ''.join(
+        ch for ch in unicodedata.normalize('NFD', value.lower())
+        if unicodedata.category(ch) != 'Mn'
+    )
 
 
-def _tasks_queryset(request, workspace):
-    qs = Task.objects.all()
-    if workspace:
-        if request.user.is_superuser:
-            return qs
-        return qs.filter(workspace=workspace)
-    if request.user.is_superuser:
-        return qs
-    return Task.objects.none()
+def _parse_month_range(message: str):
+    if not message:
+        return None
+    normalized = _normalize_text(message)
+    today = timezone.localdate()
+
+    month = None
+    year = None
+
+    if 'mes passado' in normalized or 'ultimo mes' in normalized:
+        month = today.month - 1
+        year = today.year
+        if month <= 0:
+            month = 12
+            year -= 1
+    if 'este mes' in normalized or 'mes atual' in normalized:
+        month = today.month
+        year = today.year
+
+    if month is None:
+        name_match = re.search(
+            r'\b(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b(?:\s*de)?\s*(\d{4})?',
+            normalized,
+        )
+        if name_match:
+            month = MONTHS_PT.get(name_match.group(1))
+            if name_match.group(2):
+                year = int(name_match.group(2))
+
+    if month is None:
+        num_match = re.search(r'\b(0?[1-9]|1[0-2])[\/-](\d{4})\b', normalized)
+        if num_match:
+            month = int(num_match.group(1))
+            year = int(num_match.group(2))
+
+    if month is None:
+        inv_match = re.search(r'\b(\d{4})[\/-](0?[1-9]|1[0-2])\b', normalized)
+        if inv_match:
+            year = int(inv_match.group(1))
+            month = int(inv_match.group(2))
+
+    if month is None:
+        return None
+
+    if year is None:
+        year = today.year
+        if month > today.month:
+            year -= 1
+
+    start_date = datetime.date(year, month, 1)
+    end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
+    label = f'{month:02d}/{year}'
+    return start_date, end_date, label
+
+
+def _summarize_period(workspace, request, start_date, end_date, label: str, include_tasks: bool, include_finance: bool) -> str:
+    lines = [f"Resumo de {label} ({start_date:%d/%m/%Y} a {end_date:%d/%m/%Y})"]
+
+    if include_finance:
+        finance_qs = _finance_queryset(request, workspace).filter(date__gte=start_date, date__lte=end_date)
+        income = finance_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
+        expense = finance_qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
+        balance = income - expense
+        tx_count = finance_qs.count()
+        lines.append('')
+        lines.append('Financeiro:')
+        lines.append(f'- Transa\u00e7\u00f5es: {tx_count}')
+        lines.append(f'- Entradas: R$ {income:.2f}')
+        lines.append(f'- Sa\u00eddas: R$ {expense:.2f}')
+        lines.append(f'- Saldo: R$ {balance:.2f}')
+
+        per_category = finance_qs.values('category__name').annotate(
+            total=Sum(
+                Case(
+                    When(type='income', then=F('value')),
+                    When(type='expense', then=F('value') * -1),
+                    default=0,
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            )
+        ).order_by('-total')
+        if per_category:
+            top = per_category[:3]
+            lines.append(
+                '- Top categorias (saldo l\u00edquido): '
+                + ', '.join([f"{c['category__name']} ({c['total']:+.2f})" for c in top])
+            )
+
+    if include_tasks:
+        tasks_qs = _tasks_queryset(request, workspace)
+        tasks_due = tasks_qs.filter(due_date__gte=start_date, due_date__lte=end_date)
+        tasks_done = tasks_qs.filter(status='done', completed_at__date__gte=start_date, completed_at__date__lte=end_date)
+        tasks_created = tasks_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        lines.append('')
+        lines.append('Tarefas:')
+        lines.append(f'- Criadas no per\u00edodo: {tasks_created.count()}')
+        lines.append(f'- Conclu\u00eddas no per\u00edodo: {tasks_done.count()}')
+        lines.append(f'- Com prazo no per\u00edodo: {tasks_due.count()}')
+
+    return "\n".join(lines)
 
 
 def _summarize(workspace, request):
@@ -80,10 +187,23 @@ def _summarize(workspace, request):
     if per_category:
         top = per_category[:3]
         summary_lines.append(
-            "Top categorias (net): "
+            "Top categorias (saldo l\u00edquido): "
             + ", ".join([f"{c['category__name']} ({c['total']:+.2f})" for c in top])
         )
     return "\n".join(summary_lines)
+
+
+def _top_category(finance_qs, tx_type: str):
+    top = (
+        finance_qs.filter(type=tx_type)
+        .values('category__name')
+        .annotate(total=Sum('value'))
+        .order_by('-total')
+        .first()
+    )
+    if not top or not top.get('category__name'):
+        return None
+    return top['category__name'], top['total'] or 0
 
 
 def _wants_task_details(message: str) -> bool:
@@ -94,76 +214,65 @@ def _wants_task_details(message: str) -> bool:
 
 
 def _help_response(message: str) -> str | None:
-    msg = (message or '').lower()
-    if not msg:
+    normalized = _normalize_text(message or '')
+    if not normalized:
         return None
 
-    def has_any(values: list[str]) -> bool:
-        return any(v in msg for v in values)
+    def has_any(keys):
+        return any(k in normalized for k in keys)
 
-    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'faço', 'fazer', 'adicionar', 'lançar', 'lancar'])
-    if not wants_howto:
-        return None
+    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'faco', 'fazer', 'adicionar', 'lancar', 'lan?ar'])
 
-    if has_any(['transa', 'lanç', 'lanc', 'entrada', 'saída', 'saida', 'despesa', 'receita']):
+    if has_any(['transa', 'entrada', 'saida', 'despesa', 'receita']):
         return (
-            "Para lançar transações: vá em Transações > Nova. Informe descrição, data, valor, categoria e tipo "
-            "(entrada/saída) e salve. Você também pode usar o botão Falar para preencher por voz. "
-            "Para importar em lote, use Transações > Importar CSV."
-        )
+            "Para lan\u00e7ar transa\u00e7\u00f5es: v\u00e1 em Transa\u00e7\u00f5es > Nova. Informe descri\u00e7\u00e3o, data, "
+            "valor, categoria e tipo (entrada/sa\u00edda) e salve. "
+            "Voc\u00ea tamb\u00e9m pode usar o bot\u00e3o Falar para preencher por voz. "
+            "Para importar em lote, use Transa\u00e7\u00f5es > Importar CSV/PDF."
+        ) if wants_howto else None
 
-    if has_any(['tarefa', 'etapa', 'subtarefa', 'todo']):
+    if has_any(['tarefa', 'etapa', 'prazo']):
         return (
-            "Para criar tarefas: vá em Tarefas > Nova, defina título e prazo. "
-            "Você pode adicionar etapas no mesmo formulário e depois editar/atualizar o status. "
-            "O botão Falar ajuda a preencher a tarefa e as etapas."
-        )
+            "Para criar tarefas: v\u00e1 em Tarefas > Nova, defina t\u00edtulo, prazo e categoria. "
+            "Voc\u00ea pode adicionar etapas no mesmo formul\u00e1rio e depois editar/atualizar o status. "
+            "O bot\u00e3o Falar ajuda a preencher a tarefa e as etapas."
+        ) if wants_howto else None
 
-    if has_any(['workspace', 'membro', 'membros', 'convidar', 'convite', 'participante']):
+    if has_any(['workspace', 'membro', 'convidar', 'convite']):
         return (
-            "Para convidar pessoas: abra o painel de Workspaces e clique em Convites. "
-            "Informe o username e defina se pode editar tarefas. "
-            "O convidado aceita na tela de Workspaces (Convites pendentes)."
-        )
+            "Para convidar pessoas: abra Workspaces > Convidar e informe o usu\u00e1rio. "
+            "O convidado precisa aceitar o convite para entrar. "
+            "Voc\u00ea pode ver membros em Workspaces > Membros."
+        ) if wants_howto else None
 
-    if has_any(['categoria', 'categorias', 'cor']):
+    if has_any(['categoria', 'cor']):
         return (
-            "Para cadastrar categorias: acesse Categorias > Nova. "
-            "A cor escolhida aparece nos gráficos do dashboard."
-        )
+            "As categorias ficam em Categorias. Voc\u00ea pode criar, editar e escolher cor. "
+            "A cor aparece nos gr\u00e1ficos do dashboard."
+        ) if wants_howto else None
 
-    if has_any(['exportar', 'csv', 'pdf', 'importar']):
+    if has_any(['exportar', 'csv', 'importar', 'pdf']):
         return (
-            "Exportação: nas listas de Transações ou Tarefas, use o botão Exportar CSV. "
-            "Importação: use Transações > Importar CSV ou Importar PDF."
-        )
+            "Exporta\u00e7\u00e3o: nas listas de Transa\u00e7\u00f5es ou Tarefas, use o bot\u00e3o Exportar CSV. "
+            "Importa\u00e7\u00e3o: use Transa\u00e7\u00f5es > Importar CSV ou Importar PDF."
+        ) if wants_howto else None
 
-    if has_any(['notifica', 'email', 'alerta', 'resumo']):
+    if has_any(['notificacao', 'resumo', 'semanal', 'mensal', 'alerta']):
         return (
-            "Notificações e resumos ficam no Perfil. "
-            "Marque as opções de alertas, tarefas e resumos semanais/mensais e salve."
-        )
+            "Notifica\u00e7\u00f5es e resumos ficam no Perfil. "
+            "Marque as op\u00e7\u00f5es de alertas, tarefas e resumos semanais/mensais e salve."
+        ) if wants_howto else None
 
-    if has_any(['ia', 'assistente', 'agente']):
+    if has_any(['ia', 'agente', 'chat', 'modelo']):
         return (
-            "O agente de IA responde com base no workspace atual. "
-            "Use perguntas como 'saldo', 'tarefas em andamento' ou 'top categorias'. "
-            "Você pode ativar o modo 'resumo local' se quiser evitar chamadas externas."
-        )
+            "O Agente de IA responde com base nos seus dados do workspace. "
+            "Use o bot\u00e3o Falar no chat ou nos formul\u00e1rios para ditado por voz."
+        ) if wants_howto else None
 
-    if has_any(['plano', 'assinatura', 'mensal', 'anual', 'pagamento']):
-        return (
-            "Para assinar, acesse seu Perfil e clique em 'Assinar com Mercado Pago'. "
-            "Escolha mensal ou anual e conclua o pagamento para liberar o acesso completo."
-        )
+    if wants_howto:
+        return "Voc\u00ea pode consultar a p\u00e1gina Ajuda no menu para um passo a passo completo."
 
-    if has_any(['voz', 'ditado', 'falar', 'microfone']):
-        return (
-            "Use o botão Falar nos formulários ou no chat do agente. "
-            "Fale normalmente e finalize para preencher os campos automaticamente."
-        )
-
-    return "Você pode consultar a página Ajuda no menu para um passo a passo completo."
+    return None
 
 
 def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: int = 6) -> str:
@@ -193,7 +302,7 @@ def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: 
                 email = step.responsible_email or '-'
                 order_label = step.order if step.order else '?'
                 lines.append(
-                    f"     • Etapa {order_label}: {step.title} ({step.get_status_display()})"
+                    f"     - Etapa {order_label}: {step.title} ({step.get_status_display()})"
                 )
                 lines.append(f"       Respons\u00e1vel: {responsible} | {email}")
         else:
@@ -202,12 +311,52 @@ def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: 
         lines.append(f"Mostrando {limit_tasks} de {total_done} tarefas conclu\u00eddas.")
     return "\n".join(lines)
 
-
 def _assistant_reply(message, workspace, request, local_only: bool = False, fallback_reason: str | None = None):
     """
     Usa LLM se configurado; fallback para resumo baseado em regras.
     Retorna (reply, usage, model_name).
     """
+    msg_norm = _normalize_text(message or '')
+    period_range = _parse_month_range(message)
+
+    if any(key in msg_norm for key in ['maior gasto', 'maior despesa', 'maior saida']):
+        finance_qs = _finance_queryset(request, workspace)
+        if period_range:
+            start_date, end_date, label = period_range
+            finance_qs = finance_qs.filter(date__gte=start_date, date__lte=end_date)
+        top = _top_category(finance_qs, 'expense')
+        if not top:
+            period_label = f" no per\u00edodo {label}" if period_range else ""
+            return f"N\u00e3o encontrei despesas registradas{period_label}.", None, None
+        name, total = top
+        period_label = f" no per\u00edodo {label}" if period_range else ""
+        return f"Seu maior gasto{period_label} foi em {name}: R$ {total:.2f}.", None, None
+
+    if any(key in msg_norm for key in ['maior receita', 'maior entrada']):
+        finance_qs = _finance_queryset(request, workspace)
+        if period_range:
+            start_date, end_date, label = period_range
+            finance_qs = finance_qs.filter(date__gte=start_date, date__lte=end_date)
+        top = _top_category(finance_qs, 'income')
+        if not top:
+            period_label = f" no per\u00edodo {label}" if period_range else ""
+            return f"N\u00e3o encontrei receitas registradas{period_label}.", None, None
+        name, total = top
+        period_label = f" no per\u00edodo {label}" if period_range else ""
+        return f"Sua maior receita{period_label} foi em {name}: R$ {total:.2f}.", None, None
+
+    if period_range:
+        start_date, end_date, label = period_range
+        wants_tasks = 'tarefa' in msg_norm
+        wants_finance = any(
+            key in msg_norm for key in ['transa', 'financ', 'saldo', 'entrada', 'saida', 'despesa', 'receita']
+        )
+        include_tasks = wants_tasks or not wants_finance
+        include_finance = wants_finance or not wants_tasks
+        return _summarize_period(
+            workspace, request, start_date, end_date, label, include_tasks, include_finance
+        ), None, None
+
     help_text = _help_response(message)
     if help_text:
         return help_text, None, None
@@ -234,7 +383,6 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
     logger.info("LLM fallback usado (local_only=%s)", local_only)
     prefix = fallback_reason or "N\u00e3o consegui consultar o modelo agora. Aqui vai um resumo r\u00e1pido:"
     return f"{prefix}\n{summary}", None, None
-
 
 def _record_usage(user, workspace, feature, usage, model_name):
     if not usage:
@@ -373,3 +521,9 @@ def chat_embed(request):
         'ai_quota_label': quota_label,
         'ai_quota_blocked': quota_blocked,
     })
+
+
+
+
+
+

@@ -16,6 +16,8 @@
     --text-color: #0f172a;
     --muted: #475569;
     --border: #e2e8f0;
+    --bs-tooltip-bg: #0f172a;
+    --bs-tooltip-color: #f8fafc;
 }
 
 * {
@@ -139,6 +141,56 @@ body {
     white-space: nowrap;
 }
 
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .35rem .85rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.35);
+    color: var(--text-color);
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+
+.filter-chip:hover {
+    border-color: var(--primary-soft);
+    color: var(--primary-soft);
+}
+
+.table-sticky thead th {
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 2;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: rgba(15, 23, 42, 0.25);
+}
+
+[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: rgba(15, 23, 42, 0.04);
+}
+
+.bulk-actions {
+    transition: opacity .2s ease, transform .2s ease;
+}
+
+.bulk-actions.d-none {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+.chart-skeleton {
+    min-height: 220px;
+}
+
+.table-skeleton {
+    min-height: 140px;
+}
+
 .icon-pill {
     width: 36px;
     height: 36px;
@@ -169,6 +221,11 @@ body {
     background-color: #e2e8f0;
     color: #0f172a;
     border-color: #94a3b8;
+}
+
+[data-bs-theme="light"] .filter-chip {
+    background: #f1f5f9;
+    color: #0f172a;
 }
 
 /* Skeleton utilitário para carregamentos */

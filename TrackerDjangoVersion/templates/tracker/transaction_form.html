@@ -37,6 +37,7 @@
                             <i class="fa-solid fa-microphone me-1"></i>Falar
                         </button>
                         <span class="text-secondary small" id="txVoiceStatus">Fale a descri&ccedil;&atilde;o, valor e tipo (entrada/sa&iacute;da).</span>
+                        <span class="badge bg-secondary-subtle text-secondary d-none" id="txVoiceTimer">00:00</span>
                         <span class="text-secondary small" data-bs-toggle="tooltip" title="Ex.: Sal&aacute;rio dezembro, data 10/12/2025, valor 5153, tipo entrada, categoria sal&aacute;rio.">
                             <i class="fa-solid fa-circle-info"></i>
                         </span>
@@ -97,11 +98,11 @@
                 </div>
                 {% if not is_detail %}
                 <div class="col-12 d-flex justify-content-end gap-2">
-                    <a class="btn btn-outline-light" href="{% url 'tracker:transactions_list' %}">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
                     {% if not is_edit %}
                         <button type="submit" class="btn btn-outline-light" name="save_new" value="1">Salvar e inserir nova</button>
                     {% endif %}
-                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a class="btn btn-outline-light" href="{% url 'tracker:transactions_list' %}">Cancelar</a>
                 </div>
                 {% endif %}
             </form>
@@ -115,6 +116,7 @@
         if (!voiceBtn) return;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const status = document.getElementById('txVoiceStatus');
+        const timerEl = document.getElementById('txVoiceTimer');
         const descInput = document.getElementById('id_description');
         const valueInput = document.getElementById('id_value');
         const typeInput = document.getElementById('id_type');
@@ -139,6 +141,8 @@
         rec.lang = 'pt-BR';
         rec.interimResults = false;
         rec.continuous = true;
+        let timerInterval = null;
+        let startedAt = null;
 
         let listening = false;
         let buffer = '';
@@ -465,7 +469,30 @@
             updatePreview(null);
         };
 
+        const startTimer = () => {
+            if (!timerEl) return;
+            timerEl.classList.remove('d-none');
+            startedAt = Date.now();
+            timerEl.textContent = '00:00';
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!startedAt) return;
+                const diff = Math.floor((Date.now() - startedAt) / 1000);
+                const mm = String(Math.floor(diff / 60)).padStart(2, '0');
+                const ss = String(diff % 60).padStart(2, '0');
+                timerEl.textContent = `${mm}:${ss}`;
+            }, 1000);
+        };
+
+        const stopTimer = () => {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = null;
+            startedAt = null;
+            if (timerEl) timerEl.classList.add('d-none');
+        };
+
         rec.onstart = () => {
+            startTimer();
             if (status) status.textContent = 'Ouvindo... clique em Finalizar para encerrar.';
         };
         rec.onend = () => {
@@ -474,13 +501,16 @@
                     try { rec.start(); } catch (err) { /* ignore */ }
                 }, 250);
             } else {
-                if (status) status.textContent = 'Ditado finalizado.';
+                stopTimer();
+                if (status) status.textContent = 'Processando...';
                 parsedTx = parseTranscript(buffer);
                 updatePreview(parsedTx);
                 buffer = '';
+                if (status) status.textContent = 'Pré-visualização pronta. Clique em Aplicar.';
             }
         };
         rec.onerror = () => {
+            stopTimer();
             if (status) status.textContent = 'N\u00e3o consegui acessar o microfone.';
         };
         rec.onresult = (ev) => {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.utils import timezone
 
 from .models import WorkspaceMembership, Workspace, Notification
 from django.core.files.storage import default_storage
@@ -26,6 +27,8 @@ def workspace_context(request):
                 .order_by("workspace__name")
             ]
 
+    undo_tx = _get_undo_payload(request, 'undo_tx')
+    undo_task = _get_undo_payload(request, 'undo_task')
     return {
         "current_workspace": current,
         "available_workspaces": available,
@@ -34,6 +37,8 @@ def workspace_context(request):
         "user_is_guest": _is_guest(user),
         "notifications_unread": _notification_unread_count(user),
         "app_version": getattr(settings, "APP_VERSION", ""),
+        "undo_tx": undo_tx,
+        "undo_task": undo_task,
     }
 
 
@@ -60,4 +65,26 @@ def _notification_unread_count(user):
     if not user or not getattr(user, "is_authenticated", False):
         return 0
     return Notification.objects.filter(user=user, read_at__isnull=True).count()
+
+
+def _get_undo_payload(request, key):
+    session = getattr(request, 'session', None)
+    if not session:
+        return None
+    payload = session.get(key)
+    expires = session.get(f"{key}_expires")
+    if not payload:
+        return None
+    if expires:
+        try:
+            expires_at = timezone.datetime.fromisoformat(expires)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                session.pop(key, None)
+                session.pop(f"{key}_expires", None)
+                return None
+        except Exception:
+            pass
+    return payload
 

@@ -55,6 +55,34 @@
     </div>
     {% endif %}
 
+    {% if onboarding.show %}
+    <div class="col-12">
+        <div class="glass-card p-4">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+                <div>
+                    <h5 class="mb-0">Checklist inicial</h5>
+                    <span class="text-secondary small">Complete os passos essenciais para começar no iTracker.</span>
+                </div>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for item in onboarding.items %}
+                <div class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {% if item.done %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %} px-3">
+                            {% if item.done %}Ok{% else %}Pendente{% endif %}
+                        </span>
+                        <span>{{ item.label }}</span>
+                    </div>
+                    {% if not item.done %}
+                        <a class="btn btn-sm btn-primary" href="{{ item.url }}">Começar</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-3">
@@ -180,6 +208,7 @@
                     Intervalo atual: {{ start_date|date:"d/m/Y" }} &ndash; {{ end_date|date:"d/m/Y" }}
                 </div>
             </div>
+            <div id="categorySkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="categoryChart" height="260"></canvas>
             <p class="text-secondary small mt-3 mb-0 d-none" id="chartEmpty">Adicione transa&#231;&#245;es para ver este gr&#225;fico.</p>
         </div>
@@ -190,9 +219,11 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Entradas vs Sa&#237;das</h5>
             </div>
+            <div id="typeSkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="typeChart" height="220"></canvas>
             <div class="mt-3">
                 <h6 class="small text-secondary mb-1">Status das tarefas</h6>
+                <div id="tasksSkeleton" class="skeleton chart-skeleton mb-3"></div>
                 <canvas id="tasksChart" height="180"></canvas>
             </div>
         </div>
@@ -204,6 +235,7 @@
                 <h5 class="mb-0">&Uacute;ltimas transa&ccedil;&otilde;es</h5>
                 <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:transactions_list' %}">Ver todas</a>
             </div>
+            <div id="latestTxSkeleton" class="skeleton table-skeleton mb-3"></div>
             <div class="table-responsive">
                 <table class="table table-borderless align-middle mb-0">
                     <thead>
@@ -228,7 +260,12 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="5" class="text-secondary">Sem transa&ccedil;&otilde;es por enquanto.</td>
+                                <td colspan="5">
+                                    <div class="text-secondary mb-2">Sem transa&ccedil;&otilde;es por enquanto.</div>
+                                    <a class="btn btn-sm btn-primary" href="{% url 'tracker:transaction_create' %}">
+                                        <i class="fa-solid fa-plus me-2"></i>Criar primeira transa&ccedil;&atilde;o
+                                    </a>
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -245,6 +282,7 @@
                     <span class="text-secondary small">Linha temporal (positivo/negativo)</span>
                 </div>
             </div>
+            <div id="monthlySkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="monthlyChart" height="220"></canvas>
         </div>
     </div>
@@ -257,6 +295,7 @@
                     <span class="text-secondary small">Saldo l&#237;quido por dia no per&#237;odo</span>
                 </div>
             </div>
+            <div id="dailySkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="dailyChart" height="220"></canvas>
         </div>
     </div>
@@ -269,6 +308,7 @@
                     <span class="text-secondary small">Somat&#243;rio progressivo no per&#237;odo</span>
                 </div>
             </div>
+            <div id="runningSkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="runningChart" height="220"></canvas>
         </div>
     </div>
@@ -311,9 +351,10 @@
     </div>
 
     <div class="col-lg-12">
-        <div class="glass-card p-4 h-100">
-            <h5 class="mb-3">&Uacute;ltimas tarefas</h5>
-            <div class="list-group list-group-flush">
+    <div class="glass-card p-4 h-100">
+        <h5 class="mb-3">&Uacute;ltimas tarefas</h5>
+        <div id="latestTasksSkeleton" class="skeleton table-skeleton mb-3"></div>
+        <div class="list-group list-group-flush">
                 {% for task in latest_tasks %}
                     <div class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between align-items-center">
                         <div>
@@ -329,7 +370,10 @@
                         </span>
                     </div>
                 {% empty %}
-                    <p class="text-secondary mb-0">Nenhuma tarefa encontrada.</p>
+                    <div class="text-secondary mb-2">Nenhuma tarefa encontrada.</div>
+                    <a class="btn btn-sm btn-primary" href="{% url 'tracker:task_create' %}">
+                        <i class="fa-solid fa-plus me-2"></i>Criar primeira tarefa
+                    </a>
                 {% endfor %}
             </div>
         </div>
@@ -345,6 +389,14 @@
     const monthlyCtx = document.getElementById('monthlyChart');
     const dailyCtx = document.getElementById('dailyChart');
     const runningCtx = document.getElementById('runningChart');
+    const categorySkeleton = document.getElementById('categorySkeleton');
+    const typeSkeleton = document.getElementById('typeSkeleton');
+    const tasksSkeleton = document.getElementById('tasksSkeleton');
+    const monthlySkeleton = document.getElementById('monthlySkeleton');
+    const dailySkeleton = document.getElementById('dailySkeleton');
+    const runningSkeleton = document.getElementById('runningSkeleton');
+    const latestTxSkeleton = document.getElementById('latestTxSkeleton');
+    const latestTasksSkeleton = document.getElementById('latestTasksSkeleton');
     const startHidden = document.getElementById('rangeStart');
     const endHidden = document.getElementById('rangeEnd');
     const startDisplay = document.getElementById('rangeStartDisplay');
@@ -368,6 +420,10 @@
     let dailyChartInstance;
     let runningChartInstance;
     let tasksChartInstance;
+
+    function hideSkeleton(el) {
+        if (el) el.classList.add('d-none');
+    }
 
     function formatIsoToBr(iso) {
         if (!iso) return '';
@@ -626,10 +682,18 @@
         }
 
         renderTasksChart(tasksData.open, tasksData.done);
+        hideSkeleton(categorySkeleton);
+        hideSkeleton(typeSkeleton);
+        hideSkeleton(tasksSkeleton);
+        hideSkeleton(monthlySkeleton);
+        hideSkeleton(dailySkeleton);
+        hideSkeleton(runningSkeleton);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         loadChart();
+        hideSkeleton(latestTxSkeleton);
+        hideSkeleton(latestTasksSkeleton);
         const form = document.getElementById('rangeForm');
         if (form) {
             form.addEventListener('submit', (e) => {

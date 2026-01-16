@@ -58,6 +58,12 @@
     </div>
 </div>
 
+<div class="d-flex justify-content-end d-lg-none mb-2">
+    <button class="btn btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#taskFiltersCollapse" aria-expanded="false" aria-controls="taskFiltersCollapse">
+        <i class="fa-solid fa-filter me-2"></i>Filtros
+    </button>
+</div>
+<div class="collapse d-lg-block" id="taskFiltersCollapse">
 <form id="taskFilters" method="get" class="glass-card p-3 mb-4">
     <div class="row g-3 align-items-end">
         <div class="col-md-3">
@@ -102,6 +108,17 @@
         </div>
     </div>
 </form>
+</div>
+{% if filter_chips %}
+<div class="d-flex flex-wrap gap-2 mb-4">
+    {% for chip in filter_chips %}
+        <a class="filter-chip" href="{{ chip.url }}" data-bs-toggle="tooltip" title="Remover filtro">
+            {{ chip.label }}
+            <span class="ms-2">&times;</span>
+        </a>
+    {% endfor %}
+</div>
+{% endif %}
 <script>
     (function() {
         const form = document.getElementById('taskFilters');
@@ -148,7 +165,7 @@
 
 <div class="row g-3 mb-4">
     <div class="col-12">
-        <form id="taskBulkForm" method="post" action="{% url 'tracker:tasks_bulk_update' %}" class="glass-card p-3">
+        <form id="taskBulkForm" method="post" action="{% url 'tracker:tasks_bulk_update' %}" class="glass-card p-3 bulk-actions d-none">
             {% csrf_token %}
             <input type="hidden" name="ids" id="taskBulkIds">
             <div class="row g-3 align-items-end">
@@ -190,7 +207,7 @@
 
 <div class="glass-card p-4">
     <div class="table-responsive">
-        <table id="task-table" class="table table-borderless table-striped align-middle mb-0">
+        <table id="task-table" class="table table-borderless table-striped table-sticky align-middle mb-0">
             <thead>
                 <tr class="text-secondary">
                     <th class="text-center" style="width: 40px;">
@@ -284,7 +301,12 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7" class="text-secondary">Nenhuma tarefa registrada.</td>
+                        <td colspan="7">
+                            <div class="text-secondary mb-2">Nenhuma tarefa registrada.</div>
+                            <a class="btn btn-sm btn-primary" href="{% url 'tracker:task_create' %}">
+                                <i class="fa-solid fa-plus me-2"></i>Criar primeira tarefa
+                            </a>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -335,6 +357,7 @@
             if (hiddenInput) hiddenInput.value = ids.join(',');
             if (countEl) countEl.textContent = ids.length;
             if (applyBtn) applyBtn.disabled = ids.length === 0;
+            if (form) form.classList.toggle('d-none', ids.length === 0);
         };
         if (form) {
             form.addEventListener('submit', (ev) => {

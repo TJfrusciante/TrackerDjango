@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Vis&atilde;o geral | iTracker{% endblock %}
 
@@ -107,10 +107,112 @@
     </div>
 </div>
 
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Cadastros (funil)</p>
+            <h4 class="mb-0">{{ funnel_signups }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Trials ativos</p>
+            <h4 class="mb-0">{{ funnel_trials }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Assinaturas ativas</p>
+            <h4 class="mb-0">{{ funnel_active }}</h4>
+            <div class="text-secondary small mt-1">Convers&atilde;o: {{ conversion_rate|floatformat:1 }}%</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Cancelamentos (30d)</p>
+            <h4 class="mb-0">{{ funnel_cancelled_30 }}</h4>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">MRR estimado</p>
+            <h4 class="mb-0">R$ {{ mrr|floatformat:2 }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">ARR estimado</p>
+            <h4 class="mb-0">R$ {{ arr|floatformat:2 }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Receita (30d)</p>
+            <h4 class="mb-0">R$ {{ revenue_30|floatformat:2 }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Churn (30d)</p>
+            <h4 class="mb-0">{{ churn_rate|floatformat:1 }}%</h4>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">DAU</p>
+            <h4 class="mb-0">{{ dau }}</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">WAU</p>
+            <h4 class="mb-0">{{ wau }}</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">MAU</p>
+            <h4 class="mb-0">{{ mau }}</h4>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Operacional</p>
+            <div class="d-flex flex-wrap gap-3 small text-secondary">
+                <span><i class="fa-solid fa-circle-exclamation me-1"></i>Webhooks erro (30d): {{ webhook_errors_30 }}</span>
+                <span><i class="fa-solid fa-hourglass-half me-1"></i>Assinaturas pendentes: {{ pending_subs }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-2">IA: top usu&aacute;rios</p>
+            <ul class="list-group list-group-flush">
+                {% for item in ai_top_users %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ item.user__username|default:"-" }}</span>
+                        <span class="text-secondary">{{ item.tokens|default:0 }} tokens</span>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item text-secondary">Sem consumo de IA.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
 <div class="glass-card p-4 mb-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h5 class="mb-0">Promoções e preços</h5>
+            <h5 class="mb-0">Promo&ccedil;&otilde;es e pre&ccedil;os</h5>
             <p class="text-secondary small mb-0">Atualize os valores que aparecem na landing e no checkout.</p>
         </div>
     </div>
@@ -149,7 +251,7 @@
                 {{ pricing_form.regular_annual_price }}
             </div>
             <div class="col-12 d-flex justify-content-end">
-                <button class="btn btn-primary" type="submit">Salvar preços</button>
+                <button class="btn btn-primary" type="submit">Salvar pre&ccedil;os</button>
             </div>
         </div>
     </form>
@@ -242,12 +344,14 @@
     <div class="col-md-7">
         <div class="glass-card p-3 h-100">
             <p class="text-secondary small mb-2">IA: tokens por dia (30d)</p>
+            <div id="aiTokensSkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="aiTokensChart" height="160"></canvas>
         </div>
     </div>
     <div class="col-md-5">
         <div class="glass-card p-3 h-100">
             <p class="text-secondary small mb-2">IA: distribui&ccedil;&atilde;o por recurso</p>
+            <div id="aiFeatureSkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="aiFeatureChart" height="160"></canvas>
         </div>
     </div>
@@ -267,6 +371,7 @@
     <div class="col-md-8">
         <div class="glass-card p-3 h-100">
             <p class="text-secondary small mb-2">Financeiro por workspace</p>
+            <div id="wsChartSkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="wsChart" height="140"></canvas>
         </div>
     </div>
@@ -276,6 +381,7 @@
     <div class="col-md-8">
         <div class="glass-card p-3 h-100">
             <p class="text-secondary small mb-2">Saldo mensal</p>
+            <div id="monthlyChartSkeleton" class="skeleton chart-skeleton mb-3"></div>
             <canvas id="monthlyChart" height="160"></canvas>
         </div>
     </div>
@@ -419,6 +525,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const wsCtx = document.getElementById('wsChart');
+    const wsSkeleton = document.getElementById('wsChartSkeleton');
     if (wsCtx) {
         new Chart(wsCtx, {
             type: 'bar',
@@ -431,8 +538,10 @@
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
         });
+        if (wsSkeleton) wsSkeleton.classList.add('d-none');
     }
     const monthlyCtx = document.getElementById('monthlyChart');
+    const monthlySkeleton = document.getElementById('monthlyChartSkeleton');
     if (monthlyCtx) {
         new Chart(monthlyCtx, {
             type: 'line',
@@ -444,9 +553,11 @@
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
         });
+        if (monthlySkeleton) monthlySkeleton.classList.add('d-none');
     }
 
     const aiTokensCtx = document.getElementById('aiTokensChart');
+    const aiTokensSkeleton = document.getElementById('aiTokensSkeleton');
     if (aiTokensCtx) {
         new Chart(aiTokensCtx, {
             type: 'line',
@@ -459,9 +570,11 @@
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
         });
+        if (aiTokensSkeleton) aiTokensSkeleton.classList.add('d-none');
     }
 
     const aiFeatureCtx = document.getElementById('aiFeatureChart');
+    const aiFeatureSkeleton = document.getElementById('aiFeatureSkeleton');
     if (aiFeatureCtx) {
         new Chart(aiFeatureCtx, {
             type: 'doughnut',
@@ -473,7 +586,10 @@
             },
             options: {responsive: true, plugins:{legend:{position:'bottom'}}}
         });
+        if (aiFeatureSkeleton) aiFeatureSkeleton.classList.add('d-none');
     }
 </script>
 {% endblock %}
 {% endblock %}
+
+

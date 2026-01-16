@@ -44,6 +44,7 @@
                             <i class="fa-solid fa-microphone me-1"></i>Falar
                         </button>
                         <span class="text-secondary small" id="taskVoiceStatus">Fale o t&iacute;tulo e, se quiser, uma data (dd/mm/aaaa).</span>
+                        <span class="badge bg-secondary-subtle text-secondary d-none" id="taskVoiceTimer">00:00</span>
                         <span class="text-secondary small" data-bs-toggle="tooltip" title="Ex.: Revisar relat&oacute;rio, prazo 15/01/2026, categoria Trabalho, etapa 1 enviar para Jo&atilde;o (joao@email.com).">
                             <i class="fa-solid fa-circle-info"></i>
                         </span>
@@ -159,11 +160,11 @@
                 </div>
                 {% if not is_detail %}
                 <div class="col-12 d-flex justify-content-end gap-2">
-                    <a class="btn btn-outline-light" href="{% url 'tracker:tasks_list' %}">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
                     {% if not is_edit %}
                         <button type="submit" class="btn btn-outline-light" name="save_new" value="1">Salvar e inserir nova</button>
                     {% endif %}
-                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a class="btn btn-outline-light" href="{% url 'tracker:tasks_list' %}">Cancelar</a>
                 </div>
                 {% endif %}
             </form>
@@ -364,6 +365,7 @@
         if (!voiceBtn) return;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const status = document.getElementById('taskVoiceStatus');
+        const timerEl = document.getElementById('taskVoiceTimer');
         const titleInput = document.getElementById('id_title');
         const dateInput = document.getElementById('id_due_date');
         const dateDisplay = document.getElementById('taskDateDisplay');
@@ -387,6 +389,8 @@
         rec.lang = 'pt-BR';
         rec.interimResults = false;
         rec.continuous = true;
+        let timerInterval = null;
+        let startedAt = null;
 
         let listening = false;
         let buffer = '';
@@ -667,7 +671,30 @@
             if (options.clearPreview) updatePreview(null);
         };
 
+        const startTimer = () => {
+            if (!timerEl) return;
+            timerEl.classList.remove('d-none');
+            startedAt = Date.now();
+            timerEl.textContent = '00:00';
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!startedAt) return;
+                const diff = Math.floor((Date.now() - startedAt) / 1000);
+                const mm = String(Math.floor(diff / 60)).padStart(2, '0');
+                const ss = String(diff % 60).padStart(2, '0');
+                timerEl.textContent = `${mm}:${ss}`;
+            }, 1000);
+        };
+
+        const stopTimer = () => {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = null;
+            startedAt = null;
+            if (timerEl) timerEl.classList.add('d-none');
+        };
+
         rec.onstart = () => {
+            startTimer();
             if (status) status.textContent = 'Ouvindo... clique em Finalizar para encerrar.';
         };
         rec.onend = () => {
@@ -676,14 +703,17 @@
                     try { rec.start(); } catch (err) { /* ignore */ }
                 }, 250);
             } else {
-                if (status) status.textContent = 'Ditado finalizado.';
+                stopTimer();
+                if (status) status.textContent = 'Processando...';
                 parsedTask = parseTranscript(buffer);
                 updatePreview(parsedTask);
                 applyParsed(parsedTask);
                 buffer = '';
+                if (status) status.textContent = 'Pré-visualização pronta. Clique em Aplicar.';
             }
         };
         rec.onerror = () => {
+            stopTimer();
             if (status) status.textContent = 'N\u00e3o consegui acessar o microfone.';
         };
         rec.onresult = (ev) => {
