@@ -84,6 +84,12 @@
     </div>
     <div class="col-md-3">
         <div class="glass-card p-3">
+            <div class="text-secondary small text-uppercase">Trial</div>
+            <div class="h4 fw-bold mb-0">{{ trial_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3">
             <div class="text-secondary small text-uppercase">Suspensos</div>
             <div class="h4 fw-bold mb-0">{{ suspended_count }}</div>
         </div>
@@ -125,6 +131,7 @@
             <select name="status" class="form-select">
                 <option value="">Todos</option>
                 <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Ativo</option>
+                <option value="trial" {% if filters.status == 'trial' %}selected{% endif %}>Trial</option>
                 <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pendente</option>
                 <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expirado</option>
                 <option value="suspended" {% if filters.status == 'suspended' %}selected{% endif %}>Suspenso</option>
@@ -210,6 +217,8 @@
                                 <span class="badge bg-primary">Superuser</span>
                             {% elif u.approval_status == 'guest' %}
                                 <span class="badge bg-info-subtle text-info">Convidado</span>
+                            {% elif u.approval_status == 'trial' %}
+                                <span class="badge bg-primary-subtle text-primary">Trial</span>
                             {% elif u.approval_status == 'active' %}
                                 <span class="badge bg-success-subtle text-success">Ativo</span>
                             {% elif u.approval_status == 'pending' %}
@@ -252,6 +261,7 @@
                                     A&ccedil;&otilde;es
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="{% url 'tracker:user_admin_detail' u.id %}">Ver perfil</a></li>
                                     <li><a class="dropdown-item" href="{% url 'tracker:user_admin_edit' u.id %}">Editar perfil</a></li>
                                     <li><a class="dropdown-item" href="{% url 'tracker:superuser_overview' %}?user={{ u.id }}">Ver estat&iacute;sticas</a></li>
                                     {% if not u.is_superuser and u.approval_status != 'guest' %}

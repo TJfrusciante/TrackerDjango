@@ -28,6 +28,7 @@ class Task(models.Model):
     ]
 
     title = models.CharField(max_length=180)
+    category = models.CharField(max_length=80, blank=True, default='')
     due_date = models.DateField()
     selected = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ongoing')

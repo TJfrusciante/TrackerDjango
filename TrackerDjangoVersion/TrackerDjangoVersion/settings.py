@@ -44,6 +44,14 @@ def env_list(name: str, default=None):
         return default if default is not None else []
     return [x.strip() for x in v.split(",") if x.strip()]
 
+VERSION_FILE = BASE_DIR / "VERSION"
+APP_VERSION = env("ITRACKER_VERSION")
+if not APP_VERSION:
+    try:
+        APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        APP_VERSION = "0.0.0"
+
 
 # ------------------------------------------------------------------------------
 # Quick-start development settings - unsuitable for production

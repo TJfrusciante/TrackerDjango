@@ -44,6 +44,9 @@
                             <i class="fa-solid fa-microphone me-1"></i>Falar
                         </button>
                         <span class="text-secondary small" id="taskVoiceStatus">Fale o t&iacute;tulo e, se quiser, uma data (dd/mm/aaaa).</span>
+                        <span class="text-secondary small" data-bs-toggle="tooltip" title="Ex.: Revisar relat&oacute;rio, prazo 15/01/2026, categoria Trabalho, etapa 1 enviar para Jo&atilde;o (joao@email.com).">
+                            <i class="fa-solid fa-circle-info"></i>
+                        </span>
                         <div id="taskVoicePreview" class="glass-card p-3 mt-2 d-none">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="mb-0">Pr&eacute;-visualiza&ccedil;&atilde;o do ditado</h6>
@@ -52,6 +55,7 @@
                             <div class="small">
                                 <div><strong>T&iacute;tulo:</strong> <span id="taskPrevTitle"></span></div>
                                 <div><strong>Prazo:</strong> <span id="taskPrevDate"></span></div>
+                                <div><strong>Categoria:</strong> <span id="taskPrevCategory"></span></div>
                             </div>
                             <div class="mt-2">
                                 <div class="text-secondary small mb-1">Etapas</div>
@@ -67,11 +71,21 @@
                 {% endif %}
 
                 <div class="col-md-4">
+                    <label class="form-label">Categoria</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">{{ form.instance.category|default:"-" }}</p>
+                    {% else %}
+                        {{ form.category }}{{ form.category.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Prazo</label>
                     {% if is_detail %}
                         <p class="form-control-plaintext fw-semibold">{{ form.instance.due_date|date:"d/m/Y" }}</p>
                     {% else %}
-                        {{ form.due_date }}{{ form.due_date.errors }}
+                        <input id="taskDateDisplay" type="text" class="form-control" placeholder="dd/mm/aaaa" inputmode="numeric">
+                        {{ form.due_date }}
+                        {{ form.due_date.errors }}
                     {% endif %}
                 </div>
                 <div class="col-md-4">
@@ -95,10 +109,34 @@
                                     <input class="form-control form-control-lg" name="step_title" type="text" placeholder="Descri&ccedil;&atilde;o da etapa" aria-label="Descri&ccedil;&atilde;o da etapa">
                                 </div>
                                 <div class="col-12">
-                                    <input class="form-control form-control-lg" name="step_responsible" type="text" placeholder="Respons&aacute;vel da etapa" aria-label="Respons&aacute;vel da etapa">
+                                    {% if workspace_members %}
+                                        <select class="form-select form-select-lg js-step-responsible" name="step_responsible" aria-label="Respons&aacute;vel da etapa">
+                                            <option value="">Selecione o respons&aacute;vel</option>
+                                            {% for member in workspace_members %}
+                                                <option value="{{ member.name }}" data-email="{{ member.email }}">{{ member.name }}</option>
+                                            {% endfor %}
+                                            <option value="__custom__">Outro...</option>
+                                        </select>
+                                        <input class="form-control form-control-lg js-step-responsible-custom d-none mt-2" name="step_responsible_custom" type="text" placeholder="Respons&aacute;vel (outro)" aria-label="Respons&aacute;vel (outro)">
+                                    {% else %}
+                                        <input class="form-control form-control-lg js-step-responsible" name="step_responsible" type="text" placeholder="Respons&aacute;vel da etapa" aria-label="Respons&aacute;vel da etapa">
+                                    {% endif %}
                                 </div>
                                 <div class="col-12">
-                                    <input class="form-control form-control-lg" name="step_responsible_email" type="email" placeholder="E-mail do respons&aacute;vel" aria-label="E-mail do respons&aacute;vel">
+                                    {% if workspace_members %}
+                                        <select class="form-select form-select-lg js-step-email" name="step_responsible_email" aria-label="E-mail do respons&aacute;vel">
+                                            <option value="">Selecione o e-mail</option>
+                                            {% for member in workspace_members %}
+                                                {% if member.email %}
+                                                    <option value="{{ member.email }}" data-name="{{ member.name }}">{{ member.email }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                            <option value="__custom__">Outro...</option>
+                                        </select>
+                                        <input class="form-control form-control-lg js-step-email-custom d-none mt-2" name="step_responsible_email_custom" type="email" placeholder="E-mail (outro)" aria-label="E-mail (outro)">
+                                    {% else %}
+                                        <input class="form-control form-control-lg js-step-email" name="step_responsible_email" type="email" placeholder="E-mail do respons&aacute;vel" aria-label="E-mail do respons&aacute;vel">
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -122,6 +160,9 @@
                 {% if not is_detail %}
                 <div class="col-12 d-flex justify-content-end gap-2">
                     <a class="btn btn-outline-light" href="{% url 'tracker:tasks_list' %}">Cancelar</a>
+                    {% if not is_edit %}
+                        <button type="submit" class="btn btn-outline-light" name="save_new" value="1">Salvar e inserir nova</button>
+                    {% endif %}
                     <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
                 {% endif %}
@@ -145,10 +186,34 @@
                         {{ step_form.title }}
                     </div>
                     <div class="col-12">
-                        {{ step_form.responsible }}
+                        {% if workspace_members %}
+                            <select class="form-select form-select-lg js-step-responsible" name="responsible" aria-label="Respons&aacute;vel da etapa">
+                                <option value="">Selecione o respons&aacute;vel</option>
+                                {% for member in workspace_members %}
+                                    <option value="{{ member.name }}" data-email="{{ member.email }}">{{ member.name }}</option>
+                                {% endfor %}
+                                <option value="__custom__">Outro...</option>
+                            </select>
+                            <input class="form-control form-control-lg js-step-responsible-custom d-none mt-2" name="responsible_custom" type="text" placeholder="Respons&aacute;vel (outro)" aria-label="Respons&aacute;vel (outro)">
+                        {% else %}
+                            {{ step_form.responsible }}
+                        {% endif %}
                     </div>
                     <div class="col-12">
-                        {{ step_form.responsible_email }}
+                        {% if workspace_members %}
+                            <select class="form-select form-select-lg js-step-email" name="responsible_email" aria-label="E-mail do respons&aacute;vel">
+                                <option value="">Selecione o e-mail</option>
+                                {% for member in workspace_members %}
+                                    {% if member.email %}
+                                        <option value="{{ member.email }}" data-name="{{ member.name }}">{{ member.email }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                                <option value="__custom__">Outro...</option>
+                            </select>
+                            <input class="form-control form-control-lg js-step-email-custom d-none mt-2" name="responsible_email_custom" type="email" placeholder="E-mail (outro)" aria-label="E-mail (outro)">
+                        {% else %}
+                            {{ step_form.responsible_email }}
+                        {% endif %}
                     </div>
                     <div class="col-12">
                         <label class="form-label small text-secondary">Status</label>
@@ -194,17 +259,20 @@
                         </div>
                     </div>
                 </div>
-                {% if not is_detail %}
                 <div class="d-flex gap-2 align-items-start">
-                    <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#stepEdit{{ step.id }}" aria-expanded="false">
-                        <i class="fa-solid fa-pen"></i>
-                    </button>
-                    <form method="post" action="{% url 'tracker:task_step_delete' object.id step.id %}" onsubmit="return confirm('Excluir esta etapa?');">
-                        {% csrf_token %}
-                        <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fa-solid fa-trash"></i></button>
-                    </form>
+                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:task_step_detail' object.id step.id %}" title="Ver etapa">
+                        <i class="fa-solid fa-eye"></i>
+                    </a>
+                    {% if not is_detail %}
+                        <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#stepEdit{{ step.id }}" aria-expanded="false">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <form method="post" action="{% url 'tracker:task_step_delete' object.id step.id %}" onsubmit="return confirm('Excluir esta etapa?');">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fa-solid fa-trash"></i></button>
+                        </form>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
             {% if not is_detail %}
             <div class="collapse mt-2" id="stepEdit{{ step.id }}">
@@ -214,10 +282,34 @@
                         <input class="form-control" type="text" name="title" value="{{ step.title }}" placeholder="Descri&ccedil;&atilde;o da etapa" required>
                     </div>
                     <div class="col-12">
-                        <input class="form-control" type="text" name="responsible" value="{{ step.responsible }}" placeholder="Respons&aacute;vel da etapa">
+                        {% if workspace_members %}
+                            <select class="form-select js-step-responsible" name="responsible" aria-label="Respons&aacute;vel da etapa">
+                                <option value="">Selecione o respons&aacute;vel</option>
+                                {% for member in workspace_members %}
+                                    <option value="{{ member.name }}" data-email="{{ member.email }}" {% if step.responsible == member.name %}selected{% endif %}>{{ member.name }}</option>
+                                {% endfor %}
+                                <option value="__custom__" {% if step.responsible and step.responsible not in workspace_member_names %}selected{% endif %}>Outro...</option>
+                            </select>
+                            <input class="form-control js-step-responsible-custom d-none mt-2" name="responsible_custom" type="text" placeholder="Respons&aacute;vel (outro)" aria-label="Respons&aacute;vel (outro)" value="{% if step.responsible and step.responsible not in workspace_member_names %}{{ step.responsible }}{% endif %}">
+                        {% else %}
+                            <input class="form-control js-step-responsible" type="text" name="responsible" value="{{ step.responsible }}" placeholder="Respons&aacute;vel da etapa">
+                        {% endif %}
                     </div>
                     <div class="col-12">
-                        <input class="form-control" type="email" name="responsible_email" value="{{ step.responsible_email }}" placeholder="E-mail do respons&aacute;vel">
+                        {% if workspace_members %}
+                            <select class="form-select js-step-email" name="responsible_email" aria-label="E-mail do respons&aacute;vel">
+                                <option value="">Selecione o e-mail</option>
+                                {% for member in workspace_members %}
+                                    {% if member.email %}
+                                        <option value="{{ member.email }}" data-name="{{ member.name }}" {% if step.responsible_email == member.email %}selected{% endif %}>{{ member.email }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                                <option value="__custom__" {% if step.responsible_email and step.responsible_email not in workspace_member_emails %}selected{% endif %}>Outro...</option>
+                            </select>
+                            <input class="form-control js-step-email-custom d-none mt-2" name="responsible_email_custom" type="email" placeholder="E-mail (outro)" aria-label="E-mail (outro)" value="{% if step.responsible_email and step.responsible_email not in workspace_member_emails %}{{ step.responsible_email }}{% endif %}">
+                        {% else %}
+                            <input class="form-control js-step-email" type="email" name="responsible_email" value="{{ step.responsible_email }}" placeholder="E-mail do respons&aacute;vel">
+                        {% endif %}
                     </div>
                     <div class="col-12">
                         <select class="form-select" name="status">
@@ -252,6 +344,13 @@
             clone.querySelectorAll('input').forEach(input => {
                 input.value = '';
                 delete input.dataset.manual;
+                if (input.classList.contains('js-step-responsible-custom') || input.classList.contains('js-step-email-custom')) {
+                    input.classList.add('d-none');
+                }
+            });
+            clone.querySelectorAll('select').forEach(select => {
+                select.value = '';
+                delete select.dataset.manual;
             });
             container.appendChild(clone);
         });
@@ -267,11 +366,14 @@
         const status = document.getElementById('taskVoiceStatus');
         const titleInput = document.getElementById('id_title');
         const dateInput = document.getElementById('id_due_date');
+        const dateDisplay = document.getElementById('taskDateDisplay');
+        const categoryInput = document.getElementById('id_category');
         const stepContainer = document.getElementById('stepContainer');
         const addBtn = document.getElementById('addStepRow');
         const preview = document.getElementById('taskVoicePreview');
         const prevTitle = document.getElementById('taskPrevTitle');
         const prevDate = document.getElementById('taskPrevDate');
+        const prevCategory = document.getElementById('taskPrevCategory');
         const prevSteps = document.getElementById('taskPrevSteps');
         const applyBtn = document.getElementById('taskVoiceApply');
         const clearBtn = document.getElementById('taskVoiceClear');
@@ -290,7 +392,9 @@
         let buffer = '';
         let parsedTask = null;
         let manualTitle = titleInput ? !!titleInput.value.trim() : false;
-        let manualDate = dateInput ? !!dateInput.value.trim() : false;
+        let manualDate = false;
+        let manualDateDisplay = false;
+        let manualCategory = categoryInput ? !!categoryInput.value.trim() : false;
 
         const normalize = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -306,7 +410,7 @@
             if (!text) return { dateIso: '', cleaned: text };
             let cleaned = text;
             let dateIso = '';
-            let match = text.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
+            let match = text.match(/(?:dia\s*)?(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
             if (match) {
                 const day = match[1].padStart(2, '0');
                 const month = match[2].padStart(2, '0');
@@ -330,7 +434,7 @@
                 novembro: '11',
                 dezembro: '12'
             };
-            match = text.match(/(?:dia\s*)?(\d{1,2})\s*(?:de)?\s*(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de)?\s*(\d{2,4})?/i);
+            match = text.match(/(?:dia\s*)?(\d{1,2})\s*(?:de)?\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de)?\s*(\d{2,4})?/i);
             if (match) {
                 const day = match[1].padStart(2, '0');
                 const monthKey = normalize(match[2]);
@@ -341,6 +445,38 @@
                 cleaned = cleaned.replace(match[0], '').trim();
             }
             return { dateIso, cleaned };
+        };
+
+        const formatIsoToBr = (iso) => {
+            if (!iso) return '';
+            const parts = iso.split('-');
+            if (parts.length !== 3) return iso;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        };
+
+        const parseBrToIso = (value) => {
+            const match = (value || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (!match) return '';
+            return `${match[3]}-${match[2]}-${match[1]}`;
+        };
+
+        const applyDateMask = (input) => {
+            if (!input) return;
+            const digits = (input.value || '').replace(/\D/g, '').slice(0, 8);
+            let out = '';
+            if (digits.length >= 2) out = digits.slice(0, 2);
+            if (digits.length >= 3) out += `/${digits.slice(2, 4)}`;
+            if (digits.length >= 5) out += `/${digits.slice(4, 8)}`;
+            input.value = out;
+        };
+
+        const openDatePicker = () => {
+            if (!dateInput) return;
+            if (dateInput.showPicker) {
+                dateInput.showPicker();
+            } else {
+                dateInput.focus();
+            }
         };
 
         const parseStepSegment = (segment) => {
@@ -369,9 +505,29 @@
 
         const parseTranscript = (transcript) => {
             if (!transcript) return null;
-            const dateData = extractDate(transcript);
-            let title = (dateData.cleaned || transcript).trim();
+            const normalized = normalize(transcript);
+            const markers = ['categoria', 'prazo', 'data', 'dia', 'etapa', 'passo'];
+            const markerRegex = new RegExp(`\\b(${markers.join('|')})\\b`, 'i');
+            const extractField = (label) => {
+                const labelRegex = new RegExp(`\\b${label}\\b`, 'i');
+                const match = normalized.match(labelRegex);
+                if (!match) return null;
+                const start = match.index + match[0].length;
+                const rest = normalized.slice(start);
+                const next = rest.match(markerRegex);
+                const end = next ? start + next.index : normalized.length;
+                const raw = transcript.slice(start, end).replace(/[:,-]/g, ' ').trim();
+                return { raw, index: match.index };
+            };
+
+            const categorySegment = extractField('categoria');
+            const deadlineSegment = extractField('prazo') || extractField('data') || extractField('dia');
+            const dateMatchNumeric = normalized.match(/(\d{1,2})\s*[\/-]\s*(\d{1,2})(?:\s*(?:[\/-]|de)?\s*(\d{2,4}))?/);
+            const dateMatchText = normalized.match(/(?:dia\s*)?(\d{1,2})\s*(?:de)?\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/);
+            const dateData = extractDate(deadlineSegment ? deadlineSegment.raw : transcript);
+            let title = transcript.trim();
             let dateIso = dateData.dateIso || '';
+            let categoryValue = categorySegment ? categorySegment.raw.trim() : '';
             const steps = [];
 
             const stepMatches = Array.from(transcript.matchAll(/(etapa|passo)\s*(\d+|um|dois|tres|quatro|cinco|seis|sete|oito|nove|dez)?/gi));
@@ -393,7 +549,25 @@
                 title = steps[0].title;
             }
 
-            return { title: title.trim(), dateIso, steps, stepsDetected };
+            if (!stepsDetected) {
+                const markerMatch = normalized.match(markerRegex);
+                const cutCandidates = [
+                    markerMatch ? markerMatch.index : null,
+                    dateMatchNumeric ? dateMatchNumeric.index : null,
+                    dateMatchText ? dateMatchText.index : null,
+                    categorySegment ? categorySegment.index : null,
+                    deadlineSegment ? deadlineSegment.index : null,
+                ].filter(val => typeof val === 'number');
+                const cutIndex = cutCandidates.length ? Math.min(...cutCandidates) : null;
+                if (cutIndex !== null) {
+                    title = transcript.slice(0, cutIndex).trim();
+                }
+            }
+
+            title = title.replace(/\b(categoria|prazo|data|dia)\b.*$/i, '');
+            title = title.replace(/\s{2,}/g, ' ').replace(/[,;:\-]\s*$/, '').trim();
+
+            return { title: title.trim(), dateIso, steps, stepsDetected, category: categoryValue };
         };
 
         const updatePreview = (data) => {
@@ -405,6 +579,7 @@
             preview.classList.remove('d-none');
             if (prevTitle) prevTitle.textContent = data.title || '-';
             if (prevDate) prevDate.textContent = data.dateIso ? data.dateIso.split('-').reverse().join('/') : '-';
+            if (prevCategory) prevCategory.textContent = data.category || '-';
             if (prevSteps) {
                 prevSteps.innerHTML = '';
                 if (data.steps.length) {
@@ -435,18 +610,59 @@
                 }
                 if (!entry) return;
                 const titleField = entry.querySelector('input[name=\"step_title\"]');
-                const respField = entry.querySelector('input[name=\"step_responsible\"]');
-                const emailField = entry.querySelector('input[name=\"step_responsible_email\"]');
+                const respSelect = entry.querySelector('select.js-step-responsible');
+                const respInput = entry.querySelector('input[name=\"step_responsible\"]');
+                const respCustom = entry.querySelector('.js-step-responsible-custom');
+                const emailSelect = entry.querySelector('select.js-step-email');
+                const emailInput = entry.querySelector('input[name=\"step_responsible_email\"]');
+                const emailCustom = entry.querySelector('.js-step-email-custom');
                 if (titleField && titleField.dataset.manual !== '1') titleField.value = step.title || '';
-                if (respField && respField.dataset.manual !== '1') respField.value = step.responsible || '';
-                if (emailField && emailField.dataset.manual !== '1') emailField.value = step.email || '';
+                if (respSelect && respSelect.dataset.manual !== '1') {
+                    const hasOption = Array.from(respSelect.options).some((opt) => opt.value === step.responsible);
+                    if (step.responsible && !hasOption) {
+                        respSelect.value = '__custom__';
+                        if (respCustom) {
+                            respCustom.classList.remove('d-none');
+                            respCustom.value = step.responsible;
+                        }
+                    } else {
+                        respSelect.value = step.responsible || '';
+                        if (respCustom) respCustom.classList.add('d-none');
+                        if (emailSelect && emailSelect.dataset.manual !== '1' && !step.email) {
+                            const option = respSelect.selectedOptions ? respSelect.selectedOptions[0] : null;
+                            const email = option ? option.dataset.email : '';
+                            if (email) emailSelect.value = email;
+                        }
+                    }
+                } else if (respInput && respInput.dataset.manual !== '1') {
+                    respInput.value = step.responsible || '';
+                }
+                if (emailSelect && emailSelect.dataset.manual !== '1') {
+                    const hasEmail = Array.from(emailSelect.options).some((opt) => opt.value === step.email);
+                    if (step.email && !hasEmail) {
+                        emailSelect.value = '__custom__';
+                        if (emailCustom) {
+                            emailCustom.classList.remove('d-none');
+                            emailCustom.value = step.email;
+                        }
+                    } else {
+                        emailSelect.value = step.email || '';
+                        if (emailCustom) emailCustom.classList.add('d-none');
+                    }
+                } else if (emailInput && emailInput.dataset.manual !== '1') {
+                    emailInput.value = step.email || '';
+                }
             });
         };
 
         const applyParsed = (data, options = {}) => {
             if (!data) return;
             if (titleInput && data.title && !manualTitle) titleInput.value = data.title || '';
-            if (dateInput && data.dateIso && !manualDate) dateInput.value = data.dateIso;
+            if (dateInput && data.dateIso && !manualDate) {
+                dateInput.value = data.dateIso;
+                if (dateDisplay) dateDisplay.value = formatIsoToBr(data.dateIso);
+            }
+            if (categoryInput && data.category && !manualCategory) categoryInput.value = data.category;
             if (data.stepsDetected) syncSteps(data.steps || []);
             if (options.clearPreview) updatePreview(null);
         };
@@ -504,18 +720,46 @@
         if (dateInput) {
             dateInput.addEventListener('input', () => {
                 manualDate = !!dateInput.value.trim();
+                if (dateDisplay && dateInput.value) {
+                    dateDisplay.value = formatIsoToBr(dateInput.value);
+                }
             });
         }
+        if (dateDisplay) {
+            dateDisplay.addEventListener('input', () => {
+                applyDateMask(dateDisplay);
+                manualDateDisplay = !!dateDisplay.value.trim();
+                if (manualDateDisplay) {
+                    const iso = parseBrToIso(dateDisplay.value.trim());
+                    if (iso) {
+                        dateInput.value = iso;
+                        manualDate = true;
+                    }
+                }
+            });
+            dateDisplay.addEventListener('focus', openDatePicker);
+            dateDisplay.addEventListener('click', openDatePicker);
+        }
+        if (categoryInput) {
+            categoryInput.addEventListener('input', () => {
+                manualCategory = !!categoryInput.value.trim();
+            });
+        }
+
+        if (dateDisplay && dateInput && dateInput.value) {
+            dateDisplay.value = formatIsoToBr(dateInput.value);
+        }
         if (stepContainer) {
-            stepContainer.addEventListener('input', (ev) => {
-                const target = ev.target;
-                if (!target || !target.matches('input[name^=\"step_\"]')) return;
-                if (target.value.trim()) {
+            const setManual = (target) => {
+                if (!target || !target.matches('input[name^=\"step_\"], select[name^=\"step_\"]')) return;
+                if (target.value && target.value.trim()) {
                     target.dataset.manual = '1';
                 } else {
                     delete target.dataset.manual;
                 }
-            });
+            };
+            stepContainer.addEventListener('input', (ev) => setManual(ev.target));
+            stepContainer.addEventListener('change', (ev) => setManual(ev.target));
         }
 
         if (applyBtn) applyBtn.addEventListener('click', (ev) => {
@@ -527,6 +771,69 @@
             parsedTask = null;
             buffer = '';
             updatePreview(null);
+        });
+    })();
+</script>
+{% endif %}
+{% if workspace_members %}
+<script>
+    (function() {
+        const findPair = (input, selector) => {
+            const container = input.closest('.step-entry') || input.closest('form') || input.closest('.row');
+            if (!container) return null;
+            return container.querySelector(selector);
+        };
+
+        const syncCustomState = (selectEl, customEl) => {
+            if (!selectEl || !customEl) return;
+            if (selectEl.value === '__custom__') {
+                customEl.classList.remove('d-none');
+            } else {
+                customEl.classList.add('d-none');
+            }
+        };
+
+        const applyLink = (source, targetSelector, dataKey) => {
+            const pair = findPair(source, targetSelector);
+            if (!pair) return;
+            if (pair.value === '__custom__') return;
+            const option = source.selectedOptions ? source.selectedOptions[0] : null;
+            const value = option ? option.dataset[dataKey] : '';
+            if (value) {
+                pair.value = value;
+                const custom = findPair(pair, pair.classList.contains('js-step-email') ? '.js-step-email-custom' : '.js-step-responsible-custom');
+                if (custom) custom.classList.add('d-none');
+            }
+        };
+
+        document.querySelectorAll('.js-step-responsible').forEach((selectEl) => {
+            const custom = findPair(selectEl, '.js-step-responsible-custom');
+            syncCustomState(selectEl, custom);
+        });
+        document.querySelectorAll('.js-step-email').forEach((selectEl) => {
+            const custom = findPair(selectEl, '.js-step-email-custom');
+            syncCustomState(selectEl, custom);
+        });
+
+        document.addEventListener('change', (ev) => {
+            const target = ev.target;
+            if (!target) return;
+            if (target.classList.contains('js-step-responsible')) {
+                const custom = findPair(target, '.js-step-responsible-custom');
+                syncCustomState(target, custom);
+                if (target.value) target.dataset.manual = '1';
+                if (target.value !== '__custom__') {
+                    applyLink(target, '.js-step-email', 'email');
+                }
+            }
+            if (target.classList.contains('js-step-email')) {
+                const custom = findPair(target, '.js-step-email-custom');
+                syncCustomState(target, custom);
+                if (target.value) target.dataset.manual = '1';
+                if (target.value !== '__custom__') {
+                    applyLink(target, '.js-step-responsible', 'name');
+                }
+            }
         });
     })();
 </script>

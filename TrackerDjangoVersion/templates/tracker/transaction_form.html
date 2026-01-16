@@ -37,6 +37,9 @@
                             <i class="fa-solid fa-microphone me-1"></i>Falar
                         </button>
                         <span class="text-secondary small" id="txVoiceStatus">Fale a descri&ccedil;&atilde;o, valor e tipo (entrada/sa&iacute;da).</span>
+                        <span class="text-secondary small" data-bs-toggle="tooltip" title="Ex.: Sal&aacute;rio dezembro, data 10/12/2025, valor 5153, tipo entrada, categoria sal&aacute;rio.">
+                            <i class="fa-solid fa-circle-info"></i>
+                        </span>
                         <div id="txVoicePreview" class="glass-card p-3 mt-2 d-none">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="mb-0">Pr&eacute;-visualiza&ccedil;&atilde;o do ditado</h6>
@@ -63,7 +66,9 @@
                     {% if is_detail %}
                         <p class="form-control-plaintext fw-semibold">{{ form.instance.date|date:"d/m/Y" }}</p>
                     {% else %}
-                        {{ form.date }}{{ form.date.errors }}
+                        <input id="txDateDisplay" type="text" class="form-control" placeholder="dd/mm/aaaa" inputmode="numeric">
+                        {{ form.date }}
+                        {{ form.date.errors }}
                     {% endif %}
                 </div>
                 <div class="col-md-4">
@@ -93,6 +98,9 @@
                 {% if not is_detail %}
                 <div class="col-12 d-flex justify-content-end gap-2">
                     <a class="btn btn-outline-light" href="{% url 'tracker:transactions_list' %}">Cancelar</a>
+                    {% if not is_edit %}
+                        <button type="submit" class="btn btn-outline-light" name="save_new" value="1">Salvar e inserir nova</button>
+                    {% endif %}
                     <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
                 {% endif %}
@@ -111,6 +119,7 @@
         const valueInput = document.getElementById('id_value');
         const typeInput = document.getElementById('id_type');
         const dateInput = document.getElementById('id_date');
+        const dateDisplay = document.getElementById('txDateDisplay');
         const categorySelect = document.getElementById('id_category');
         const preview = document.getElementById('txVoicePreview');
         const prevDesc = document.getElementById('txPrevDesc');
@@ -135,7 +144,8 @@
         let buffer = '';
         let parsedTx = null;
         let manualDesc = descInput ? !!descInput.value.trim() : false;
-        let manualDate = dateInput ? !!dateInput.value.trim() : false;
+        let manualDate = false;
+        let manualDateDisplay = false;
         let manualValue = valueInput ? !!valueInput.value.trim() : false;
         let manualType = typeInput ? !!typeInput.value : false;
         let manualCategory = categorySelect ? !!categorySelect.value : false;
@@ -246,33 +256,106 @@
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
         };
 
+        const parseBrToIso = (value) => {
+            const match = (value || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (!match) return '';
+            return `${match[3]}-${match[2]}-${match[1]}`;
+        };
+
+        const applyDateMask = (input) => {
+            if (!input) return;
+            const digits = (input.value || '').replace(/\D/g, '').slice(0, 8);
+            let out = '';
+            if (digits.length >= 2) out = digits.slice(0, 2);
+            if (digits.length >= 3) out += `/${digits.slice(2, 4)}`;
+            if (digits.length >= 5) out += `/${digits.slice(4, 8)}`;
+            input.value = out;
+        };
+
+        const openDatePicker = () => {
+            if (!dateInput) return;
+            if (dateInput.showPicker) {
+                dateInput.showPicker();
+            } else {
+                dateInput.focus();
+            }
+        };
+
+        const parseDateText = (text) => {
+            if (!text) return { dateIso: '', dateDisplay: '' };
+            const norm = normalize(text);
+            let match = norm.match(/(?:dia\s*)?(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
+            if (match) {
+                const day = match[1].padStart(2, '0');
+                const month = match[2].padStart(2, '0');
+                let year = match[3] ? match[3] : String(new Date().getFullYear());
+                if (year.length === 2) year = `20${year}`;
+                return { dateIso: `${year}-${month}-${day}`, dateDisplay: `${day}/${month}/${year}` };
+            }
+            match = norm.match(/(?:dia\s*)?(\d{1,2})\s*(?:de)?\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de)?\s*(\d{2,4})?/);
+            if (match) {
+                const monthMap = {
+                    janeiro: '01',
+                    fevereiro: '02',
+                    marco: '03',
+                    abril: '04',
+                    maio: '05',
+                    junho: '06',
+                    julho: '07',
+                    agosto: '08',
+                    setembro: '09',
+                    outubro: '10',
+                    novembro: '11',
+                    dezembro: '12'
+                };
+                const day = match[1].padStart(2, '0');
+                const month = monthMap[match[2]] || '01';
+                let year = match[3] ? match[3] : String(new Date().getFullYear());
+                if (year.length === 2) year = `20${year}`;
+                return { dateIso: `${year}-${month}-${day}`, dateDisplay: `${day}/${month}/${year}` };
+            }
+            return { dateIso: '', dateDisplay: '' };
+        };
+
         const parseTranscript = (transcript) => {
             if (!transcript) return null;
             const normalized = normalize(transcript);
-            let desc = transcript;
-            let dateIso = '';
-            let dateDisplay = '';
+            const markers = ['categoria', 'valor', 'data', 'dia', 'tipo', 'entrada', 'saida', 'despesa', 'gasto', 'receita'];
+            const markerRegex = new RegExp(`\\b(${markers.join('|')})\\b`, 'i');
 
-            const dateMatch = normalized.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
-            if (dateMatch) {
-                const day = dateMatch[1].padStart(2, '0');
-                const month = dateMatch[2].padStart(2, '0');
-                let year = dateMatch[3] ? dateMatch[3] : String(new Date().getFullYear());
-                if (year.length === 2) year = `20${year}`;
-                dateIso = `${year}-${month}-${day}`;
-                dateDisplay = `${day}/${month}/${year}`;
-                desc = desc.replace(dateMatch[0], '');
-            }
+            const extractField = (label) => {
+                const labelRegex = new RegExp(`\\b${label}\\b`, 'i');
+                const match = normalized.match(labelRegex);
+                if (!match) return null;
+                const start = match.index + match[0].length;
+                const rest = normalized.slice(start);
+                const next = rest.match(markerRegex);
+                const end = next ? start + next.index : normalized.length;
+                const raw = transcript.slice(start, end).replace(/[:,-]/g, ' ').trim();
+                return { raw, index: match.index };
+            };
 
-            let valueRaw = '';
-            const valueMatch = normalized.match(/valor\s*([0-9\.,]+)/i);
-            if (valueMatch) {
-                valueRaw = valueMatch[1];
-                desc = desc.replace(valueMatch[0], '');
-            }
+            const categorySegment = extractField('categoria');
+            const valueSegment = extractField('valor');
+            const dateSegment = extractField('data') || extractField('dia');
+            const typeSegment = extractField('tipo');
+            const dateMatchNumeric = normalized.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*(?:[\/\-]|de)?\s*(\d{2,4}))?/);
+            const dateMatchText = normalized.match(/(?:dia\s*)?(\d{1,2})\s*(?:de)?\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/);
+
+            const dateData = parseDateText(dateSegment ? dateSegment.raw : transcript);
+            const dateIso = dateData.dateIso;
+            const dateDisplay = dateData.dateDisplay;
+
+            let valueRaw = valueSegment ? valueSegment.raw : '';
             if (!valueRaw) {
-                const cleaned = normalized.replace(dateMatch ? dateMatch[0] : '', '');
-                const numbers = cleaned.match(/-?\d+[\.,]?\d*/g);
+                let searchText = normalized;
+                if (dateSegment && dateSegment.raw) {
+                    const dateRawNorm = normalize(dateSegment.raw);
+                    if (dateRawNorm) searchText = searchText.replace(dateRawNorm, ' ');
+                }
+                if (dateMatchNumeric) searchText = searchText.replace(dateMatchNumeric[0], ' ');
+                if (dateMatchText) searchText = searchText.replace(dateMatchText[0], ' ');
+                const numbers = searchText.match(/-?\d+[\.,]?\d*/g);
                 if (numbers && numbers.length) {
                     valueRaw = numbers[numbers.length - 1];
                 }
@@ -300,25 +383,42 @@
                 if (wordValue) valueNum = wordValue;
             }
 
-            const tipo = (/(saida|despesa|gasto|paguei)/i.test(normalized))
-                ? 'expense'
-                : (/(entrada|receita|salario)/i.test(normalized))
-                    ? 'income'
-                    : (isNegative ? 'expense' : (valueNum !== null ? 'income' : ''));
+            let tipo = '';
+            if (typeSegment && typeSegment.raw) {
+                const typeNorm = normalize(typeSegment.raw);
+                if (/(saida|despesa|gasto|paguei)/i.test(typeNorm)) tipo = 'expense';
+                if (/(entrada|receita|salario)/i.test(typeNorm)) tipo = 'income';
+            }
+            if (!tipo) {
+                tipo = (/(saida|despesa|gasto|paguei)/i.test(normalized))
+                    ? 'expense'
+                    : (/(entrada|receita|salario)/i.test(normalized))
+                        ? 'income'
+                        : (isNegative ? 'expense' : (valueNum !== null ? 'income' : ''));
+            }
 
             const categories = getCategories();
             let category = null;
             if (categorySelect && categories.length) {
-                category = findCategory(normalized, categories);
-                if (category) {
-                    const regex = new RegExp(escapeRegExp(category.name), 'i');
-                    desc = desc.replace(regex, '');
-                }
+                const categoryText = categorySegment ? categorySegment.raw : normalized;
+                category = findCategory(normalize(categoryText), categories);
             }
 
-            desc = desc.replace(/\b(valor|dia|data)\b/ig, '');
-            desc = desc.replace(/\b(entrada|saida|despesa|gasto|paguei)\b/ig, '');
-            desc = desc.replace(/\s{2,}/g, ' ').trim();
+            const markerMatch = normalized.match(markerRegex);
+            const cutCandidates = [
+                markerMatch ? markerMatch.index : null,
+                dateMatchNumeric ? dateMatchNumeric.index : null,
+                dateMatchText ? dateMatchText.index : null,
+                categorySegment ? categorySegment.index : null,
+                valueSegment ? valueSegment.index : null,
+                dateSegment ? dateSegment.index : null,
+                typeSegment ? typeSegment.index : null,
+            ].filter(val => typeof val === 'number');
+            const cutIndex = cutCandidates.length ? Math.min(...cutCandidates) : null;
+
+            let desc = cutIndex !== null ? transcript.slice(0, cutIndex) : transcript;
+            desc = desc.replace(/\b(categoria|valor|data|dia|tipo|entrada|saida|despesa|gasto|receita)\b.*$/i, '');
+            desc = desc.replace(/\s{2,}/g, ' ').replace(/[,;:\-]\s*$/, '').trim();
             const finalDesc = desc || transcript;
 
             return {
@@ -345,10 +445,20 @@
             if (prevCategory) prevCategory.textContent = data.category ? data.category.name : '-';
         };
 
+        const syncDateDisplay = () => {
+            if (!dateInput || !dateDisplay) return;
+            if (dateInput.value) {
+                dateDisplay.value = formatIsoToBr(dateInput.value);
+            }
+        };
+
         const applyParsed = () => {
             if (!parsedTx) return;
             if (descInput && !manualDesc) descInput.value = parsedTx.description || '';
-            if (dateInput && parsedTx.dateIso && !manualDate) dateInput.value = parsedTx.dateIso;
+            if (dateInput && parsedTx.dateIso && !manualDate) {
+                dateInput.value = parsedTx.dateIso;
+                if (dateDisplay) dateDisplay.value = formatIsoToBr(parsedTx.dateIso);
+            }
             if (valueInput && parsedTx.value !== null && !manualValue) valueInput.value = parsedTx.value.toFixed(2);
             if (typeInput && parsedTx.type && !manualType) typeInput.value = parsedTx.type;
             if (categorySelect && parsedTx.category && !manualCategory) categorySelect.value = parsedTx.category.id;
@@ -406,7 +516,23 @@
         if (dateInput) {
             dateInput.addEventListener('input', () => {
                 manualDate = !!dateInput.value.trim();
+                syncDateDisplay();
             });
+        }
+        if (dateDisplay) {
+            dateDisplay.addEventListener('input', () => {
+                applyDateMask(dateDisplay);
+                manualDateDisplay = !!dateDisplay.value.trim();
+                if (manualDateDisplay) {
+                    const iso = parseBrToIso(dateDisplay.value.trim());
+                    if (iso) {
+                        dateInput.value = iso;
+                        manualDate = true;
+                    }
+                }
+            });
+            dateDisplay.addEventListener('focus', openDatePicker);
+            dateDisplay.addEventListener('click', openDatePicker);
         }
         if (valueInput) {
             valueInput.addEventListener('input', () => {
@@ -423,6 +549,8 @@
                 manualCategory = !!categorySelect.value;
             });
         }
+
+        syncDateDisplay();
 
         if (applyBtn) applyBtn.addEventListener('click', (ev) => {
             ev.preventDefault();

@@ -2,16 +2,49 @@
 
 {% block title %}{{ object|default:"Novo usu&aacute;rio" }} | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    .avatar-lg {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div class="d-flex align-items-center gap-3">
+        {% if object and object.profile and object.profile.avatar %}
+            <img src="{{ object.profile.avatar.url }}" alt="Avatar" class="avatar-lg">
+        {% else %}
+            <span class="avatar-lg d-inline-flex align-items-center justify-content-center bg-secondary text-white">
+                {{ object.username|default:"?"|first|upper }}
+            </span>
+        {% endif %}
+        <div>
+            <p class="text-secondary small text-uppercase mb-1">Admin</p>
+            <h1 class="h4 fw-bold mb-0">{{ object|default:"Novo usu&aacute;rio" }}</h1>
+            <p class="text-secondary mb-0">Edite dados pessoais, plano e informa&ccedil;&otilde;es de pagamento.</p>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Voltar</a>
+        {% if object %}
+            <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_detail' object.id %}">Ver perfil</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
     <div class="col-lg-10">
         <div class="glass-card p-4">
-            <h1 class="h5 fw-bold mb-3">{{ object|default:"Novo usu&aacute;rio" }}</h1>
             <form method="post" novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-lg-6">
-                        <div class="p-3 bg-dark bg-opacity-10 rounded">
+                        <div class="p-3 bg-dark bg-opacity-10 rounded h-100">
                             <h6 class="mb-3">Dados do usu&aacute;rio</h6>
                             {% for field in form %}
                                 <div class="mb-3">
@@ -25,7 +58,7 @@
                         </div>
                     </div>
                     <div class="col-lg-6">
-                        <div class="p-3 bg-dark bg-opacity-10 rounded">
+                        <div class="p-3 bg-dark bg-opacity-10 rounded h-100">
                             <h6 class="mb-3">Plano e pagamento</h6>
                             {% for field in profile_form %}
                                 <div class="mb-3">
@@ -47,7 +80,6 @@
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Voltar</a>
                     <button class="btn btn-primary" type="submit">Salvar</button>
                 </div>
             </form>

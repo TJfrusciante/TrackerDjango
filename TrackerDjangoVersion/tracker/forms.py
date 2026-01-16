@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm, PasswordResetForm
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from django.utils.text import slugify
 
@@ -48,6 +49,12 @@ class TransactionForm(BaseStyledForm):
         super().__init__(*args, **kwargs)
         self.fields['date'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
         self.fields['date'].widget.format = '%Y-%m-%d'
+        self.fields['date'].widget.attrs.update({
+            'class': 'form-control visually-hidden',
+            'type': 'date',
+            'lang': 'pt-BR',
+            'id': 'id_date',
+        })
 
     class Meta:
         model = Transaction
@@ -56,21 +63,42 @@ class TransactionForm(BaseStyledForm):
             'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'}),
         }
 
+    def clean_value(self):
+        raw = self.data.get(self.add_prefix('value'), '')
+        if isinstance(raw, str) and raw.strip():
+            sanitized = raw.strip().replace(' ', '')
+            if ',' in sanitized and '.' in sanitized:
+                sanitized = sanitized.replace('.', '').replace(',', '.')
+            elif ',' in sanitized:
+                sanitized = sanitized.replace(',', '.')
+            try:
+                return Decimal(sanitized)
+            except InvalidOperation:
+                raise ValidationError('Informe um valor numérico válido.')
+        return self.cleaned_data.get('value')
+
 
 class TaskForm(BaseStyledForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['due_date'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
         self.fields['due_date'].widget.format = '%Y-%m-%d'
+        self.fields['due_date'].widget.attrs.update({
+            'class': 'form-control visually-hidden',
+            'type': 'date',
+            'lang': 'pt-BR',
+            'id': 'id_due_date',
+        })
 
     class Meta:
         model = Task
-        fields = ['title', 'due_date', 'status']
+        fields = ['title', 'category', 'due_date', 'status']
         widgets = {
             'due_date': forms.DateInput(
                 format='%Y-%m-%d',
                 attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'}
             ),
+            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Categoria da tarefa'}),
         }
 
 
@@ -80,10 +108,49 @@ class TaskStepForm(BaseStyledForm):
         fields = ['title', 'responsible', 'responsible_email', 'status']
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'Descri\u00e7\u00e3o da etapa', 'title': 'Descri\u00e7\u00e3o da etapa', 'class': 'form-control form-control-lg'}),
-            'responsible': forms.TextInput(attrs={'placeholder': 'Respons\u00e1vel da etapa', 'title': 'Respons\u00e1vel da etapa', 'class': 'form-control form-control-lg'}),
-            'responsible_email': forms.EmailInput(attrs={'placeholder': 'E-mail do respons\u00e1vel', 'title': 'E-mail do respons\u00e1vel', 'class': 'form-control form-control-lg'}),
+            'responsible': forms.TextInput(attrs={'placeholder': 'Respons\u00e1vel da etapa', 'title': 'Respons\u00e1vel da etapa', 'class': 'form-control form-control-lg js-step-responsible', 'list': 'workspaceMembersList'}),
+            'responsible_email': forms.EmailInput(attrs={'placeholder': 'E-mail do respons\u00e1vel', 'title': 'E-mail do respons\u00e1vel', 'class': 'form-control form-control-lg js-step-email', 'list': 'workspaceEmailsList'}),
             'status': forms.Select(attrs={'class': 'form-select form-select-lg'}),
         }
+
+
+class TransactionBulkUpdateForm(forms.Form):
+    category = forms.ModelChoiceField(queryset=Category.objects.none(), required=False, empty_label='Manter categoria')
+    type = forms.ChoiceField(
+        choices=(('', 'Manter tipo'), ('income', 'Entrada'), ('expense', 'Sa\u00edda')),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    selected_action = forms.ChoiceField(
+        choices=(('', 'Manter destaque'), ('mark', 'Marcar destaque'), ('unmark', 'Remover destaque')),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    def __init__(self, *args, workspace=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if workspace:
+            self.fields['category'].queryset = Category.objects.filter(workspace=workspace)
+        else:
+            self.fields['category'].queryset = Category.objects.all()
+        self.fields['category'].widget.attrs.setdefault('class', 'form-select')
+
+
+class TaskBulkUpdateForm(forms.Form):
+    category = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nova categoria', 'list': 'taskCategoriesList'})
+    )
+    due_date = forms.DateField(
+        required=False,
+        input_formats=['%Y-%m-%d'],
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'})
+    )
+    status = forms.ChoiceField(
+        choices=(('', 'Manter status'), ('ongoing', 'Em andamento'), ('done', 'Finalizada')),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
 
 
 class CategoryForm(BaseStyledForm):

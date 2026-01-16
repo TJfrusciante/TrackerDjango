@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil de {{ object.username }} | iTracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .avatar-lg {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div class="d-flex align-items-center gap-3">
+        {% if profile and profile.avatar %}
+            <img src="{{ profile.avatar.url }}" alt="Avatar" class="avatar-lg">
+        {% else %}
+            <span class="avatar-lg d-inline-flex align-items-center justify-content-center bg-secondary text-white">
+                {{ object.username|first|upper }}
+            </span>
+        {% endif %}
+        <div>
+            <p class="text-secondary small text-uppercase mb-1">Perfil</p>
+            <h1 class="h4 fw-bold mb-0">{{ object.get_full_name|default:object.username }}</h1>
+            <div class="text-secondary">{{ object.email|default:"-" }}</div>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Voltar</a>
+        <a class="btn btn-primary" href="{% url 'tracker:user_admin_edit' object.id %}">Editar perfil</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Status</p>
+            {% if approval_status == 'superuser' %}
+                <span class="badge bg-primary">Superuser</span>
+            {% elif approval_status == 'guest' %}
+                <span class="badge bg-info-subtle text-info">Convidado</span>
+            {% elif approval_status == 'trial' %}
+                <span class="badge bg-primary-subtle text-primary">Trial</span>
+            {% elif approval_status == 'active' %}
+                <span class="badge bg-success-subtle text-success">Ativo</span>
+            {% elif approval_status == 'pending' %}
+                <span class="badge bg-warning-subtle text-warning">Pendente</span>
+            {% elif approval_status == 'expired' %}
+                <span class="badge bg-danger-subtle text-danger">Expirado</span>
+            {% else %}
+                <span class="badge bg-secondary-subtle text-secondary">Suspenso</span>
+            {% endif %}
+            {% if trial_active and profile and profile.trial_expires_at %}
+                <div class="small text-secondary mt-2">Trial at&eacute; {{ profile.trial_expires_at|date:"d/m/Y" }}</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Plano</p>
+            <div class="fw-semibold">{{ profile.get_plan_display|default:"-" }}</div>
+            <div class="small text-secondary">Ciclo: {{ profile.billing_cycle|default:"-" }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Renova&ccedil;&atilde;o</p>
+            <div class="fw-semibold">
+                {% if profile and profile.subscription_expires %}
+                    {{ profile.subscription_expires|date:"d/m/Y" }}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+            <div class="small text-secondary">
+                {% if profile and profile.payment_confirmed %}
+                    Pagamento confirmado
+                {% else %}
+                    Pagamento pendente
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Conta criada</p>
+            <div class="fw-semibold">{{ object.date_joined|date:"d/m/Y" }}</div>
+            <div class="small text-secondary">Login: {% if object.last_login %}{{ object.last_login|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Workspaces (owner)</p>
+            <h4 class="mb-0">{{ owned_workspace_count }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Workspaces (membro)</p>
+            <h4 class="mb-0">{{ member_workspace_count }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Categorias</p>
+            <h4 class="mb-0">{{ categories_count }}</h4>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-3 h-100">
+            <p class="text-secondary small mb-1">Chat (mensagens)</p>
+            <h4 class="mb-0">{{ chat_messages }}</h4>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Financeiro (workspaces do owner)</h5>
+                <span class="badge bg-secondary-subtle text-secondary">Transa&ccedil;&otilde;es</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Entradas</p>
+                    <div class="fw-semibold text-success">R$ {{ tx_income|floatformat:2 }}</div>
+                </div>
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Sa&iacute;das</p>
+                    <div class="fw-semibold text-danger">R$ {{ tx_expense|floatformat:2 }}</div>
+                </div>
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Saldo</p>
+                    <div class="fw-semibold">R$ {{ tx_net|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="mt-3 text-secondary small">
+                Total de transa&ccedil;&otilde;es: {{ tx_total }}
+                {% if last_tx %}
+                    &middot; &Uacute;ltima: {{ last_tx.date|date:"d/m/Y" }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Tarefas</h5>
+                <span class="badge bg-secondary-subtle text-secondary">Workspaces com acesso</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Total</p>
+                    <div class="fw-semibold">{{ tasks_total }}</div>
+                </div>
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Em andamento</p>
+                    <div class="fw-semibold text-warning">{{ tasks_open }}</div>
+                </div>
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Conclu&iacute;das</p>
+                    <div class="fw-semibold text-success">{{ tasks_done }}</div>
+                </div>
+            </div>
+            <div class="mt-3 text-secondary small">Etapas cadastradas: {{ steps_total }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Uso de IA ({{ ai_window_days }} dias)</h5>
+                <span class="badge bg-secondary-subtle text-secondary">Tokens</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Requisi&ccedil;&otilde;es</p>
+                    <div class="fw-semibold">{{ ai_requests }}</div>
+                </div>
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">Tokens</p>
+                    <div class="fw-semibold">{{ ai_tokens }}</div>
+                </div>
+                <div class="col-md-4">
+                    <p class="text-secondary small mb-1">M&eacute;dia</p>
+                    <div class="fw-semibold">{{ ai_avg_tokens }}</div>
+                </div>
+            </div>
+            <div class="mt-3 text-secondary small">
+                Custo estimado: R$ {{ ai_cost_brl|floatformat:2 }} (USD {{ ai_cost_usd|floatformat:4 }})
+                {% if last_ai %}
+                    &middot; &Uacute;ltimo uso: {{ last_ai.created_at|date:"d/m/Y H:i" }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <h5 class="mb-3">Resumo do perfil</h5>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="text-secondary small">Usu&aacute;rio</div>
+                    <div class="fw-semibold">{{ object.username }}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="text-secondary small">Nome completo</div>
+                    <div class="fw-semibold">{{ object.get_full_name|default:"-" }}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="text-secondary small">E-mail</div>
+                    <div class="fw-semibold">{{ object.email|default:"-" }}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="text-secondary small">Aprovado</div>
+                    <div class="fw-semibold">{% if profile and profile.is_approved %}Sim{% else %}N&atilde;o{% endif %}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="text-secondary small">Convidado</div>
+                    <div class="fw-semibold">{% if profile and profile.is_guest %}Sim{% else %}N&atilde;o{% endif %}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="text-secondary small">Pagamento</div>
+                    <div class="fw-semibold">{% if profile and profile.payment_confirmed %}Confirmado{% else %}Pendente{% endif %}</div>
+                </div>
+                {% if profile and profile.trial_started_at %}
+                <div class="col-md-6">
+                    <div class="text-secondary small">Trial iniciado</div>
+                    <div class="fw-semibold">{{ profile.trial_started_at|date:"d/m/Y" }}</div>
+                </div>
+                {% endif %}
+                {% if profile and profile.trial_expires_at %}
+                <div class="col-md-6">
+                    <div class="text-secondary small">Trial expira</div>
+                    <div class="fw-semibold">{{ profile.trial_expires_at|date:"d/m/Y" }}</div>
+                </div>
+                {% endif %}
+                {% if profile and profile.payment_confirmed_at %}
+                <div class="col-md-6">
+                    <div class="text-secondary small">Pagamento confirmado</div>
+                    <div class="fw-semibold">{{ profile.payment_confirmed_at|date:"d/m/Y H:i" }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

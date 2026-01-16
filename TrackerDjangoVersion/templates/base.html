@@ -205,7 +205,7 @@
                         <a href="{% url 'tracker:contact_admin' %}" class="btn btn-outline-light footer-link-btn">Contato</a>
                         {% endif %}
                     </div>
-                    <div class="small text-secondary mt-2">&copy; {% now "Y" %} iTracker.</div>
+                    <div class="small text-secondary mt-2">&copy; {% now "Y" %} iTracker{% if app_version %} &middot; Vers&atilde;o {{ app_version }}{% endif %}.</div>
                 </div>
             </div>
         </div>

@@ -116,6 +116,15 @@
         const endDisplay = document.getElementById('txEndDisplay');
         const startHidden = document.getElementById('txStartHidden');
         const endHidden = document.getElementById('txEndHidden');
+        const applyDateMask = (input) => {
+            if (!input) return;
+            const digits = (input.value || '').replace(/\D/g, '').slice(0, 8);
+            let out = '';
+            if (digits.length >= 2) out = digits.slice(0, 2);
+            if (digits.length >= 3) out += `/${digits.slice(2, 4)}`;
+            if (digits.length >= 5) out += `/${digits.slice(4, 8)}`;
+            input.value = out;
+        };
         const toIso = (val) => {
             const parts = (val || '').split('/');
             if (parts.length !== 3) return '';
@@ -123,6 +132,12 @@
             if (!d || !m || !y) return '';
             return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
         };
+        if (startDisplay) {
+            startDisplay.addEventListener('input', () => applyDateMask(startDisplay));
+        }
+        if (endDisplay) {
+            endDisplay.addEventListener('input', () => applyDateMask(endDisplay));
+        }
         form.addEventListener('submit', (e) => {
             const isoStart = toIso(startDisplay.value.trim());
             const isoEnd = toIso(endDisplay.value.trim());
@@ -138,6 +153,33 @@
 </script>
 
 <div class="row g-3 mb-4">
+    <div class="col-12">
+        <form id="txBulkForm" method="post" action="{% url 'tracker:transactions_bulk_update' %}" class="glass-card p-3">
+            {% csrf_token %}
+            <input type="hidden" name="ids" id="txBulkIds">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">A&ccedil;&atilde;o em massa</label>
+                    <div class="small text-secondary">Selecionadas: <span id="txSelectedCount">0</span></div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Categoria</label>
+                    {{ bulk_form.category }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tipo</label>
+                    {{ bulk_form.type }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Destaque</label>
+                    {{ bulk_form.selected_action }}
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-outline-light" type="submit">Aplicar</button>
+                </div>
+            </div>
+        </form>
+    </div>
     <div class="col-md-4">
         <div class="glass-card p-3">
             <p class="text-secondary small mb-1">Entradas</p>
@@ -163,6 +205,9 @@
         <table id="tx-table" class="table table-borderless table-striped align-middle mb-0">
             <thead>
                 <tr class="text-secondary">
+                    <th class="text-center" style="width: 40px;">
+                        <input class="form-check-input" type="checkbox" id="txSelectAll" aria-label="Selecionar todas">
+                    </th>
                     <th>Descri&ccedil;&atilde;o</th>
                     <th>Categoria</th>
                     <th>Data</th>
@@ -174,6 +219,9 @@
             <tbody>
                 {% for tx in transactions_page %}
                     <tr class="{% if tx.selected %}due-warning{% endif %}">
+                        <td class="text-center">
+                            <input class="form-check-input tx-select" type="checkbox" value="{{ tx.id }}" aria-label="Selecionar transa&ccedil;&atilde;o">
+                        </td>
                         <td class="fw-semibold">{{ tx.description }}</td>
                         <td><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
                         <td class="text-secondary">{{ tx.date|date:"d/m/Y" }}</td>
@@ -214,7 +262,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6" class="text-secondary">Nenhuma transa&ccedil;&atilde;o registrada.</td>
+                        <td colspan="7" class="text-secondary">Nenhuma transa&ccedil;&atilde;o registrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -245,6 +293,41 @@
     </div>
     {% endif %}
 </div>
+<script>
+    (function() {
+        const selectAll = document.getElementById('txSelectAll');
+        const checkboxes = Array.from(document.querySelectorAll('.tx-select'));
+        const hiddenInput = document.getElementById('txBulkIds');
+        const countEl = document.getElementById('txSelectedCount');
+        const form = document.getElementById('txBulkForm');
+        const applyBtn = form ? form.querySelector('button[type="submit"]') : null;
+        const update = () => {
+            const ids = checkboxes.filter(cb => cb.checked).map(cb => cb.value);
+            if (hiddenInput) hiddenInput.value = ids.join(',');
+            if (countEl) countEl.textContent = ids.length;
+            if (applyBtn) applyBtn.disabled = ids.length === 0;
+        };
+        if (form) {
+            form.addEventListener('submit', (ev) => {
+                if (!hiddenInput || !hiddenInput.value) {
+                    ev.preventDefault();
+                    alert('Selecione ao menos uma transa\u00e7\u00e3o para aplicar a a\u00e7\u00e3o.');
+                }
+            });
+        }
+        if (selectAll) {
+            selectAll.addEventListener('change', () => {
+                checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                update();
+            });
+        }
+        checkboxes.forEach(cb => cb.addEventListener('change', () => {
+            if (selectAll) selectAll.checked = checkboxes.every(item => item.checked);
+            update();
+        }));
+        update();
+    })();
+</script>
 {% endblock %}
 
 

@@ -138,5 +138,13 @@ Mapa rapido (onde mexer)
 - Reset/confirmacao de email: `TrackerDjangoVersion/tracker/views.py` -> `TrackerPasswordResetView` (linha 256) e `verify_email` (linha 1930); templates em `TrackerDjangoVersion/templates/registration/` e `TrackerDjangoVersion/templates/tracker/email_verified.html`.
 - Metricas/observabilidade: `TrackerDjangoVersion/tracker/metrics.py` (record_metric), model `MetricEvent` em `TrackerDjangoVersion/tracker/models.py`, cards em `TrackerDjangoVersion/templates/tracker/superuser_overview.html`.
 - Logs/Sentry: `TrackerDjangoVersion/tracker/logging.py` e configuracao em `TrackerDjangoVersion/TrackerDjangoVersion/settings.py` (LOG_JSON/SENTRY_*).
+- Dashboard: filtros de data com calendarios (inputs ocultos type=date) e seletor de mes/ano; exibicao dd/mm/aaaa em `TrackerDjangoVersion/templates/tracker/dashboard.html`.
+- Ditado: transacoes e tarefas agora cortam descricao/titulo ao detectar marcadores (categoria/data/valor/tipo) e datas; parse de "dia" em `TrackerDjangoVersion/templates/tracker/transaction_form.html` e `TrackerDjangoVersion/templates/tracker/task_form.html`.
+- Categorias: paleta com 30 cores clicaveis em `TrackerDjangoVersion/templates/tracker/categories_list.html`.
+- Formularios: data visivel com mascara dd/mm/aaaa em transacoes e tarefas (JS nos respectivos templates).
+- Filtros: data visivel com mascara dd/mm/aaaa no dashboard e listas de transacoes/tarefas.
+- Ditado: preview de tarefas agora mostra categoria detectada; tooltips com exemplos nos botoes de voz (transacoes/tarefas).
+- Ditado: aplicar nao trava data com valor inicial (manualDate agora so ativa apos edicao do usuario).
+- Formularios: inputs date ocultos configurados no backend (forms) para evitar erro de template com as_widget(attrs).
 
 

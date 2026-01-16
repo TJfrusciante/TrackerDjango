@@ -2,6 +2,32 @@
 
 {% block title %}Categorias | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    .color-palette {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+        gap: 0.5rem;
+    }
+    .color-swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        border: 1px solid var(--border, #e2e8f0);
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .color-swatch:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    }
+    .color-swatch.active {
+        outline: 2px solid #10b981;
+        outline-offset: 2px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
     <div>
@@ -37,7 +63,12 @@
                     <label class="form-label">Cor (opcional)</label>
                     {{ form.color }}
                     {{ form.color.errors }}
-                    <div class="form-text">Clique no seletor para escolher. Usada nos cards, gr&aacute;ficos e tabelas.</div>
+                    <div class="form-text">Clique no seletor ou em uma cor abaixo. Usada nos cards, gr&aacute;ficos e tabelas.</div>
+                    <div class="color-palette mt-3" id="colorPalette">
+                        {% for color in color_palette %}
+                            <button class="color-swatch" type="button" data-color="{{ color }}" style="background: {{ color }};" aria-label="Selecionar {{ color }}"></button>
+                        {% endfor %}
+                    </div>
                 </div>
                 <div class="col-12 d-grid">
                     <button class="btn btn-primary" type="submit">Salvar</button>
@@ -88,4 +119,26 @@
         </div>
     </div>
 </div>
+<script>
+    (function() {
+        const input = document.getElementById('id_color');
+        const palette = document.getElementById('colorPalette');
+        if (!input || !palette) return;
+        const buttons = Array.from(palette.querySelectorAll('[data-color]'));
+        const setActive = (value) => {
+            const normalized = (value || '').toLowerCase();
+            buttons.forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.color.toLowerCase() === normalized);
+            });
+        };
+        buttons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                input.value = btn.dataset.color;
+                setActive(btn.dataset.color);
+            });
+        });
+        input.addEventListener('input', () => setActive(input.value));
+        setActive(input.value);
+    })();
+</script>
 {% endblock %}

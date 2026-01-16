@@ -1,5 +1,6 @@
 import csv
 import datetime
+import calendar
 import io
 import json
 import os
@@ -68,6 +69,8 @@ from .forms import (
     SubscriptionInviteForm,
     PasswordResetRequestForm,
     PricingConfigForm,
+    TransactionBulkUpdateForm,
+    TaskBulkUpdateForm,
 )
 from .models import (
     Category,
@@ -101,7 +104,7 @@ from .notifications import (
 from .metrics import record_metric
 from .pricing import get_pricing_state
 from assistant.services import llm_complete, estimate_costs
-from assistant.models import AiUsage
+from assistant.models import AiUsage, ChatMessage
 from assistant.limits import get_ai_quota
 from payments.models import MpSubscription, MpWebhookEvent
 
@@ -187,6 +190,30 @@ def _ensure_unique_slug(base: str) -> str:
         slug = f"{base_slug}-{counter}"
         counter += 1
     return slug
+
+
+def _get_workspace_members(workspace):
+    if not workspace:
+        return []
+    people_map = {}
+
+    def add_user(user):
+        if not user:
+            return
+        if user.id in people_map:
+            return
+        name = user.get_full_name() or user.username
+        people_map[user.id] = {
+            'name': name,
+            'email': user.email or '',
+        }
+
+    add_user(getattr(workspace, 'owner', None))
+    members = WorkspaceMembership.objects.filter(workspace=workspace).select_related('user')
+    for membership in members:
+        add_user(membership.user)
+
+    return sorted(people_map.values(), key=lambda item: item['name'].lower())
 
 
 def _record_ai_usage(user, workspace, feature, usage, model_name):
@@ -578,6 +605,7 @@ def dashboard(request):
         return reference_date.replace(day=1), reference_date
 
     period = request.GET.get('period', '') or 'all'
+    month_param = request.GET.get('month') or ''
     start_param = request.GET.get('start')
     end_param = request.GET.get('end')
 
@@ -589,6 +617,17 @@ def dashboard(request):
         end_date = datetime.date.fromisoformat(end_param) if end_param else None
     except ValueError:
         end_date = None
+
+    if month_param:
+        try:
+            year_str, month_str = month_param.split('-')
+            year = int(year_str)
+            month = int(month_str)
+            start_date = datetime.date(year, month, 1)
+            last_day = calendar.monthrange(year, month)[1]
+            end_date = datetime.date(year, month, last_day)
+        except (ValueError, TypeError):
+            month_param = ''
 
     if not start_date or not end_date:
         start_date, end_date = range_from_period(period)
@@ -647,6 +686,20 @@ def dashboard(request):
         ('year', 'Ultimo ano'),
         ('all', 'Tudo'),
     ]
+    month_labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    month_options = []
+    base_month = today.replace(day=1)
+    for idx in range(0, 24):
+        month_date = shift_months(base_month, -idx)
+        start_month = month_date.replace(day=1)
+        last_day = calendar.monthrange(month_date.year, month_date.month)[1]
+        end_month = datetime.date(month_date.year, month_date.month, last_day)
+        month_options.append({
+            'value': f'{month_date.year:04d}-{month_date.month:02d}',
+            'label': f'{month_labels[month_date.month - 1]}/{str(month_date.year)[2:]}',
+            'start': start_month,
+            'end': end_month,
+        })
 
     tasks_qs = _apply_workspace_filter(Task.objects.all(), workspace, request.user)
     tasks_total = tasks_qs.count()
@@ -681,6 +734,8 @@ def dashboard(request):
         'top_income': top_income,
         'top_expense': top_expense,
         'quick_ranges': quick_ranges,
+        'month_options': month_options,
+        'selected_month': month_param,
         'period_has_data': period_has_data,
         'workspace_mode': workspace,
         'can_finance': can_finance,
@@ -750,6 +805,7 @@ def transactions_list(request):
         'expense_total': expense_total,
         'balance_total': income_total - expense_total,
         'categories': Category.objects.filter(workspace=workspace) if workspace else Category.objects.all(),
+        'bulk_form': TransactionBulkUpdateForm(workspace=workspace),
         'query_string': query_string,
         'today': timezone.now().date(),
         'filters': {
@@ -765,6 +821,48 @@ def transactions_list(request):
         }
     }
     return render(request, 'tracker/transactions_list.html', context)
+
+
+@login_required
+def transactions_bulk_update(request):
+    if request.method != 'POST':
+        return redirect('tracker:transactions_list')
+    workspace = getattr(request, "workspace", None)
+    if workspace and not _user_can_view_finance(request, workspace):
+        messages.error(request, 'Voc\u00ea n\u00e3o pode editar transa\u00e7\u00f5es neste workspace.')
+        return redirect('tracker:transactions_list')
+    ids_raw = (request.POST.get('ids') or '').strip()
+    ids = [int(val) for val in ids_raw.split(',') if val.isdigit()]
+    if not ids:
+        messages.warning(request, 'Selecione ao menos uma transa\u00e7\u00e3o.')
+        return redirect('tracker:transactions_list')
+    form = TransactionBulkUpdateForm(request.POST, workspace=workspace)
+    if not form.is_valid():
+        messages.error(request, 'N\u00e3o foi poss\u00edvel aplicar as altera\u00e7\u00f5es.')
+        return redirect('tracker:transactions_list')
+    qs = Transaction.objects.filter(id__in=ids)
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    updates = {}
+    category = form.cleaned_data.get('category')
+    tx_type = form.cleaned_data.get('type')
+    selected_action = form.cleaned_data.get('selected_action')
+    if category:
+        updates['category'] = category
+    if tx_type:
+        updates['type'] = tx_type
+    if selected_action == 'mark':
+        updates['selected'] = True
+    elif selected_action == 'unmark':
+        updates['selected'] = False
+    if not updates:
+        messages.warning(request, 'Nenhuma altera\u00e7\u00e3o escolhida.')
+        return redirect('tracker:transactions_list')
+    qs.update(**updates)
+    messages.success(request, 'Transa\u00e7\u00f5es atualizadas.')
+    return redirect('tracker:transactions_list')
 
 
 @login_required
@@ -786,6 +884,8 @@ def transaction_create(request):
             check_category_budgets(workspace)
             check_balance_goals(workspace)
         messages.success(request, 'Transação criada com sucesso.')
+        if request.POST.get('save_new'):
+            return redirect('tracker:transaction_create')
         return redirect('tracker:transactions_list')
     return render(request, 'tracker/transaction_form.html', {'form': form, 'is_edit': False})
 
@@ -1303,13 +1403,20 @@ def tasks_list(request):
     tasks_qs = _apply_workspace_filter(Task.objects.prefetch_related('steps').all(), workspace, request.user)
     status = request.GET.get('status', '')
     search = request.GET.get('q', '').strip()
+    category = request.GET.get('category', '').strip()
     start = request.GET.get('start', '')
     end = request.GET.get('end', '')
+
+    task_categories = list(
+        tasks_qs.exclude(category='').values_list('category', flat=True).distinct()
+    )
 
     if status in ('ongoing', 'done'):
         tasks_qs = tasks_qs.filter(status=status)
     if search:
         tasks_qs = tasks_qs.filter(title__icontains=search)
+    if category:
+        tasks_qs = tasks_qs.filter(category__iexact=category)
     if start:
         tasks_qs = tasks_qs.filter(due_date__gte=start)
     if end:
@@ -1350,10 +1457,13 @@ def tasks_list(request):
         'done_count': tasks_qs.filter(status='done').count(),
         'today': today,
         'soon_threshold': soon_threshold,
+        'bulk_form': TaskBulkUpdateForm(),
+        'task_categories': task_categories,
         'query_string': query_string,
         'filters': {
             'status': status,
             'q': search,
+            'category': category,
             'start': start,
             'end': end,
         },
@@ -1363,6 +1473,49 @@ def tasks_list(request):
         }
     }
     return render(request, 'tracker/tasks_list.html', context)
+
+
+@login_required
+def tasks_bulk_update(request):
+    if request.method != 'POST':
+        return redirect('tracker:tasks_list')
+    workspace = getattr(request, "workspace", None)
+    if workspace and not request.user.is_superuser:
+        membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
+        if membership and not membership.can_edit_tasks:
+            messages.error(request, 'Voc\u00ea n\u00e3o tem permiss\u00e3o para editar tarefas neste workspace.')
+            return redirect('tracker:tasks_list')
+    ids_raw = (request.POST.get('ids') or '').strip()
+    ids = [int(val) for val in ids_raw.split(',') if val.isdigit()]
+    if not ids:
+        messages.warning(request, 'Selecione ao menos uma tarefa.')
+        return redirect('tracker:tasks_list')
+    form = TaskBulkUpdateForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, 'N\u00e3o foi poss\u00edvel aplicar as altera\u00e7\u00f5es.')
+        return redirect('tracker:tasks_list')
+    qs = Task.objects.filter(id__in=ids)
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    updates = {}
+    category = (form.cleaned_data.get('category') or '').strip()
+    due_date = form.cleaned_data.get('due_date')
+    status = form.cleaned_data.get('status')
+    if category:
+        updates['category'] = category
+    if due_date:
+        updates['due_date'] = due_date
+    if status:
+        updates['status'] = status
+        updates['completed_at'] = timezone.now() if status == 'done' else None
+    if not updates:
+        messages.warning(request, 'Nenhuma altera\u00e7\u00e3o escolhida.')
+        return redirect('tracker:tasks_list')
+    qs.update(**updates)
+    messages.success(request, 'Tarefas atualizadas.')
+    return redirect('tracker:tasks_list')
 
 
 @login_required
@@ -1384,25 +1537,47 @@ def task_create(request):
         step_titles = request.POST.getlist('step_title')
         step_responsibles = request.POST.getlist('step_responsible')
         step_emails = request.POST.getlist('step_responsible_email')
+        step_responsible_custom = request.POST.getlist('step_responsible_custom')
+        step_email_custom = request.POST.getlist('step_responsible_email_custom')
         order = 1
         for idx, title in enumerate(step_titles):
             step_title = (title or '').strip()
             if not step_title:
                 continue
+            responsible_value = step_responsibles[idx].strip() if idx < len(step_responsibles) and step_responsibles[idx] else ''
+            if responsible_value == '__custom__':
+                responsible_value = step_responsible_custom[idx].strip() if idx < len(step_responsible_custom) and step_responsible_custom[idx] else ''
+            email_value = step_emails[idx].strip() if idx < len(step_emails) and step_emails[idx] else ''
+            if email_value == '__custom__':
+                email_value = step_email_custom[idx].strip() if idx < len(step_email_custom) and step_email_custom[idx] else ''
             step = TaskStep(
                 task=obj,
                 title=step_title,
                 order=order,
-                responsible=(step_responsibles[idx].strip() if idx < len(step_responsibles) and step_responsibles[idx] else ''),
-                responsible_email=(step_emails[idx].strip() if idx < len(step_emails) and step_emails[idx] else ''),
+                responsible=responsible_value,
+                responsible_email=email_value,
             )
             step.save()
             order += 1
         if order > 1:
             _update_task_progress(obj)
         messages.success(request, 'Tarefa criada com sucesso.')
+        if request.POST.get('save_new'):
+            return redirect('tracker:task_create')
         return redirect('tracker:tasks_list')
-    return render(request, 'tracker/task_form.html', {'form': form, 'step_form': step_form, 'is_edit': False, 'steps': []})
+    workspace_members = _get_workspace_members(workspace)
+    member_names = [member['name'] for member in workspace_members]
+    member_emails = [member['email'] for member in workspace_members if member.get('email')]
+    context = {
+        'form': form,
+        'step_form': step_form,
+        'is_edit': False,
+        'steps': [],
+        'workspace_members': workspace_members,
+        'workspace_member_names': member_names,
+        'workspace_member_emails': member_emails,
+    }
+    return render(request, 'tracker/task_form.html', context)
 
 
 @login_required
@@ -1434,7 +1609,34 @@ def task_update(request, pk):
             notify_task_completed(task, actor=request.user)
         messages.success(request, 'Tarefa atualizada.')
         return redirect('tracker:tasks_list')
-    return render(request, 'tracker/task_form.html', {'form': form, 'is_edit': True, 'object': task, 'is_detail': request.GET.get('detail') == '1', 'steps': steps, 'step_form': step_form})
+    workspace_members = _get_workspace_members(workspace)
+    member_names = [member['name'] for member in workspace_members]
+    member_emails = [member['email'] for member in workspace_members if member.get('email')]
+    context = {
+        'form': form,
+        'is_edit': True,
+        'object': task,
+        'is_detail': request.GET.get('detail') == '1',
+        'steps': steps,
+        'step_form': step_form,
+        'workspace_members': workspace_members,
+        'workspace_member_names': member_names,
+        'workspace_member_emails': member_emails,
+    }
+    return render(request, 'tracker/task_form.html', context)
+
+
+@login_required
+def task_step_detail(request, pk, step_id):
+    workspace = getattr(request, "workspace", None)
+    qs = Task.objects.prefetch_related('steps')
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+    task = get_object_or_404(qs, pk=pk)
+    step = get_object_or_404(task.steps, pk=step_id)
+    return render(request, 'tracker/task_step_detail.html', {'task': task, 'step': step})
 
 
 @login_required
@@ -1451,7 +1653,12 @@ def task_step_add(request, pk):
         if membership and not membership.can_edit_tasks:
             messages.error(request, 'Você não pode editar etapas neste workspace.')
             return redirect('tracker:task_update', pk=pk)
-    form = TaskStepForm(request.POST or None)
+    post_data = request.POST.copy()
+    if post_data.get('responsible') == '__custom__':
+        post_data['responsible'] = (post_data.get('responsible_custom') or '').strip()
+    if post_data.get('responsible_email') == '__custom__':
+        post_data['responsible_email'] = (post_data.get('responsible_email_custom') or '').strip()
+    form = TaskStepForm(post_data or None)
     if request.method == 'POST' and form.is_valid():
         step = form.save(commit=False)
         step.task = task
@@ -1481,7 +1688,12 @@ def task_step_update(request, pk, step_id):
             messages.error(request, 'Voc\u00ea n\u00e3o pode editar etapas neste workspace.')
             return redirect('tracker:task_update', pk=pk)
     if request.method == 'POST':
-        form = TaskStepForm(request.POST, instance=step)
+        post_data = request.POST.copy()
+        if post_data.get('responsible') == '__custom__':
+            post_data['responsible'] = (post_data.get('responsible_custom') or '').strip()
+        if post_data.get('responsible_email') == '__custom__':
+            post_data['responsible_email'] = (post_data.get('responsible_email_custom') or '').strip()
+        form = TaskStepForm(post_data, instance=step)
         if form.is_valid():
             step = form.save()
             _update_task_progress(task)
@@ -1680,7 +1892,18 @@ def categories_list(request):
         obj.save()
         messages.success(request, 'Categoria criada com sucesso.')
         return redirect('tracker:categories_list')
-    return render(request, 'tracker/categories_list.html', {'categories': categories, 'form': form})
+    color_palette = [
+        '#0f172a', '#1e3a8a', '#2563eb', '#0ea5e9', '#14b8a6', '#10b981',
+        '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#f97316', '#ef4444',
+        '#dc2626', '#be123c', '#db2777', '#c026d3', '#9333ea', '#6366f1',
+        '#64748b', '#475569', '#334155', '#1f2937', '#111827', '#7c3aed',
+        '#8b5cf6', '#a855f7', '#f472b6', '#fb7185', '#f43f5e', '#06b6d4',
+    ]
+    return render(
+        request,
+        'tracker/categories_list.html',
+        {'categories': categories, 'form': form, 'color_palette': color_palette},
+    )
 
 
 @login_required
@@ -1918,10 +2141,11 @@ def _export_tasks_csv(queryset):
     response['Content-Disposition'] = 'attachment; filename="tarefas.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)
-    writer.writerow(['titulo', 'prazo', 'status'])
+    writer.writerow(['titulo', 'categoria', 'prazo', 'status'])
     for task in queryset:
         writer.writerow([
             task.title,
+            task.category,
             task.due_date.isoformat(),
             task.get_status_display(),
         ])
@@ -3280,8 +3504,10 @@ def user_admin_list(request):
         last_login_ts=F('last_login'),
     ).order_by('-date_joined')
     today = timezone.localdate()
+    now = timezone.now()
     pending_count = 0
     active_count = 0
+    trial_count = 0
     expired_count = 0
     suspended_count = 0
     guest_count = 0
@@ -3311,6 +3537,10 @@ def user_admin_list(request):
             else:
                 user.approval_status = 'pending'
                 pending_count += 1
+            continue
+        if profile.trial_active() and not profile.payment_confirmed:
+            user.approval_status = 'trial'
+            trial_count += 1
             continue
         if profile.subscription_expires and profile.subscription_expires < today:
             user.approval_status = 'expired'
@@ -3353,6 +3583,8 @@ def user_admin_list(request):
             users = users.filter(Q(profile__isnull=True) | Q(profile__is_approved=False, profile__approved_at__isnull=True))
         elif status_filter == 'suspended':
             users = users.filter(profile__is_approved=False, profile__approved_at__isnull=False)
+        elif status_filter == 'trial':
+            users = users.filter(profile__trial_expires_at__gte=now, profile__payment_confirmed=False)
         elif status_filter == 'expired':
             users = users.filter(profile__subscription_expires__lt=today, profile__is_approved=True)
         elif status_filter == 'active':
@@ -3381,6 +3613,9 @@ def user_admin_list(request):
             else:
                 user.approval_status = 'pending'
             continue
+        if profile.trial_active() and not profile.payment_confirmed:
+            user.approval_status = 'trial'
+            continue
         if profile.subscription_expires and profile.subscription_expires < today:
             user.approval_status = 'expired'
             continue
@@ -3399,6 +3634,7 @@ def user_admin_list(request):
         'billing_choices': UserProfile.BILLING_CHOICES,
         'pending_count': pending_count,
         'active_count': active_count,
+        'trial_count': trial_count,
         'expired_count': expired_count,
         'suspended_count': suspended_count,
         'guest_count': guest_count,
@@ -3406,6 +3642,102 @@ def user_admin_list(request):
         'unpaid_count': unpaid_count,
     }
     return render(request, 'tracker/user_admin_list.html', context)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def user_admin_detail(request, pk):
+    user_obj = get_object_or_404(User.objects.select_related('profile'), pk=pk)
+    profile = getattr(user_obj, 'profile', None)
+    today = timezone.localdate()
+    now = timezone.now()
+
+    trial_active = bool(profile and profile.trial_active() and not profile.payment_confirmed)
+    if user_obj.is_superuser:
+        approval_status = 'superuser'
+    elif profile and profile.is_guest:
+        approval_status = 'guest'
+    elif not profile or not profile.is_approved:
+        if profile and profile.approved_at:
+            approval_status = 'suspended'
+        else:
+            approval_status = 'pending'
+    elif trial_active:
+        approval_status = 'trial'
+    elif profile.subscription_expires and profile.subscription_expires < today:
+        approval_status = 'expired'
+    else:
+        approval_status = 'active'
+
+    owned_ws_qs = Workspace.objects.filter(owner=user_obj)
+    owned_workspace_count = owned_ws_qs.count()
+    member_workspace_count = WorkspaceMembership.objects.filter(user=user_obj).exclude(workspace__owner=user_obj).count()
+
+    tasks_qs = Task.objects.filter(
+        Q(workspace__owner=user_obj) | Q(workspace__memberships__user=user_obj)
+    ).distinct()
+    tasks_total = tasks_qs.count()
+    tasks_done = tasks_qs.filter(status='done').count()
+    tasks_open = tasks_qs.filter(status='ongoing').count()
+    steps_total = TaskStep.objects.filter(task__in=tasks_qs).count()
+
+    transactions_qs = Transaction.objects.filter(workspace__owner=user_obj)
+    tx_totals = transactions_qs.aggregate(
+        total=Sum('value'),
+        income=Sum(Case(When(type='income', then=F('value')), default=Value(0), output_field=DecimalField())),
+        expense=Sum(Case(When(type='expense', then=F('value')), default=Value(0), output_field=DecimalField())),
+    )
+    tx_income = tx_totals.get('income') or Decimal('0')
+    tx_expense = tx_totals.get('expense') or Decimal('0')
+    tx_total = transactions_qs.count()
+    tx_net = tx_income - tx_expense
+    last_tx = transactions_qs.order_by('-date', '-created_at').first()
+
+    categories_count = Category.objects.filter(workspace__owner=user_obj).count()
+
+    ai_window_days = 30
+    ai_since = now - datetime.timedelta(days=ai_window_days)
+    ai_qs = AiUsage.objects.filter(user=user_obj, created_at__gte=ai_since)
+    ai_totals = ai_qs.aggregate(
+        tokens=Sum('total_tokens'),
+        cost_brl=Sum('cost_brl'),
+        cost_usd=Sum('cost_usd'),
+    )
+    ai_tokens = int(ai_totals.get('tokens') or 0)
+    ai_cost_brl = ai_totals.get('cost_brl') or 0
+    ai_cost_usd = ai_totals.get('cost_usd') or 0
+    ai_requests = ai_qs.count()
+    ai_avg_tokens = int(ai_tokens / ai_requests) if ai_requests else 0
+    last_ai = ai_qs.order_by('-created_at').first()
+    chat_messages = ChatMessage.objects.filter(user=user_obj).count()
+
+    context = {
+        'object': user_obj,
+        'profile': profile,
+        'approval_status': approval_status,
+        'trial_active': trial_active,
+        'owned_workspace_count': owned_workspace_count,
+        'member_workspace_count': member_workspace_count,
+        'categories_count': categories_count,
+        'tasks_total': tasks_total,
+        'tasks_done': tasks_done,
+        'tasks_open': tasks_open,
+        'steps_total': steps_total,
+        'tx_total': tx_total,
+        'tx_income': tx_income,
+        'tx_expense': tx_expense,
+        'tx_net': tx_net,
+        'last_tx': last_tx,
+        'ai_window_days': ai_window_days,
+        'ai_tokens': ai_tokens,
+        'ai_cost_brl': ai_cost_brl,
+        'ai_cost_usd': ai_cost_usd,
+        'ai_requests': ai_requests,
+        'ai_avg_tokens': ai_avg_tokens,
+        'last_ai': last_ai,
+        'chat_messages': chat_messages,
+    }
+    return render(request, 'tracker/user_admin_detail.html', context)
 
 
 @login_required

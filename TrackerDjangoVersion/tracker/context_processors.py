@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.conf import settings
+
 from .models import WorkspaceMembership, Workspace, Notification
 from django.core.files.storage import default_storage
 
@@ -31,6 +33,7 @@ def workspace_context(request):
         "user_avatar_url": _avatar_url(user),
         "user_is_guest": _is_guest(user),
         "notifications_unread": _notification_unread_count(user),
+        "app_version": getattr(settings, "APP_VERSION", ""),
     }
 
 
