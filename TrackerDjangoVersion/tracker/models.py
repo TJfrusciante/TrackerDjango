@@ -32,6 +32,7 @@ class Task(models.Model):
     due_date = models.DateField()
     selected = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ongoing')
+    responsible_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='responsible_tasks')
     responsible = models.CharField(max_length=120, blank=True, default='')
     responsible_email = models.EmailField(blank=True, default='')
     progress = models.DecimalField(max_digits=5, decimal_places=2, default=0)
@@ -45,6 +46,7 @@ class Task(models.Model):
         indexes = [
             models.Index(fields=['workspace', 'status']),
             models.Index(fields=['workspace', 'due_date']),
+            models.Index(fields=['workspace', 'responsible_user']),
         ]
 
     def __str__(self):
@@ -63,6 +65,7 @@ class Transaction(models.Model):
     value = models.DecimalField(max_digits=12, decimal_places=2)
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     selected = models.BooleanField(default=False)
+    responsible = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='responsible_transactions')
     workspace = models.ForeignKey('Workspace', null=True, blank=True, on_delete=models.SET_NULL, related_name='transactions')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -175,9 +178,9 @@ class WorkspaceInvite(models.Model):
 
 class UserProfile(models.Model):
     PLAN_CHOICES = [
-        ('starter', 'B\u00e1sico'),
+        ('essential', 'Essencial'),
         ('pro', 'Pro'),
-        ('team', 'Equipe'),
+        ('master', 'Master'),
     ]
     BILLING_CHOICES = [
         ('monthly', 'Mensal'),
@@ -187,7 +190,8 @@ class UserProfile(models.Model):
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     is_approved = models.BooleanField(default=False)
     is_guest = models.BooleanField(default=False)
-    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='starter')
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='essential')
+    master_guest_limit = models.PositiveIntegerField(default=6)
     billing_cycle = models.CharField(max_length=20, choices=BILLING_CHOICES, default='monthly')
     payment_confirmed = models.BooleanField(default=False)
     payment_confirmed_at = models.DateTimeField(null=True, blank=True)
@@ -232,8 +236,16 @@ class PricingConfig(models.Model):
     promo_limit = models.PositiveIntegerField(default=100)
     promo_monthly_price = models.DecimalField(max_digits=8, decimal_places=2, default=8.99)
     promo_annual_price = models.DecimalField(max_digits=8, decimal_places=2, default=5.99)
+    promo_monthly_pro = models.DecimalField(max_digits=8, decimal_places=2, default=12.59)
+    promo_annual_pro = models.DecimalField(max_digits=8, decimal_places=2, default=8.39)
+    promo_monthly_master = models.DecimalField(max_digits=8, decimal_places=2, default=17.08)
+    promo_annual_master = models.DecimalField(max_digits=8, decimal_places=2, default=11.38)
     regular_monthly_price = models.DecimalField(max_digits=8, decimal_places=2, default=14.99)
     regular_annual_price = models.DecimalField(max_digits=8, decimal_places=2, default=9.99)
+    regular_monthly_pro = models.DecimalField(max_digits=8, decimal_places=2, default=20.99)
+    regular_annual_pro = models.DecimalField(max_digits=8, decimal_places=2, default=13.99)
+    regular_monthly_master = models.DecimalField(max_digits=8, decimal_places=2, default=28.48)
+    regular_annual_master = models.DecimalField(max_digits=8, decimal_places=2, default=18.98)
     promo_label = models.CharField(max_length=120, default='Promo\u00e7\u00e3o de lan\u00e7amento')
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -256,6 +268,7 @@ class SubscriptionInvite(models.Model):
     PLAN_CHOICES = UserProfile.BILLING_CHOICES
     code = models.CharField(max_length=40, unique=True)
     plan_cycle = models.CharField(max_length=20, choices=PLAN_CHOICES, default='monthly')
+    plan_tier = models.CharField(max_length=20, choices=UserProfile.PLAN_CHOICES, default='essential')
     max_uses = models.PositiveIntegerField(default=1)
     used_count = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)

@@ -8,7 +8,7 @@ import unicodedata
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Case, When, DecimalField, F
+from django.db.models import Sum, Case, When, DecimalField, F, Prefetch
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_exempt
@@ -249,7 +249,8 @@ def _wants_task_details(message: str) -> bool:
 
 
 def _task_list_summary(workspace, request, status: str | None = None, limit_tasks: int = 6, limit_steps: int = 6) -> str:
-    tasks_qs = _tasks_queryset(request, workspace).order_by('-due_date', '-created_at')
+    steps_prefetch = Prefetch('steps', queryset=TaskStep.objects.order_by('order', 'created_at'))
+    tasks_qs = _tasks_queryset(request, workspace).order_by('-due_date', '-created_at').prefetch_related(steps_prefetch)
     status_label = None
     if status:
         tasks_qs = tasks_qs.filter(status=status)
@@ -265,8 +266,8 @@ def _task_list_summary(workspace, request, status: str | None = None, limit_task
     for idx, task in enumerate(tasks_qs[:limit_tasks], start=1):
         due_label = task.due_date.strftime('%d/%m/%Y') if task.due_date else '-'
         lines.append(f"{idx}. {task.title} (prazo {due_label})")
-        steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
-        if steps.exists():
+        steps = list(task.steps.all())
+        if steps:
             lines.append("   - Etapas:")
             for step in steps[:limit_steps]:
                 lines.append(f"     - {step.title} ({step.get_status_display()})")
@@ -341,7 +342,8 @@ def _help_response(message: str) -> str | None:
 
 def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: int = 6) -> str:
     tasks_qs = _tasks_queryset(request, workspace)
-    done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at')
+    steps_prefetch = Prefetch('steps', queryset=TaskStep.objects.order_by('order', 'created_at'))
+    done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at').prefetch_related(steps_prefetch)
     total_done = done_tasks.count()
     if total_done == 0:
         return "Nenhuma tarefa conclu\u00edda no momento."
@@ -358,8 +360,8 @@ def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: 
         lines.append(f"   - Conclu\u00edda em: {completed_label}")
         lines.append(f"   - Prazo: {due_label}")
         lines.append(f"   - Status: {status_label}")
-        steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
-        if steps.exists():
+        steps = list(task.steps.all())
+        if steps:
             lines.append("   - Etapas:")
             for step in steps[:limit_steps]:
                 responsible = step.responsible or '-'

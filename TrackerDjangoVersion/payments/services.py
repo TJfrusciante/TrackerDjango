@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 import urllib.request
 import urllib.error
 from typing import Any
@@ -10,6 +12,17 @@ try:
     import requests
 except Exception:
     requests = None
+
+logger = logging.getLogger(__name__)
+
+
+def _sleep_backoff(attempt: int, base: float = 0.4, cap: float = 2.0) -> None:
+    delay = min(cap, base * (2 ** attempt))
+    time.sleep(delay)
+
+
+def _is_retryable_status(status_code: int) -> bool:
+    return status_code == 429 or status_code >= 500
 
 
 def _mp_headers() -> dict:
@@ -24,22 +37,32 @@ def _mp_base_url() -> str:
     return os.getenv('MP_BASE_URL', 'https://api.mercadopago.com')
 
 
-def mp_request(method: str, path: str, payload: dict | None = None) -> dict:
+def mp_request(method: str, path: str, payload: dict | None = None, retries: int = 2) -> dict:
     url = f"{_mp_base_url().rstrip('/')}/{path.lstrip('/')}"
     headers = _mp_headers()
     if requests is not None:
-        resp = requests.request(method, url, headers=headers, json=payload, timeout=10)
-        if resp.status_code >= 400:
-            raise ValueError(f"MP {resp.status_code}: {resp.text}")
-        return resp.json()
+        for attempt in range(retries + 1):
+            resp = requests.request(method, url, headers=headers, json=payload, timeout=10)
+            if resp.status_code >= 400:
+                if _is_retryable_status(resp.status_code) and attempt < retries:
+                    logger.warning("MP retryable status %s (try %s/%s)", resp.status_code, attempt + 1, retries + 1)
+                    _sleep_backoff(attempt)
+                    continue
+                raise ValueError(f"MP {resp.status_code}: {resp.text}")
+            return resp.json()
     data = json.dumps(payload or {}).encode('utf-8') if payload is not None else None
-    req = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read().decode('utf-8'))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode('utf-8', errors='ignore')
-        raise ValueError(f"MP {exc.code}: {body}") from exc
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode('utf-8', errors='ignore')
+            if _is_retryable_status(exc.code) and attempt < retries:
+                logger.warning("MP retryable status %s (try %s/%s)", exc.code, attempt + 1, retries + 1)
+                _sleep_backoff(attempt)
+                continue
+            raise ValueError(f"MP {exc.code}: {body}") from exc
 
 
 def build_preapproval_payload(*, reason: str, external_reference: str, back_url: str, plan_cycle: str, payer_email: str | None, amount: float) -> dict:

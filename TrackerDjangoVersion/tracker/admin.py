@@ -44,7 +44,7 @@ class TaskAdmin(WorkspaceScopedAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(WorkspaceScopedAdmin):
-    list_display = ('description', 'workspace', 'date', 'type', 'value', 'category', 'selected', 'created_at')
+    list_display = ('description', 'workspace', 'date', 'type', 'value', 'category', 'responsible', 'selected', 'created_at')
     list_filter = ('workspace', 'type', 'category', 'date')
     search_fields = ('description',)
     ordering = ('-date',)
@@ -52,8 +52,8 @@ class TransactionAdmin(WorkspaceScopedAdmin):
 
 @admin.register(SubscriptionInvite)
 class SubscriptionInviteAdmin(admin.ModelAdmin):
-    list_display = ('code', 'plan_cycle', 'used_count', 'max_uses', 'is_active', 'expires_at', 'created_at')
-    list_filter = ('plan_cycle', 'is_active')
+    list_display = ('code', 'plan_cycle', 'plan_tier', 'used_count', 'max_uses', 'is_active', 'expires_at', 'created_at')
+    list_filter = ('plan_cycle', 'plan_tier', 'is_active')
     search_fields = ('code',)
 
 

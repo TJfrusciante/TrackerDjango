@@ -102,7 +102,7 @@ from .notifications import (
     check_balance_goals,
 )
 from .metrics import record_metric
-from .pricing import get_pricing_state
+from .pricing import get_pricing_state, plan_label, plan_price
 from assistant.services import llm_complete, estimate_costs
 from assistant.models import AiUsage, ChatMessage
 from assistant.limits import get_ai_quota
@@ -127,6 +127,24 @@ def _user_can_view_finance(request, workspace) -> bool:
     role = getattr(request, "workspace_role", None)
     return role == 'owner'
 
+
+def _user_can_create_transaction(request, workspace) -> bool:
+    """Guests podem lançar transações, mas não ver/editar o painel financeiro."""
+    if not workspace:
+        return request.user.is_superuser
+    if request.user.is_superuser:
+        return True
+    profile = getattr(request.user, "profile", None)
+    if profile and profile.is_guest:
+        return True
+    return _user_can_view_finance(request, workspace)
+
+
+def _finance_access_denied_redirect(request):
+    profile = getattr(request.user, "profile", None)
+    if profile and profile.is_guest:
+        return redirect('tracker:tasks_list')
+    return redirect('tracker:dashboard')
 
 def _is_paid_user(user) -> bool:
     if user.is_superuser:
@@ -172,6 +190,17 @@ def _workspace_unpaid_invite_count(workspace) -> int:
             )
         )
     ).count()
+
+
+def _workspace_guest_limit(workspace) -> int:
+    if not workspace:
+        return 2
+    owner_profile = getattr(workspace.owner, 'profile', None)
+    if owner_profile and owner_profile.plan == 'pro':
+        return 6
+    if owner_profile and owner_profile.plan == 'master':
+        return max(owner_profile.master_guest_limit or 6, 6)
+    return 2
 
 
 def _apply_workspace_filter(queryset, workspace, user):
@@ -411,35 +440,48 @@ def home(request):
             {"url": static("help/dashboard.png"), "label": "Dashboard"},
             {"url": static("help/transaction_form.png"), "label": "Nova transa\u00e7\u00e3o"},
         ]
-    pricing_plans = [
-        {
-            "name": "Mensal",
-            "price": pricing_state.monthly_price,
-            "regular_price": pricing_state.regular_monthly_price,
-            "subtitle": f"R$ {pricing_state.monthly_price:.2f}/m\u00eas. Cancele quando quiser.",
-            "badge": "Promo\u00e7\u00e3o" if pricing_state.promo_active else "Flex\u00edvel",
-            "features": [
-                "1 workspace + at\u00e9 3 participantes",
-                "Dashboards financeiros e tarefas em etapas",
-                "Notifica\u00e7\u00f5es, or\u00e7amentos e metas",
-                "Agente de IA com dados do workspace",
-            ],
-        },
-        {
-            "name": "Anual",
-            "price": pricing_state.annual_price,
-            "regular_price": pricing_state.regular_annual_price,
-            "subtitle": f"R$ {pricing_state.annual_price:.2f}/m\u00eas (R$ {annual_total:.2f}/ano).",
-            "badge": "Mais escolhido",
-            "annual_total": annual_total,
-            "features": [
-                "Tudo do Mensal",
-                "Resumos semanais e mensais",
-                "Uso de IA ampliado",
-                "Backups e hist\u00f3rico estendido",
-            ],
-        },
-    ]
+    plan_features = {
+        "essential": [
+            "Acessos manuais e ditados",
+            "IA b\u00e1sica",
+            "At\u00e9 2 convidados por workspace",
+            "Dashboards financeiros e tarefas em etapas",
+        ],
+        "pro": [
+            "Tudo do Essencial",
+            "Maior limite de tokens da IA",
+            "At\u00e9 6 convidados por workspace",
+            "ChatAgent no WhatsApp",
+        ],
+        "master": [
+            "Tudo do Pro",
+            "Limites m\u00e1ximos de IA",
+            "Convidados personalizados (a partir de 6)",
+            "Custo ajustado por convidado extra",
+        ],
+    }
+    discount_pct_map = {
+        "essential": 38,
+        "pro": 45,
+        "master": 63,
+    }
+    pricing_plans = []
+    for tier in ("essential", "pro", "master"):
+        monthly_price = plan_price(pricing_state, tier, "monthly", guest_limit=6)
+        annual_price = plan_price(pricing_state, tier, "annual", guest_limit=6)
+        pricing_plans.append({
+            "tier": tier,
+            "name": plan_label(tier),
+            "badge": "Mais escolhido" if tier == "pro" else "Novo" if tier == "master" else "Essencial",
+            "monthly_price": monthly_price,
+            "annual_price": annual_price,
+            "monthly_regular": plan_price(pricing_state, tier, "monthly", guest_limit=6, promo=False),
+            "annual_regular": plan_price(pricing_state, tier, "annual", guest_limit=6, promo=False),
+            "annual_total": annual_price * Decimal("12"),
+            "features": plan_features[tier],
+            "note": "Master: +15% por convidado acima de 6." if tier == "master" else "",
+            "discount_pct": discount_pct_map.get(tier, 0),
+        })
 
     feature_cards = [
         {
@@ -477,14 +519,14 @@ def home(request):
     carousel_slides = [feature_cards[i:i + 3] for i in range(0, len(feature_cards), 3)]
 
     steps = [
-        {"title": "Crie sua conta", "text": "Escolha plano mensal ou anual e defina o primeiro workspace."},
+        {"title": "Crie sua conta", "text": "Escolha plano e ciclo (Mensal ou Anual) para o seu workspace."},
         {"title": "Importe dados", "text": "Importe CSV/PDF ou lance com o bot\u00e3o Falar em tempo real."},
-        {"title": "Convide sua equipe", "text": "At\u00e9 3 convidados sem assinatura; assinantes n\u00e3o contam no limite."},
+        {"title": "Convide sua equipe", "text": "Essencial: 2 convidados. Pro: 6. Master: personalize o limite."},
         {"title": "Acompanhe no painel", "text": "Troque workspaces, aprove convites e configure alertas."},
     ]
 
     faq_items = [
-        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. H\u00e1 limite de 3 convidados sem assinatura."},
+        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. O limite de convidados depende do plano (2/6/personalizado)."},
         {"question": "Posso escolher mensal ou anual?", "answer": "Sim. A escolha do ciclo \u00e9 feita no cadastro e pode ser revisada pelo admin."},
         {"question": "Meu financeiro \u00e9 privado?", "answer": "Sim. Cada workspace isola finan\u00e7as; o owner controla permiss\u00f5es de tarefas."},
         {"question": "Posso exportar dados?", "answer": "Sim, CSV das listas e endpoints JSON para gr\u00e1ficos."},
@@ -512,6 +554,7 @@ def help_page(request):
         {"id": "alertas", "label": "Or\u00e7amentos e metas", "icon": "fa-bullseye"},
         {"id": "voz", "label": "Falar por voz", "icon": "fa-microphone"},
         {"id": "ia", "label": "Agente de IA", "icon": "fa-robot"},
+        {"id": "whatsapp", "label": "WhatsApp", "icon": "fa-whatsapp"},
         {"id": "filtros", "label": "Filtros e exporta\u00e7\u00e3o", "icon": "fa-filter"},
         {"id": "faq", "label": "FAQ", "icon": "fa-circle-question"},
     ]
@@ -544,6 +587,10 @@ def help_page(request):
         {
             "question": "Como funciona o agente de IA?",
             "answer": "Ele responde com base nos dados do seu workspace. Se a chave da OpenAI estiver configurada, a resposta vem do modelo; sen\u00e3o, um resumo local \u00e9 exibido.",
+        },
+        {
+            "question": "Como ativar o WhatsApp?",
+            "answer": "Cadastre seu numero no perfil do WhatsApp via admin e configure o webhook Twilio em /whatsapp/webhook/. Depois envie mensagens como 'Gastei 150 no mercado'.",
         },
         {
             "question": "Posso exportar dados?",
@@ -583,6 +630,9 @@ def dashboard(request):
     can_finance = _user_can_view_finance(request, workspace)
     last30_start = today - datetime.timedelta(days=30)
     profile = getattr(request.user, "profile", None)
+    if profile and profile.is_guest:
+        messages.info(request, 'Contas convidadas podem apenas lan\u00e7ar transa\u00e7\u00f5es e gerenciar tarefas.')
+        return redirect('tracker:tasks_list')
     trial_active = bool(profile and profile.trial_active())
     trial_expires_at = profile.trial_expires_at if profile else None
     trial_remaining = None
@@ -621,6 +671,7 @@ def dashboard(request):
     month_param = request.GET.get('month') or ''
     start_param = request.GET.get('start')
     end_param = request.GET.get('end')
+    responsible_param = request.GET.get('responsible') or ''
 
     try:
         start_date = datetime.date.fromisoformat(start_param) if start_param else None
@@ -650,6 +701,8 @@ def dashboard(request):
         workspace,
         request.user,
     ) if can_finance else Transaction.objects.none()
+    if responsible_param.isdigit():
+        base_qs = base_qs.filter(responsible_id=int(responsible_param))
     period_has_data = base_qs.exists()
 
     income_total = base_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
@@ -661,6 +714,8 @@ def dashboard(request):
         workspace,
         request.user,
     ) if can_finance else Transaction.objects.none()
+    if responsible_param.isdigit():
+        last30_qs = last30_qs.filter(responsible_id=int(responsible_param))
     last30_income = last30_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
     last30_expense = last30_qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
     net_30 = last30_income - last30_expense
@@ -714,7 +769,9 @@ def dashboard(request):
             'end': end_month,
         })
 
-    tasks_qs = _apply_workspace_filter(Task.objects.all(), workspace, request.user)
+    tasks_qs = _apply_workspace_filter(Task.objects.select_related('responsible_user'), workspace, request.user)
+    if responsible_param.isdigit():
+        tasks_qs = tasks_qs.filter(responsible_user_id=int(responsible_param))
     tasks_total = tasks_qs.count()
     tasks_done = tasks_qs.filter(status='done').count()
     tasks_progress_pct = round((tasks_done / tasks_total) * 100, 1) if tasks_total else 100
@@ -723,8 +780,23 @@ def dashboard(request):
     total_transactions = 0
     if can_finance:
         total_transactions = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user).count()
+    budget_count = 0
+    goal_count = 0
+    if workspace:
+        budget_count = CategoryBudget.objects.filter(workspace=workspace).count()
+        goal_count = BalanceGoal.objects.filter(workspace=workspace).count()
+    ai_message_count = 0
+    if not (profile and profile.is_guest):
+        ai_message_count = ChatMessage.objects.filter(user=request.user).count()
+    profile_has_avatar = bool(profile and profile.avatar)
 
     onboarding_items = []
+    onboarding_items.append({
+        'label': 'Adicionar foto ao perfil (opcional)',
+        'done': profile_has_avatar,
+        'url': reverse('tracker:profile_edit'),
+        'optional': True,
+    })
     if can_finance:
         onboarding_items.append({
             'label': 'Criar primeira categoria',
@@ -736,11 +808,38 @@ def dashboard(request):
             'done': total_transactions > 0,
             'url': reverse('tracker:transaction_create'),
         })
+        onboarding_items.append({
+            'label': 'Importar extrato CSV/PDF (opcional)',
+            'done': total_transactions >= 5,
+            'url': reverse('tracker:transaction_import'),
+            'optional': True,
+        })
+        onboarding_items.append({
+            'label': 'Definir orcamento por categoria',
+            'done': budget_count > 0,
+            'url': reverse('tracker:category_budget_create'),
+        })
+        onboarding_items.append({
+            'label': 'Criar meta de saldo',
+            'done': goal_count > 0,
+            'url': reverse('tracker:balance_goal_create'),
+        })
     onboarding_items.append({
         'label': 'Criar primeira tarefa',
         'done': tasks_total > 0,
         'url': reverse('tracker:task_create'),
     })
+    onboarding_items.append({
+        'label': 'Concluir uma tarefa',
+        'done': tasks_done > 0,
+        'url': reverse('tracker:tasks_list'),
+    })
+    if not (profile and profile.is_guest):
+        onboarding_items.append({
+            'label': 'Conversar com o agente de IA',
+            'done': ai_message_count > 0,
+            'url': reverse('assistant:chat'),
+        })
     if workspace and (request.user.is_superuser or workspace.owner_id == request.user.id):
         has_members = WorkspaceMembership.objects.filter(workspace=workspace).exclude(role='owner').exists()
         onboarding_items.append({
@@ -760,6 +859,16 @@ def dashboard(request):
                 completed_late = True
         task.completed_late = completed_late
 
+    responsible_users = []
+    if workspace:
+        member_ids = set(
+            WorkspaceMembership.objects.filter(workspace=workspace)
+            .values_list('user_id', flat=True)
+        )
+        if workspace.owner_id:
+            member_ids.add(workspace.owner_id)
+        responsible_users = list(User.objects.filter(id__in=member_ids).order_by('first_name', 'username'))
+
     context = {
         'income_total': income_total,
         'expense_total': expense_total,
@@ -774,6 +883,8 @@ def dashboard(request):
         'start_date': start_date,
         'end_date': end_date,
         'period': period,
+        'responsible_filter': responsible_param,
+        'responsible_users': responsible_users,
         'top_income': top_income,
         'top_expense': top_expense,
         'quick_ranges': quick_ranges,
@@ -805,10 +916,10 @@ def dashboard(request):
 def transactions_list(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
-        return redirect('tracker:dashboard')
+        messages.error(request, 'Voc\u00ea n\u00e3o pode acessar finan\u00e7as deste workspace.')
+        return _finance_access_denied_redirect(request)
 
-    transactions_qs = _apply_workspace_filter(Transaction.objects.select_related('category'), workspace, request.user)
+    transactions_qs = _apply_workspace_filter(Transaction.objects.select_related('category', 'responsible'), workspace, request.user)
     search = request.GET.get('q', '').strip()
     tx_type = request.GET.get('type', '')
     category_id = request.GET.get('category', '')
@@ -894,27 +1005,52 @@ def transactions_bulk_update(request):
     workspace = getattr(request, "workspace", None)
     if workspace and not _user_can_view_finance(request, workspace):
         messages.error(request, 'Voc\u00ea n\u00e3o pode editar transa\u00e7\u00f5es neste workspace.')
-        return redirect('tracker:transactions_list')
+        return _finance_access_denied_redirect(request)
+    select_all = request.POST.get('select_all') == '1'
     ids_raw = (request.POST.get('ids') or '').strip()
     ids = [int(val) for val in ids_raw.split(',') if val.isdigit()]
-    if not ids:
+    if not select_all and not ids:
         messages.warning(request, 'Selecione ao menos uma transa\u00e7\u00e3o.')
         return redirect('tracker:transactions_list')
     form = TransactionBulkUpdateForm(request.POST, workspace=workspace)
     if not form.is_valid():
         messages.error(request, 'N\u00e3o foi poss\u00edvel aplicar as altera\u00e7\u00f5es.')
         return redirect('tracker:transactions_list')
-    qs = Transaction.objects.filter(id__in=ids)
-    if workspace:
-        qs = qs.filter(workspace=workspace)
-    elif not request.user.is_superuser:
-        qs = qs.none()
+    if select_all:
+        qs = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user)
+        search = (request.POST.get('q') or '').strip()
+        tx_type = request.POST.get('type', '')
+        category_id = request.POST.get('category', '')
+        start = request.POST.get('start', '')
+        end = request.POST.get('end', '')
+        if search:
+            qs = qs.filter(Q(description__icontains=search) | Q(category__name__icontains=search))
+        if tx_type in ('income', 'expense'):
+            qs = qs.filter(type=tx_type)
+        if category_id:
+            qs = qs.filter(category_id=category_id)
+        if start:
+            qs = qs.filter(date__gte=start)
+        if end:
+            qs = qs.filter(date__lte=end)
+    else:
+        qs = Transaction.objects.filter(id__in=ids)
+        if workspace:
+            qs = qs.filter(workspace=workspace)
+        elif not request.user.is_superuser:
+            qs = qs.none()
     updates = {}
     category = form.cleaned_data.get('category')
+    responsible = form.cleaned_data.get('responsible')
+    new_date = form.cleaned_data.get('date')
     tx_type = form.cleaned_data.get('type')
     selected_action = form.cleaned_data.get('selected_action')
     if category:
         updates['category'] = category
+    if responsible:
+        updates['responsible'] = responsible
+    if new_date:
+        updates['date'] = new_date
     if tx_type:
         updates['type'] = tx_type
     if selected_action == 'mark':
@@ -932,12 +1068,13 @@ def transactions_bulk_update(request):
 @login_required
 def transaction_create(request):
     workspace = getattr(request, "workspace", None)
-    if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
-        return redirect('tracker:dashboard')
-    form = TransactionForm(request.POST or None, initial={'date': timezone.now().date()})
-    if workspace:
-        form.fields['category'].queryset = Category.objects.filter(workspace=workspace)
+    if not _user_can_create_transaction(request, workspace):
+        messages.error(request, 'Voc\u00ea n\u00e3o pode lan\u00e7ar finan\u00e7as neste workspace.')
+        return _finance_access_denied_redirect(request)
+    initial = {'date': timezone.now().date()}
+    if workspace and workspace.owner_id:
+        initial['responsible'] = workspace.owner_id
+    form = TransactionForm(request.POST or None, initial=initial, workspace=workspace)
     if request.method == 'POST' and form.is_valid():
         obj = form.save(commit=False)
         if workspace:
@@ -949,7 +1086,10 @@ def transaction_create(request):
             check_balance_goals(workspace)
         messages.success(request, 'Transação criada com sucesso.')
         if request.POST.get('save_new'):
+            profile = getattr(request.user, "profile", None)
+        if profile and profile.is_guest:
             return redirect('tracker:transaction_create')
+
         return redirect('tracker:transactions_list')
     return render(request, 'tracker/transaction_form.html', {'form': form, 'is_edit': False})
 
@@ -958,17 +1098,15 @@ def transaction_create(request):
 def transaction_update(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
-        messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
-        return redirect('tracker:dashboard')
+        messages.error(request, 'Você não pode editar finanças deste workspace.')
+        return _finance_access_denied_redirect(request)
     qs = Transaction.objects.all()
     if workspace:
         qs = qs.filter(workspace=workspace)
     elif not request.user.is_superuser:
         qs = qs.none()
     transaction = get_object_or_404(qs, pk=pk)
-    form = TransactionForm(request.POST or None, instance=transaction)
-    if workspace:
-        form.fields['category'].queryset = Category.objects.filter(workspace=workspace)
+    form = TransactionForm(request.POST or None, instance=transaction, workspace=workspace)
     is_detail = request.GET.get('detail') == '1'
     if request.method == 'POST' and form.is_valid():
         form.save()
@@ -987,7 +1125,7 @@ def transaction_delete(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
         messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
-        return redirect('tracker:dashboard')
+        return _finance_access_denied_redirect(request)
     qs = Transaction.objects.all()
     if workspace:
         qs = qs.filter(workspace=workspace)
@@ -1001,6 +1139,7 @@ def transaction_delete(request, pk):
             'value': str(transaction.value),
             'type': transaction.type,
             'category_id': transaction.category_id,
+            'responsible_id': transaction.responsible_id,
             'workspace_id': transaction.workspace_id,
             'selected': transaction.selected,
         }
@@ -1053,6 +1192,7 @@ def transaction_undo_delete(request):
         value=value_val,
         type=payload.get('type', 'expense'),
         category=category,
+        responsible_id=payload.get('responsible_id'),
         workspace_id=payload.get('workspace_id'),
         selected=bool(payload.get('selected')),
     )
@@ -1067,7 +1207,7 @@ def transaction_toggle_selected(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
         messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
-        return redirect('tracker:dashboard')
+        return _finance_access_denied_redirect(request)
 
     qs = Transaction.objects.all()
     if workspace:
@@ -1086,7 +1226,7 @@ def transaction_toggle_type(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
         messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
-        return redirect('tracker:dashboard')
+        return _finance_access_denied_redirect(request)
 
     qs = Transaction.objects.all()
     if workspace:
@@ -1440,7 +1580,7 @@ def transaction_import(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
         messages.error(request, 'Voc\u00ea n\u00e3o pode remover finan\u00e7as deste workspace.')
-        return redirect('tracker:dashboard')
+        return _finance_access_denied_redirect(request)
 
     categories = list(Category.objects.filter(workspace=workspace) if workspace else Category.objects.all())
     if not categories:
@@ -1463,6 +1603,7 @@ def transaction_import(request):
             skip_list = set(request.POST.getlist('skip'))
 
             to_create = []
+            default_responsible = workspace.owner if workspace else None
             for idx, desc in enumerate(desc_list):
                 if str(idx) in skip_list:
                     continue
@@ -1491,6 +1632,7 @@ def transaction_import(request):
                     type=tx_type,
                     category=category,
                     workspace=workspace,
+                    responsible=default_responsible,
                     selected=selected,
                 ))
             if to_create:
@@ -1535,7 +1677,7 @@ def transaction_import(request):
 @login_required
 def tasks_list(request):
     workspace = getattr(request, "workspace", None)
-    tasks_qs = _apply_workspace_filter(Task.objects.prefetch_related('steps').all(), workspace, request.user)
+    tasks_qs = _apply_workspace_filter(Task.objects.select_related('responsible_user').prefetch_related('steps').all(), workspace, request.user)
     status = request.GET.get('status', '')
     search = request.GET.get('q', '').strip()
     category = request.GET.get('category', '').strip()
@@ -1604,7 +1746,7 @@ def tasks_list(request):
         'done_count': tasks_qs.filter(status='done').count(),
         'today': today,
         'soon_threshold': soon_threshold,
-        'bulk_form': TaskBulkUpdateForm(),
+        'bulk_form': TaskBulkUpdateForm(workspace=workspace),
         'task_categories': task_categories,
         'query_string': query_string,
         'filters': {
@@ -1638,7 +1780,7 @@ def tasks_bulk_update(request):
     if not ids:
         messages.warning(request, 'Selecione ao menos uma tarefa.')
         return redirect('tracker:tasks_list')
-    form = TaskBulkUpdateForm(request.POST)
+    form = TaskBulkUpdateForm(request.POST, workspace=workspace)
     if not form.is_valid():
         messages.error(request, 'N\u00e3o foi poss\u00edvel aplicar as altera\u00e7\u00f5es.')
         return redirect('tracker:tasks_list')
@@ -1648,9 +1790,12 @@ def tasks_bulk_update(request):
     elif not request.user.is_superuser:
         qs = qs.none()
     updates = {}
+    responsible_user = form.cleaned_data.get('responsible_user')
     category = (form.cleaned_data.get('category') or '').strip()
     due_date = form.cleaned_data.get('due_date')
     status = form.cleaned_data.get('status')
+    if responsible_user:
+        updates['responsible_user'] = responsible_user
     if category:
         updates['category'] = category
     if due_date:
@@ -1675,7 +1820,10 @@ def task_create(request):
         if membership and not membership.can_edit_tasks:
             messages.error(request, 'Você não tem permissão para criar tarefas neste workspace.')
             return redirect('tracker:tasks_list')
-    form = TaskForm(request.POST or None, initial={'due_date': timezone.now().date()})
+    initial = {'due_date': timezone.now().date()}
+    if workspace and workspace.owner_id:
+        initial['responsible_user'] = workspace.owner_id
+    form = TaskForm(request.POST or None, initial=initial, workspace=workspace)
     step_form = TaskStepForm()
     if request.method == 'POST' and form.is_valid():
         obj = form.save(commit=False)
@@ -1737,7 +1885,7 @@ def task_update(request, pk):
     elif not request.user.is_superuser:
         qs = qs.none()
     task = get_object_or_404(qs, pk=pk)
-    form = TaskForm(request.POST or None, instance=task)
+    form = TaskForm(request.POST or None, instance=task, workspace=workspace)
     steps = task.steps.all()
     step_form = TaskStepForm()
     prev_status = task.status
@@ -1962,6 +2110,7 @@ def task_delete(request, pk):
             'due_date': task.due_date.isoformat(),
             'status': task.status,
             'selected': task.selected,
+            'responsible_user_id': task.responsible_user_id,
             'responsible': task.responsible,
             'responsible_email': task.responsible_email,
             'progress': str(task.progress),
@@ -2017,6 +2166,7 @@ def task_undo_delete(request):
         due_date=due_date_val,
         status=payload.get('status', 'ongoing'),
         selected=bool(payload.get('selected')),
+        responsible_user_id=payload.get('responsible_user_id'),
         responsible=payload.get('responsible', ''),
         responsible_email=payload.get('responsible_email', ''),
         progress=payload.get('progress') or 0,
@@ -2212,7 +2362,10 @@ def chart_data(request):
     period = request.GET.get('period') or ''
     type_filter = request.GET.get('type') or ''
     selected_only = request.GET.get('selected_only') == '1'
+    category_id = request.GET.get('category_id') or ''
+    responsible_id = request.GET.get('responsible') or ''
     workspace = getattr(request, "workspace", None)
+    active_category_color = ""
 
     def parse_date(val, fallback):
         try:
@@ -2258,16 +2411,27 @@ def chart_data(request):
     can_finance = _user_can_view_finance(request, workspace)
 
     qs_all = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user) if can_finance else Transaction.objects.none()
+    if responsible_id.isdigit():
+        qs_all = qs_all.filter(responsible_id=int(responsible_id))
+    if category_id.isdigit():
+        cat_qs = Category.objects.filter(id=int(category_id))
+        if workspace:
+            cat_qs = cat_qs.filter(workspace=workspace)
+        category_obj = cat_qs.first()
+        if category_obj and category_obj.color:
+            active_category_color = category_obj.color
     qs = qs_all.filter(date__gte=start_date, date__lte=end_date)
     if type_filter in ('income', 'expense'):
         qs = qs.filter(type=type_filter)
     if selected_only:
         qs = qs.filter(selected=True)
+    if category_id.isdigit():
+        qs = qs.filter(category_id=int(category_id))
 
     income_total = qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
     expense_total = qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
 
-    category_net = qs.values('category__name').annotate(
+    category_net = qs.values('category_id', 'category__name').annotate(
         total=Sum(
             Case(
                 When(type='income', then=F('value')),
@@ -2280,17 +2444,36 @@ def chart_data(request):
 
     labels = [item['category__name'] for item in category_net]
     values = [float(item['total'] or 0) for item in category_net]
+    category_ids = [item['category_id'] for item in category_net]
     fallback_colors = ['#10b981','#3b82f6','#ef4444','#f59e0b','#8b5cf6','#14b8a6','#ec4899','#6366f1','#0ea5e9','#22c55e']
     color_map = {}
-    cat_qs = Category.objects.filter(name__in=labels)
-    if workspace:
-        cat_qs = cat_qs.filter(workspace=workspace)
-    for cat in cat_qs:
-        if cat.color:
-            color_map[cat.name] = cat.color
+    if qs.exists():
+        cat_qs = Category.objects.filter(id__in=qs.values_list('category_id', flat=True).distinct())
+        if workspace:
+            cat_qs = cat_qs.filter(workspace=workspace)
+        for cat in cat_qs:
+            if cat.color:
+                color_map[cat.id] = cat.color
     colors = []
-    for idx, label in enumerate(labels):
-        colors.append(color_map.get(label, fallback_colors[idx % len(fallback_colors)]))
+    for idx, cat_id in enumerate(category_ids):
+        colors.append(color_map.get(cat_id, fallback_colors[idx % len(fallback_colors)]))
+
+    def build_pie(qs_subset):
+        data = (
+            qs_subset.values('category_id', 'category__name')
+            .annotate(total=Sum('value'))
+            .order_by('-total')
+        )
+        pie_labels = [item['category__name'] for item in data]
+        pie_values = [float(item['total'] or 0) for item in data]
+        pie_ids = [item['category_id'] for item in data]
+        pie_colors = []
+        for idx, cat_id in enumerate(pie_ids):
+            pie_colors.append(color_map.get(cat_id, fallback_colors[idx % len(fallback_colors)]))
+        return pie_labels, pie_values, pie_colors, pie_ids
+
+    income_category_labels, income_category_values, income_category_colors, income_category_ids = build_pie(qs.filter(type='income'))
+    expense_category_labels, expense_category_values, expense_category_colors, expense_category_ids = build_pie(qs.filter(type='expense'))
 
     monthly = (
         qs.annotate(month=F('date__month'), year=F('date__year'))
@@ -2308,7 +2491,7 @@ def chart_data(request):
         .order_by('year', 'month')
     )
     monthly_labels = [
-        datetime.date(item['year'], item['month'], 1).strftime('%d/%m/%Y')
+        datetime.date(item['year'], item['month'], 1).strftime('%m/%Y')
         for item in monthly
     ]
     monthly_values = [float(item['net'] or 0) for item in monthly]
@@ -2341,7 +2524,7 @@ def chart_data(request):
         .order_by('date')
     )
     daily_map = {item['date']: float(item['net'] or 0) for item in daily}
-    daily_labels = [item['date'].strftime('%d/%m/%Y') for item in daily]
+    daily_labels = [item['date'].strftime('%d/%m') for item in daily]
     daily_values = [float(item['net'] or 0) for item in daily]
 
     running_labels = []
@@ -2350,7 +2533,7 @@ def chart_data(request):
     cursor = start_date
     while cursor <= end_date:
         running_total += daily_map.get(cursor, 0.0)
-        running_labels.append(cursor.strftime('%d/%m/%Y'))
+        running_labels.append(cursor.strftime('%d/%m'))
         running_values.append(running_total)
         cursor += datetime.timedelta(days=1)
 
@@ -2358,6 +2541,8 @@ def chart_data(request):
         'labels': labels,
         'values': values,
         'colors': colors,
+        'category_ids': category_ids,
+        'active_category_color': active_category_color,
         'income_total': float(income_total),
         'expense_total': float(expense_total),
         'balance_total': float(income_total - expense_total),
@@ -2371,6 +2556,14 @@ def chart_data(request):
         'daily_values': daily_values,
         'running_labels': running_labels,
         'running_values': running_values,
+        'income_category_labels': income_category_labels,
+        'income_category_values': income_category_values,
+        'income_category_colors': income_category_colors,
+        'income_category_ids': income_category_ids,
+        'expense_category_labels': expense_category_labels,
+        'expense_category_values': expense_category_values,
+        'expense_category_colors': expense_category_colors,
+        'expense_category_ids': expense_category_ids,
     })
 
 
@@ -2381,8 +2574,18 @@ def _export_transactions_csv(queryset):
     response['Content-Disposition'] = 'attachment; filename="transacoes.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)
-    writer.writerow(['descrição', 'categoria', 'data', 'tipo', 'valor'])
+    writer.writerow([
+        tx.description,
+        tx.category.name,
+        responsible_name,
+        tx.date.isoformat(),
+        tx.get_type_display(),
+        f'{tx.value:.2f}',
+    ])
     for tx in queryset:
+        responsible_name = ''
+        if tx.responsible:
+            responsible_name = tx.responsible.get_full_name() or tx.responsible.username
         writer.writerow([
             tx.description,
             tx.category.name,
@@ -2398,11 +2601,17 @@ def _export_tasks_csv(queryset):
     response['Content-Disposition'] = 'attachment; filename="tarefas.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)
-    writer.writerow(['titulo', 'categoria', 'prazo', 'status'])
+    writer.writerow(['titulo', 'categoria', 'responsavel', 'prazo', 'status'])
     for task in queryset:
+        responsible_name = ''
+        if task.responsible_user:
+            responsible_name = task.responsible_user.get_full_name() or task.responsible_user.username
+        elif task.responsible:
+            responsible_name = task.responsible
         writer.writerow([
             task.title,
             task.category,
+            responsible_name,
             task.due_date.isoformat(),
             task.get_status_display(),
         ])
@@ -2471,6 +2680,9 @@ def register_view(request):
     if request.method == 'POST' and form.is_valid():
         trial_days = int(getattr(settings, 'TRIAL_DAYS', 7))
         invite_code = (form.cleaned_data.get('invite_code') or '').strip()
+        plan_choice = form.cleaned_data.get('plan_choice') or 'monthly:essential'
+        billing_cycle, plan_tier = plan_choice.split(':', 1)
+        master_guest_limit = form.cleaned_data.get('master_guest_limit')
         invite = None
         if invite_code:
             invite = SubscriptionInvite.objects.filter(code__iexact=invite_code).first()
@@ -2487,6 +2699,11 @@ def register_view(request):
             ws = Workspace.objects.create(name=ws_name, slug=slug, owner=user, is_active=ws_active)
             WorkspaceMembership.objects.create(workspace=ws, user=user, role='owner')
             profile, _ = UserProfile.objects.get_or_create(user=user)
+            profile.plan = plan_tier
+            profile.billing_cycle = billing_cycle
+            if plan_tier == 'master' and master_guest_limit:
+                profile.master_guest_limit = master_guest_limit
+            profile.save(update_fields=['plan', 'billing_cycle', 'master_guest_limit'])
             if invite:
                 today = timezone.localdate()
                 if invite.plan_cycle == 'annual':
@@ -2494,6 +2711,9 @@ def register_view(request):
                 else:
                     expires = today + datetime.timedelta(days=30)
                 profile.billing_cycle = invite.plan_cycle
+                profile.plan = invite.plan_tier
+                if invite.plan_tier == 'master' and master_guest_limit:
+                    profile.master_guest_limit = master_guest_limit
                 profile.payment_confirmed = True
                 profile.payment_confirmed_at = timezone.now()
                 profile.subscription_expires = expires
@@ -2502,6 +2722,8 @@ def register_view(request):
                 profile.approved_by = None
                 profile.save(update_fields=[
                     'billing_cycle',
+                    'plan',
+                    'master_guest_limit',
                     'payment_confirmed',
                     'payment_confirmed_at',
                     'subscription_expires',
@@ -2547,7 +2769,8 @@ def register_view(request):
                 login(request, user)
                 messages.success(request, 'Conta criada. Conclua a assinatura para ativar todos os recursos.')
                 cycle = getattr(profile, 'billing_cycle', 'monthly')
-                return redirect(f"{reverse('payments:subscription_start')}?plan={cycle}")
+                plan = getattr(profile, 'plan', 'essential')
+                return redirect(f"{reverse('payments:subscription_start')}?plan={cycle}:{plan}")
             notify_new_account(user)
             messages.success(request, 'Cadastro enviado. Aguarde aprova\u00e7\u00e3o do administrador.')
         return redirect('tracker:login')
@@ -2779,8 +3002,9 @@ def workspace_members(request, slug=None):
             ).first()
             if not existing_invite and not request.user.is_superuser and not _is_paid_user(user):
                 unpaid_total = _workspace_unpaid_count(target_ws) + _workspace_unpaid_invite_count(target_ws)
-                if unpaid_total >= 3:
-                    messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+                limit = _workspace_guest_limit(target_ws)
+                if unpaid_total >= limit:
+                    messages.error(request, f'Limite de {limit} convidados sem assinatura atingido.')
                     return redirect('tracker:workspace_members', slug=target_ws.slug)
 
 
@@ -2818,8 +3042,9 @@ def workspace_members(request, slug=None):
             ).first()
             if not existing_invite and not request.user.is_superuser and not _is_paid_user(user):
                 unpaid_total = _workspace_unpaid_count(target_ws) + _workspace_unpaid_invite_count(target_ws)
-                if unpaid_total >= 3:
-                    messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+                limit = _workspace_guest_limit(target_ws)
+                if unpaid_total >= limit:
+                    messages.error(request, f'Limite de {limit} convidados sem assinatura atingido.')
                     return redirect('tracker:workspace_members', slug=target_ws.slug)
 
 
@@ -2906,8 +3131,9 @@ def workspace_invite(request, slug=None):
         ).first()
         if not existing_invite and not request.user.is_superuser and not _is_paid_user(user):
             unpaid_total = _workspace_unpaid_count(target_ws) + _workspace_unpaid_invite_count(target_ws)
-            if unpaid_total >= 3:
-                messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+            limit = _workspace_guest_limit(target_ws)
+            if unpaid_total >= limit:
+                messages.error(request, f'Limite de {limit} convidados sem assinatura atingido.')
                 return redirect('tracker:workspace_invite', slug=target_ws.slug)
 
         invite, created = WorkspaceInvite.objects.get_or_create(
@@ -3002,8 +3228,9 @@ def workspace_request_action(request, slug, req_id, decision):
     if decision == 'approve':
         if not request.user.is_superuser and not _is_paid_user(req.user):
             unpaid_total = _workspace_unpaid_count(workspace) + _workspace_unpaid_invite_count(workspace)
-            if unpaid_total >= 3:
-                messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+            limit = _workspace_guest_limit(workspace)
+            if unpaid_total >= limit:
+                messages.error(request, f'Limite de {limit} convidados sem assinatura atingido.')
                 return redirect('tracker:workspace_members', slug=slug)
         WorkspaceMembership.objects.get_or_create(workspace=workspace, user=req.user, defaults={'role': 'member'})
         req.status = 'approved'
@@ -3030,8 +3257,9 @@ def workspace_invite_action(request, invite_id, decision):
         if not request.user.is_superuser and not _is_paid_user(invite.invited_user):
             unpaid_invites = _workspace_unpaid_invite_count(invite.workspace)
             unpaid_total = _workspace_unpaid_count(invite.workspace) + max(unpaid_invites - 1, 0)
-            if unpaid_total >= 3:
-                messages.error(request, 'Limite de 3 convidados sem assinatura atingido.')
+            limit = _workspace_guest_limit(invite.workspace)
+            if unpaid_total >= limit:
+                messages.error(request, f'Limite de {limit} convidados sem assinatura atingido.')
                 return redirect('tracker:workspace_select')
         WorkspaceMembership.objects.get_or_create(
             workspace=invite.workspace,
@@ -3146,6 +3374,8 @@ def export_my_data(request):
                 'status': t.status,
                 'progress': float(t.progress or 0),
                 'workspace': t.workspace.slug if t.workspace else None,
+                'responsible': (t.responsible_user.get_full_name() or t.responsible_user.username) if t.responsible_user else t.responsible,
+                'responsible_id': t.responsible_user_id,
                 'created_at': t.created_at.isoformat(),
             }
             for t in task_qs

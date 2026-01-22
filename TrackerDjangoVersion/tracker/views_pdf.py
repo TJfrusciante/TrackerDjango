@@ -6,7 +6,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from .forms import StatementUploadForm
 from .models import Category, Transaction
-from .views import _user_can_view_finance, _parse_pdf_statement, _build_preview
+from .views import _user_can_view_finance, _finance_access_denied_redirect, _parse_pdf_statement, _build_preview
 from .notifications import notify_balance_threshold, check_category_budgets, check_balance_goals
 
 @login_required
@@ -14,7 +14,7 @@ def transaction_import_pdf(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
         messages.error(request, 'Você não pode importar finanças neste workspace.')
-        return redirect('tracker:dashboard')
+        return _finance_access_denied_redirect(request)
 
     categories = list(Category.objects.filter(workspace=workspace) if workspace else Category.objects.all())
     if not categories:
@@ -36,6 +36,7 @@ def transaction_import_pdf(request):
             category_list = request.POST.getlist('category')
             selected_list = request.POST.getlist('selected')
             to_create = []
+            default_responsible = workspace.owner if workspace else None
             for idx, desc in enumerate(desc_list):
                 desc = (desc or '').strip()
                 if not desc:
@@ -59,6 +60,7 @@ def transaction_import_pdf(request):
                     type=tx_type,
                     category=category,
                     workspace=workspace,
+                    responsible=default_responsible,
                     selected=selected,
                 ))
             if to_create:

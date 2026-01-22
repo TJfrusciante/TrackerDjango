@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from tracker.models import UserProfile
 
 
 class MpSubscription(models.Model):
@@ -14,6 +15,8 @@ class MpSubscription(models.Model):
     ]
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mp_subscription')
     plan_cycle = models.CharField(max_length=20, choices=[('monthly', 'Mensal'), ('annual', 'Anual')], default='monthly')
+    plan_tier = models.CharField(max_length=20, choices=UserProfile.PLAN_CHOICES, default='essential')
+    guest_limit = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     preapproval_id = models.CharField(max_length=120, blank=True, default='')
     init_point = models.URLField(blank=True, default='')

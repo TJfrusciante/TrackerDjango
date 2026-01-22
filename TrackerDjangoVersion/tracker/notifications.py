@@ -6,8 +6,9 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.db.models import Sum
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
@@ -29,11 +30,23 @@ except Exception:  # pragma: no cover - optional dependency
     webpush = None
 
 
-def _send_email(to_email: str, subject: str, body: str) -> bool:
+def _send_email(to_email: str, subject: str, body: str, action_url: str = '') -> bool:
     if not to_email:
         return False
     try:
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [to_email], fail_silently=True)
+        body_lines = [line.strip().lstrip('-').strip() for line in body.splitlines() if line.strip()]
+        html_body = render_to_string(
+            'emails/notification.html',
+            {
+                'subject': subject,
+                'body': body,
+                'body_lines': body_lines,
+                'action_url': action_url,
+            },
+        )
+        msg = EmailMultiAlternatives(subject, body, settings.DEFAULT_FROM_EMAIL, [to_email])
+        msg.attach_alternative(html_body, "text/html")
+        msg.send(fail_silently=True)
         return True
     except Exception:
         return False
@@ -91,7 +104,7 @@ def _notify_superusers(pref_field: str, subject: str, body: str, level: str = 'i
     for admin in User.objects.filter(is_superuser=True, is_active=True).select_related('profile'):
         profile = _get_profile(admin)
         if profile and getattr(profile, pref_field, False):
-            _send_email(admin.email, subject, body)
+            _send_email(admin.email, subject, body, action_url)
             _create_notification(admin, subject, body, level=level, action_url=action_url)
             _send_push(admin, subject, body, action_url)
 
@@ -161,7 +174,7 @@ def notify_balance_threshold(user, workspace) -> None:
             f'Saldo atual: R$ {balance:.2f}\n'
             f'Limite configurado: R$ {threshold:.2f}\n'
         )
-        _send_email(user.email, subject, body)
+        _send_email(user.email, subject, body, reverse('tracker:dashboard'))
         _create_notification(user, subject, body, level='warning', workspace=workspace, action_url=reverse('tracker:dashboard'))
         _send_push(user, subject, body, reverse('tracker:dashboard'))
         profile.balance_alert_last_value = balance
@@ -203,7 +216,7 @@ def check_category_budgets(workspace, reference_date=None):
                 f'Total: R$ {total:.2f}\n'
                 f'Limite: R$ {budget.limit_value:.2f}\n'
             )
-            _send_email(owner.email, title, body)
+            _send_email(owner.email, title, body, reverse('tracker:dashboard'))
             _create_notification(owner, title, body, level='warning', workspace=workspace, action_url=reverse('tracker:dashboard'))
             _send_push(owner, title, body, reverse('tracker:dashboard'))
             budget.last_notified_at = timezone.now()
@@ -243,7 +256,7 @@ def check_balance_goals(workspace, reference_date=None):
                 f'Saldo atual: R$ {balance:.2f}\n'
                 f'Meta: R$ {goal.target_value:.2f}\n'
             )
-            _send_email(owner.email, title, body)
+            _send_email(owner.email, title, body, reverse('tracker:dashboard'))
             _create_notification(owner, title, body, level='success', workspace=workspace, action_url=reverse('tracker:dashboard'))
             _send_push(owner, title, body, reverse('tracker:dashboard'))
             goal.last_notified_at = timezone.now()
@@ -268,7 +281,7 @@ def notify_task_completed(task, actor=None) -> None:
         f'Conclu\u00edda por: {actor.get_full_name() if actor else "-"} ({actor.username if actor else "-"})\n'
     )
     if notify_owner:
-        _send_email(owner.email, subject, body)
+        _send_email(owner.email, subject, body, reverse('tracker:task_update', args=[task.id]) + '?detail=1')
         _create_notification(owner, subject, body, level='success', workspace=workspace, action_url=reverse('tracker:task_update', args=[task.id]) + '?detail=1')
         _send_push(owner, subject, body, reverse('tracker:task_update', args=[task.id]) + '?detail=1')
     if task.responsible_email:
@@ -292,7 +305,7 @@ def notify_step_completed(task, step, actor=None) -> None:
         f'Conclu\u00edda por: {actor.get_full_name() if actor else "-"} ({actor.username if actor else "-"})\n'
     )
     if notify_owner:
-        _send_email(owner.email, subject, body)
+        _send_email(owner.email, subject, body, reverse('tracker:task_update', args=[task.id]) + '?detail=1')
         _create_notification(owner, subject, body, level='success', workspace=workspace, action_url=reverse('tracker:task_update', args=[task.id]) + '?detail=1')
         _send_push(owner, subject, body, reverse('tracker:task_update', args=[task.id]) + '?detail=1')
     if step.responsible_email:
@@ -319,7 +332,7 @@ def notify_task_due(task, status_label: str, days_left: int | None = None):
         f'Prazo: {task.due_date.strftime("%d/%m/%Y")}\n'
         f'Workspace: {workspace.name}\n'
     )
-    _send_email(owner.email, title, body)
+    _send_email(owner.email, title, body, reverse('tracker:task_update', args=[task.id]) + '?detail=1')
     _create_notification(owner, title, body, level='warning', workspace=workspace, action_url=reverse('tracker:task_update', args=[task.id]) + '?detail=1')
     _send_push(owner, title, body, reverse('tracker:task_update', args=[task.id]) + '?detail=1')
     if task.responsible_email:

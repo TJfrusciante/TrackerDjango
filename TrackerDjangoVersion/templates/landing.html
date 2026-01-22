@@ -29,7 +29,7 @@
                     <a class="btn btn-primary btn-lg" href="{% url 'tracker:register' %}">Criar conta</a>
                     <a class="btn btn-outline-light btn-lg" href="{% url 'tracker:login' %}">J&aacute; tenho acesso</a>
                 </div>
-                <p class="lp-muted mt-3 small">Somente o dono do workspace paga; at&eacute; 3 convidados sem assinatura.</p>
+                <p class="lp-muted mt-3 small">Somente o dono do workspace paga; Essencial inclui 2 convidados, Pro 6 e Master permite personalizar.</p>
             </div>
             <div class="col-lg-6">
                 <div class="lp-hero-card">
@@ -312,42 +312,50 @@
 <section class="py-5">
     <div class="container">
         <div class="row g-4 align-items-start">
-            <div class="col-lg-6">
+            <div class="col-12">
                 <h2 class="section-title mb-3">Planos</h2>
-                <p class="lp-muted mb-4">Escolha mensal ou anual. O dono paga o workspace; at&eacute; 3 convidados sem assinatura inclusos.</p>
-                <div class="row g-3">
+                <p class="lp-muted mb-4">Escolha ciclo e plano. Essencial inclui 2 convidados, Pro 6 e Master ajusta conforme sua equipe.</p>
+            </div>
+            <div class="col-12">
+                <div class="row g-3 plan-row">
                     {% for plan in pricing_plans %}
-                    <div class="col-md-6">
-                        <div class="plan-card h-100">
+                    <div class="col-12 col-md-4">
+                        <div class="plan-card plan-card--{{ plan.tier }} h-100 reveal-on-scroll" style="--reveal-delay: {{ forloop.counter0|add:'1' }}00ms;">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h5 class="mb-0">{{ plan.name }}</h5>
                                 <span class="badge bg-primary-subtle text-primary">{{ plan.badge }}</span>
                             </div>
-                            <p class="lp-muted small mb-2">{{ plan.subtitle }}</p>
-                            <h3 class="fw-bold mb-1">R$ {{ plan.price|floatformat:2 }}/m&ecirc;s</h3>
+                            <p class="lp-muted small mb-2">Mensal: R$ {{ plan.monthly_price|floatformat:2 }}/m&ecirc;s</p>
+                            <h3 class="fw-bold mb-1">Anual: R$ {{ plan.annual_price|floatformat:2 }}/m&ecirc;s</h3>
                             {% if pricing_state.promo_active %}
                                 <div class="lp-muted small mb-2">
-                                    De <span class="text-decoration-line-through">R$ {{ plan.regular_price|floatformat:2 }}</span>
+                                    De <span class="text-decoration-line-through">R$ {{ plan.monthly_regular|floatformat:2 }}</span> (mensal)
                                 </div>
                             {% endif %}
-                            {% if plan.name == 'Anual' %}
-                                <p class="lp-muted small mb-3">Total anual: R$ {{ plan.annual_total|floatformat:2 }}</p>
+                            {% if pricing_state.promo_active %}
+                                <div class="plan-discount mb-2">
+                                    De R$ {{ plan.monthly_regular|floatformat:2 }} por R$ {{ plan.monthly_price|floatformat:2 }} &middot; economize {{ plan.discount_pct }}%
+                                </div>
                             {% else %}
-                                <p class="lp-muted small mb-3">Pagamento mensal recorrente</p>
+                                <div class="plan-discount muted mb-2">Promo&ccedil;&atilde;o indispon&iacute;vel no momento.</div>
                             {% endif %}
+                            <p class="lp-muted small mb-3">Total anual: R$ {{ plan.annual_total|floatformat:2 }}</p>
                             <ul class="lp-muted small ps-3 mb-3">
                                 {% for f in plan.features %}
                                 <li class="mb-1">{{ f }}</li>
                                 {% endfor %}
                             </ul>
+                            {% if plan.note %}
+                                <div class="lp-muted small mb-3">{{ plan.note }}</div>
+                            {% endif %}
                             <a class="btn btn-primary w-100" href="{% url 'tracker:register' %}">Assinar</a>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
             </div>
-            <div class="col-lg-6">
-                <div class="lp-card h-100">
+            <div class="col-12">
+                <div class="lp-card h-100 reveal-on-scroll">
                     <h2 class="section-title mb-3">Para quem &eacute;</h2>
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -375,7 +383,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="lp-highlight mt-3">
+                    <div class="lp-highlight mt-3 reveal-on-scroll">
                         <h6 class="fw-bold mb-2">Seguran&ccedil;a e privacidade</h6>
                         <p class="lp-muted mb-0">Workspaces isolados, permiss&otilde;es por membro e controle total do owner.</p>
                     </div>
@@ -437,6 +445,32 @@
             };
             requestAnimationFrame(step);
         });
+    })();
+
+    (function() {
+        const targets = document.querySelectorAll('.reveal-on-scroll, .lp-card, .lp-highlight, .lp-hero-card, .lp-promo-banner, .lp-cta, .lp-step, .lp-carousel-card, .lp-screenshot-card');
+        targets.forEach((el, idx) => {
+            el.classList.add('reveal-on-scroll');
+            if (!el.style.getPropertyValue('--reveal-delay')) {
+                el.style.setProperty('--reveal-delay', `${Math.min(idx, 6) * 90}ms`);
+            }
+        });
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            targets.forEach(el => el.classList.add('is-visible'));
+            return;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.2 });
+
+        targets.forEach(target => observer.observe(target));
     })();
 </script>
 {% endblock %}

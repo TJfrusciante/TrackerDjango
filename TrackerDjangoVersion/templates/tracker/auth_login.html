@@ -32,7 +32,7 @@
                 <div class="d-flex gap-2">
                     <a class="small" href="{% url 'tracker:register' %}">Criar conta</a>
                     <span class="text-secondary small">&middot;</span>
-                    <a class="small" href="{% url 'tracker:register_guest' %}" onclick="return confirm('Conta de convidado acessa apenas tarefas dos workspaces em que for convidado. Transa&ccedil;&otilde;es e IA ficam bloqueadas.');">Sou convidado</a>
+                    <a class="small" href="{% url 'tracker:register_guest' %}" onclick="return confirm('Conta de convidado pode lan&ccedil;ar transa&ccedil;&otilde;es e ver tarefas, mas n&atilde;o acessa dashboard, edi&ccedil;&otilde;es e IA.');">Sou convidado</a>
                 </div>
             </div>
             {% if form.non_field_errors %}

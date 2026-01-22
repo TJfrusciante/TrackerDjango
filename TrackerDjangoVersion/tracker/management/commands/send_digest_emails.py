@@ -2,9 +2,10 @@ import datetime
 from decimal import Decimal
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.db.models import Sum
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from tracker.models import Notification, Task, Transaction, UserProfile, Workspace, WorkspaceMembership
@@ -19,43 +20,45 @@ def _period_range(kind: str, today):
     return today - datetime.timedelta(days=7), today
 
 
-def _format_currency(value):
-    return f'R$ {value:.2f}'
-
-
-def _build_digest(user, start, end):
-    lines = [f'Resumo de {start:%d/%m/%Y} a {end:%d/%m/%Y}']
+def _digest_context(user, start, end):
     owned_workspaces = list(Workspace.objects.filter(owner=user, is_active=True))
-    if owned_workspaces:
+    has_finance = bool(owned_workspaces)
+    income = Decimal('0')
+    expense = Decimal('0')
+    balance = Decimal('0')
+    if has_finance:
         tx_qs = Transaction.objects.filter(workspace__in=owned_workspaces, date__gte=start, date__lte=end)
         income = tx_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or Decimal('0')
         expense = tx_qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or Decimal('0')
         balance = income - expense
-        lines.append('')
-        lines.append('Financeiro (workspaces do owner):')
-        lines.append(f'- Entradas: {_format_currency(income)}')
-        lines.append(f'- Sa\u00eddas: {_format_currency(expense)}')
-        lines.append(f'- Saldo: {_format_currency(balance)}')
-    else:
-        lines.append('')
-        lines.append('Financeiro: voc\u00ea n\u00e3o possui workspaces como owner.')
 
     membership_ws_ids = list(
         WorkspaceMembership.objects.filter(user=user, workspace__is_active=True).values_list('workspace_id', flat=True)
     )
     task_ws_ids = set(membership_ws_ids) | {ws.id for ws in owned_workspaces}
-    if task_ws_ids:
-        task_qs = Task.objects.filter(workspace_id__in=task_ws_ids, updated_at__date__gte=start, updated_at__date__lte=end)
+    has_tasks = bool(task_ws_ids)
+    open_count = 0
+    done_count = 0
+    if has_tasks:
+        task_qs = Task.objects.filter(
+            workspace_id__in=task_ws_ids,
+            updated_at__date__gte=start,
+            updated_at__date__lte=end,
+        )
         open_count = task_qs.filter(status='ongoing').count()
         done_count = task_qs.filter(status='done').count()
-        lines.append('')
-        lines.append('Tarefas (workspaces com acesso):')
-        lines.append(f'- Em andamento: {open_count}')
-        lines.append(f'- Conclu\u00eddas: {done_count}')
-    else:
-        lines.append('')
-        lines.append('Tarefas: nenhuma atividade registrada no per\u00edodo.')
-    return '\n'.join(lines)
+
+    return {
+        'start': start,
+        'end': end,
+        'has_finance': has_finance,
+        'income': income,
+        'expense': expense,
+        'balance': balance,
+        'has_tasks': has_tasks,
+        'open_count': open_count,
+        'done_count': done_count,
+    }
 
 
 class Command(BaseCommand):
@@ -90,14 +93,20 @@ class Command(BaseCommand):
                 start, end = _period_range(kind, today)
                 if last_sent and last_sent >= start:
                     continue
-                body = _build_digest(user, start, end)
+                context = _digest_context(user, start, end)
+                context['label'] = "semanal" if kind == "weekly" else "mensal"
+                context['user'] = user
+                text_body = render_to_string('emails/digest.txt', context).strip()
+                html_body = render_to_string('emails/digest.html', context)
                 label = "semanal" if kind == "weekly" else "mensal"
                 subject = f"Resumo {label}"
-                send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+                msg = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [user.email])
+                msg.attach_alternative(html_body, "text/html")
+                msg.send(fail_silently=True)
                 Notification.objects.create(
                     user=user,
                     title=subject,
-                    body=body,
+                    body=text_body,
                     level='info',
                 )
                 setattr(profile, last_field, today)

@@ -58,7 +58,7 @@
                                     <div class="fw-semibold">{{ invite.code }}</div>
                                     <div class="small text-secondary">Criado em {{ invite.created_at|date:"d/m/Y" }}</div>
                                 </td>
-                                <td>{{ invite.get_plan_cycle_display }}</td>
+                                <td>{{ invite.get_plan_cycle_display }} / {{ invite.get_plan_tier_display }}</td>
                                 <td>{{ invite.used_count }}/{{ invite.max_uses }}</td>
                                 <td>
                                     {% if invite.is_active %}

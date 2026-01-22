@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     'tracker',
     'assistant',
     'payments',
+    'whatsapp_finance',
 ]
 
 MIDDLEWARE = [
@@ -130,17 +131,24 @@ WSGI_APPLICATION = 'TrackerDjangoVersion.wsgi.application'
 # DB_PASSWORD=...
 # DB_HOST=127.0.0.1
 # DB_PORT=5432
+#DB POSTGRESQL
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': env('DB_NAME_TRACKER', 'tracker'),
+#         'USER': env('DB_USER_TRACKER', 'postgres'),
+#         'PASSWORD': env('DB_PASSWORD_TRACKER', ''),
+#         'HOST': env('DB_HOST_TRACKER', 'localhost'),
+#         'PORT': env('DB_PORT_TRACKER', '5432'),
+#     }
+# }
+#DB SQLITE3
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME_TRACKER', 'tracker'),
-        'USER': env('DB_USER_TRACKER', 'postgres'),
-        'PASSWORD': env('DB_PASSWORD_TRACKER', ''),
-        'HOST': env('DB_HOST_TRACKER', 'localhost'),
-        'PORT': env('DB_PORT_TRACKER', '5432'),
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
-
 
 # ------------------------------------------------------------------------------
 # Password validation
@@ -151,6 +159,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {'NAME': 'tracker.validators.SpecialCharacterValidator'},
 ]
 
 
@@ -179,6 +188,19 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Serve estaticos em producao sem depender do Nginx
+
+
+# ------------------------------------------------------------------------------
+# Cache (rate limit, sessions, metrics)
+# ------------------------------------------------------------------------------
+
+# Em producao, configure REDIS/Memcached via DJANGO_CACHE_BACKEND/LOCATION.
+CACHES = {
+    "default": {
+        "BACKEND": env("DJANGO_CACHE_BACKEND", "django.core.cache.backends.locmem.LocMemCache"),
+        "LOCATION": env("DJANGO_CACHE_LOCATION", "itracker-cache"),
+    }
+}
 
 # ------------------------------------------------------------------------------
 # Auth redirects
@@ -241,9 +263,9 @@ TRIAL_DAYS = int(env("TRIAL_DAYS", "7"))
 # ------------------------------------------------------------------
 
 AI_PLAN_TOKEN_LIMITS = {
-    "starter": int(env("AI_STARTER_TOKEN_LIMIT", "20000")),
+    "essential": int(env("AI_ESSENTIAL_TOKEN_LIMIT", env("AI_STARTER_TOKEN_LIMIT", "20000"))),
     "pro": int(env("AI_PRO_TOKEN_LIMIT", "80000")),
-    "team": int(env("AI_TEAM_TOKEN_LIMIT", "200000")),
+    "master": int(env("AI_MASTER_TOKEN_LIMIT", env("AI_TEAM_TOKEN_LIMIT", "200000"))),
 }
 AI_USAGE_WINDOW_DAYS = int(env("AI_USAGE_WINDOW_DAYS", "30"))
 
@@ -333,3 +355,18 @@ if SENTRY_DSN:
         )
     except Exception:
         pass
+
+# ------------------------------------------------------------------------------
+# WhatsApp Finance (Twilio)
+# ------------------------------------------------------------------------------
+
+TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", "")
+TWILIO_WHATSAPP_NUMBER = env("TWILIO_WHATSAPP_NUMBER", "")
+WHATSAPP_VALIDATE_TWILIO = env_bool("WHATSAPP_VALIDATE_TWILIO", False)
+WHATSAPP_TRANSCRIBE_PROVIDER = env("WHATSAPP_TRANSCRIBE_PROVIDER", "none")  # none|whisper|google
+WHATSAPP_WHISPER_MODEL = env("WHATSAPP_WHISPER_MODEL", "base")
+WHATSAPP_OCR_ENABLED = env_bool("WHATSAPP_OCR_ENABLED", True)
+WHATSAPP_CONFIRMATION_THRESHOLD = env("WHATSAPP_CONFIRMATION_THRESHOLD", 1000)
+WHATSAPP_AUTO_CONFIRM_BELOW_THRESHOLD = env_bool("WHATSAPP_AUTO_CONFIRM_BELOW_THRESHOLD", False)
+WHATSAPP_CREATE_MISSING_CATEGORIES = env_bool("WHATSAPP_CREATE_MISSING_CATEGORIES", True)

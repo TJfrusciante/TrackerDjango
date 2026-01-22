@@ -1,14 +1,10 @@
-django==5.2.6
-pdfminer.six==20240706
+django==5.2.10
+pdfminer.six==20260107
 PyPDF2==3.0.1
-python-dotenv==1.0.1
-pywebpush==1.14.0
-sentry-sdk==2.20.0
+python-dotenv==1.2.1
+pywebpush==2.2.0
+sentry-sdk==2.50.0
+twilio==9.4.4
+pytesseract==0.3.13
+Pillow==11.1.0
 
-# Mercado Pago (planejamento - NAO instalar agora)
-# - Criar fluxo de assinatura com webhook (payment.created, payment.updated).
-# - Guardar customer_id, subscription_id, status e next_billing_date no perfil/conta.
-# - Tela admin para aprovar pagamentos manuais e reconcilhar assinaturas.
-# - Pagina de checkout com plano mensal/anual e comprovante.
-# - Notificacoes de falha e renovacao (email + in-app).
-# - Dominio: configurar DNS (A/AAAA) e SSL (LetsEncrypt) no nginx.

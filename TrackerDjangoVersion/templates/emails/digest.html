@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Resumo {{ label }}</title>
+</head>
+<body style="margin:0;background-color:#0b1221;color:#e2e8f0;font-family:'Segoe UI',Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b1221;padding:24px 0;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background-color:#0f172a;border-radius:16px;overflow:hidden;border:1px solid #1f2937;">
+                    <tr>
+                        <td style="padding:24px 28px;">
+                            <div style="font-size:18px;font-weight:700;margin-bottom:4px;">iTracker</div>
+                            <h1 style="font-size:22px;margin:0 0 8px;">Resumo {{ label }}</h1>
+                            <p style="margin:0 0 18px;color:#94a3b8;">
+                                Período: {{ start|date:"d/m/Y" }} a {{ end|date:"d/m/Y" }}
+                            </p>
+
+                            <div style="padding:16px;border:1px solid #1f2937;border-radius:12px;margin-bottom:16px;">
+                                <div style="font-weight:600;margin-bottom:8px;">Financeiro</div>
+                                {% if has_finance %}
+                                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                        <div style="min-width:160px;">
+                                            <div style="color:#94a3b8;font-size:12px;">Entradas</div>
+                                            <div style="font-size:18px;color:#10b981;">R$ {{ income|floatformat:2 }}</div>
+                                        </div>
+                                        <div style="min-width:160px;">
+                                            <div style="color:#94a3b8;font-size:12px;">Saídas</div>
+                                            <div style="font-size:18px;color:#ef4444;">R$ {{ expense|floatformat:2 }}</div>
+                                        </div>
+                                        <div style="min-width:160px;">
+                                            <div style="color:#94a3b8;font-size:12px;">Saldo</div>
+                                            <div style="font-size:18px;color:#38bdf8;">R$ {{ balance|floatformat:2 }}</div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div style="color:#94a3b8;">Você não possui workspaces como owner no período.</div>
+                                {% endif %}
+                            </div>
+
+                            <div style="padding:16px;border:1px solid #1f2937;border-radius:12px;margin-bottom:16px;">
+                                <div style="font-weight:600;margin-bottom:8px;">Tarefas</div>
+                                {% if has_tasks %}
+                                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                        <div style="min-width:160px;">
+                                            <div style="color:#94a3b8;font-size:12px;">Em andamento</div>
+                                            <div style="font-size:18px;">{{ open_count }}</div>
+                                        </div>
+                                        <div style="min-width:160px;">
+                                            <div style="color:#94a3b8;font-size:12px;">Concluídas</div>
+                                            <div style="font-size:18px;color:#22c55e;">{{ done_count }}</div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div style="color:#94a3b8;">Nenhuma atividade registrada no período.</div>
+                                {% endif %}
+                            </div>
+
+                            <p style="margin:0;color:#94a3b8;font-size:13px;">
+                                Acesse o iTracker para ver detalhes, atualizar categorias e acompanhar metas.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <div style="margin-top:14px;color:#64748b;font-size:12px;">&copy; {% now "Y" %} iTracker</div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

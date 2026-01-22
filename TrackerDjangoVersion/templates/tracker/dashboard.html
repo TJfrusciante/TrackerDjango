@@ -9,9 +9,9 @@
         <div class="glass-card p-4">
             <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
                 <div>
-                    <p class="text-uppercase small mb-1 text-secondary">Vis&atilde;o geral</p>
+                    <p class="text-uppercase small mb-1 text-secondary">Dashboard</p>
                     <h1 class="h3 fw-bold mb-2">Controle de finan&ccedil;as e tarefas</h1>
-                    <p class="mb-0 text-secondary">Resumo r&aacute;pido do m&ecirc;s atual e &uacute;ltimas movimenta&ccedil;&otilde;es.</p>
+                    <p class="mb-0 text-secondary">An&aacute;lises detalhadas do per&iacute;odo selecionado.</p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="{% url 'tracker:transactions_list' %}" class="btn btn-outline-light page-action-btn">
@@ -63,25 +63,55 @@
                     <h5 class="mb-0">Checklist inicial</h5>
                     <span class="text-secondary small">Complete os passos essenciais para começar no iTracker.</span>
                 </div>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for item in onboarding.items %}
-                <div class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge {% if item.done %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %} px-3">
-                            {% if item.done %}Ok{% else %}Pendente{% endif %}
-                        </span>
-                        <span>{{ item.label }}</span>
-                    </div>
-                    {% if not item.done %}
-                        <a class="btn btn-sm btn-primary" href="{{ item.url }}">Começar</a>
-                    {% endif %}
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-light btn-sm" type="button" id="startTourBtn">
+                        <i class="fa-solid fa-compass me-2"></i>Iniciar tour guiado
+                    </button>
+                    <button class="btn btn-outline-light btn-sm collapse-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#onboardingChecklist" aria-expanded="true" aria-controls="onboardingChecklist">
+                        <i class="fa-solid fa-chevron-up collapse-icon me-2"></i>Checklist
+                    </button>
                 </div>
-                {% endfor %}
+            </div>
+            <div class="collapse show" id="onboardingChecklist">
+                <div class="list-group list-group-flush">
+                    {% for item in onboarding.items %}
+                    <div class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge {% if item.done %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %} px-3">
+                                {% if item.done %}Ok{% else %}Pendente{% endif %}
+                            </span>
+                            <span>{{ item.label }}</span>
+                        </div>
+                        {% if not item.done %}
+                            <a class="btn btn-sm btn-primary" href="{{ item.url }}">Come&ccedil;ar</a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>
     {% endif %}
+
+    <div class="modal fade" id="onboardingModal" tabindex="-1" aria-labelledby="onboardingModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-card border-0">
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="fw-bold mb-2" id="onboardingModalLabel">Quer fazer um tour guiado?</h5>
+                            <p class="text-secondary mb-3">Vamos te mostrar os principais pontos do iTracker em poucos passos.</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 justify-content-end">
+                        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Agora n&atilde;o</button>
+                        <button type="button" class="btn btn-primary" id="startTourModal">Come&ccedil;ar tour</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="col-12">
         <div class="row g-3">
@@ -156,15 +186,24 @@
         </div>
     </div>
 
+    <div class="col-12">
+        <div class="dashboard-toolbar">
+            <button class="btn btn-outline-light page-action-btn" id="clearFilters" type="button" data-default-start="{{ start_date|date:'Y-m-d' }}" data-default-end="{{ end_date|date:'Y-m-d' }}" data-bs-toggle="tooltip" title="Limpar filtros e voltar ao per&iacute;odo inicial">
+                <i class="fa-solid fa-eraser me-1"></i>Limpar filtros
+            </button>
+        </div>
+    </div>
+
     <div class="col-lg-7">
         <div class="glass-card p-4 h-100">
-            <form id="rangeForm" method="get" class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
+            <form id="rangeForm" method="get" class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3" data-tour="dashboard-filters">
                 <div>
                     <h5 class="mb-0">Distribui&#231;&#227;o por categoria</h5>
                     <span class="text-secondary small">Entradas - sa&#237;das (filtr&#225;vel)</span>
                     {% if not period_has_data %}
                         <div class="text-warning small mt-1">Sem dados neste per&iacute;odo.</div>
                     {% endif %}
+                    <div class="text-secondary small mt-1" id="categoryFilterInfo">Clique em uma categoria para filtrar os gr&aacute;ficos.</div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <input id="rangeStartDisplay" type="text" inputmode="numeric" class="form-control" value="{{ start_date|date:'d/m/Y' }}" placeholder="dd/mm/aaaa" aria-label="Data inicial">
@@ -187,6 +226,16 @@
                         <option value="income">S&#243; entradas</option>
                         <option value="expense">S&#243; sa&#237;das</option>
                     </select>
+                    {% if responsible_users %}
+                    <select id="responsibleFilter" name="responsible" class="form-select" aria-label="Filtrar por respons&aacute;vel">
+                        <option value="">Todos os respons&aacute;veis</option>
+                        {% for member in responsible_users %}
+                            <option value="{{ member.id }}" {% if responsible_filter == member.id|stringformat:"s" %}selected{% endif %}>
+                                {{ member.get_full_name|default:member.username }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
                     <div class="form-check align-self-center">
                         <input class="form-check-input" type="checkbox" id="selectedOnly" aria-label="Somente destacados">
                         <label class="form-check-label small text-secondary" for="selectedOnly">Destacados</label>
@@ -209,7 +258,9 @@
                 </div>
             </div>
             <div id="categorySkeleton" class="skeleton chart-skeleton mb-3"></div>
-            <canvas id="categoryChart" height="260"></canvas>
+            <div class="chart-box">
+                <canvas id="categoryChart" class="chart-canvas" data-tour="chart-category"></canvas>
+            </div>
             <p class="text-secondary small mt-3 mb-0 d-none" id="chartEmpty">Adicione transa&#231;&#245;es para ver este gr&#225;fico.</p>
         </div>
     </div>
@@ -220,11 +271,44 @@
                 <h5 class="mb-0">Entradas vs Sa&#237;das</h5>
             </div>
             <div id="typeSkeleton" class="skeleton chart-skeleton mb-3"></div>
-            <canvas id="typeChart" height="220"></canvas>
+            <div class="chart-box chart-box--sm">
+                <canvas id="typeChart" class="chart-canvas"></canvas>
+            </div>
             <div class="mt-3">
                 <h6 class="small text-secondary mb-1">Status das tarefas</h6>
                 <div id="tasksSkeleton" class="skeleton chart-skeleton mb-3"></div>
-                <canvas id="tasksChart" height="180"></canvas>
+                <div class="chart-box chart-box--xs">
+                    <canvas id="tasksChart" class="chart-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="glass-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Despesas por categoria</h5>
+                        <span class="text-secondary small">No per&#237;odo</span>
+                    </div>
+                    <div id="expenseCategorySkeleton" class="skeleton chart-skeleton mb-3"></div>
+                    <div class="chart-box chart-box--sm chart-box--pie">
+                        <canvas id="expenseCategoryChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="glass-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Entradas por categoria</h5>
+                        <span class="text-secondary small">No per&#237;odo</span>
+                    </div>
+                    <div id="incomeCategorySkeleton" class="skeleton chart-skeleton mb-3"></div>
+                    <div class="chart-box chart-box--sm chart-box--pie">
+                        <canvas id="incomeCategoryChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -283,7 +367,9 @@
                 </div>
             </div>
             <div id="monthlySkeleton" class="skeleton chart-skeleton mb-3"></div>
-            <canvas id="monthlyChart" height="220"></canvas>
+            <div class="chart-box chart-box--sm">
+                <canvas id="monthlyChart" class="chart-canvas"></canvas>
+            </div>
         </div>
     </div>
 
@@ -296,7 +382,9 @@
                 </div>
             </div>
             <div id="dailySkeleton" class="skeleton chart-skeleton mb-3"></div>
-            <canvas id="dailyChart" height="220"></canvas>
+            <div class="chart-box chart-box--sm">
+                <canvas id="dailyChart" class="chart-canvas"></canvas>
+            </div>
         </div>
     </div>
 
@@ -309,7 +397,9 @@
                 </div>
             </div>
             <div id="runningSkeleton" class="skeleton chart-skeleton mb-3"></div>
-            <canvas id="runningChart" height="220"></canvas>
+            <div class="chart-box chart-box--sm">
+                <canvas id="runningChart" class="chart-canvas"></canvas>
+            </div>
         </div>
     </div>
 
@@ -383,12 +473,15 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/onboarding.js' %}"></script>
 <script>
     const ctx = document.getElementById('categoryChart');
     const typeCtx = document.getElementById('typeChart');
     const monthlyCtx = document.getElementById('monthlyChart');
     const dailyCtx = document.getElementById('dailyChart');
     const runningCtx = document.getElementById('runningChart');
+    const expenseCategoryCtx = document.getElementById('expenseCategoryChart');
+    const incomeCategoryCtx = document.getElementById('incomeCategoryChart');
     const categorySkeleton = document.getElementById('categorySkeleton');
     const typeSkeleton = document.getElementById('typeSkeleton');
     const tasksSkeleton = document.getElementById('tasksSkeleton');
@@ -397,6 +490,8 @@
     const runningSkeleton = document.getElementById('runningSkeleton');
     const latestTxSkeleton = document.getElementById('latestTxSkeleton');
     const latestTasksSkeleton = document.getElementById('latestTasksSkeleton');
+    const expenseCategorySkeleton = document.getElementById('expenseCategorySkeleton');
+    const incomeCategorySkeleton = document.getElementById('incomeCategorySkeleton');
     const startHidden = document.getElementById('rangeStart');
     const endHidden = document.getElementById('rangeEnd');
     const startDisplay = document.getElementById('rangeStartDisplay');
@@ -405,12 +500,15 @@
     const endPicker = document.getElementById('rangeEndPicker');
     const monthSelect = document.getElementById('rangeMonth');
     const typeFilter = document.getElementById('typeFilter');
+    const responsibleFilter = document.getElementById('responsibleFilter');
     const selectedOnly = document.getElementById('selectedOnly');
     const emptyMsg = document.getElementById('chartEmpty');
     const incomeEl = document.getElementById('incomeValue');
     const expenseEl = document.getElementById('expenseValue');
     const balanceEl = document.getElementById('balanceValue');
     const applyBtn = document.getElementById('applyRange');
+    const clearFiltersBtn = document.getElementById('clearFilters');
+    const categoryFilterInfo = document.getElementById('categoryFilterInfo');
     const chartUrl = "{% url 'tracker:chart_data' %}";
     const period = "{{ period }}";
     const tasksData = { open: {{ tasks_open }}, done: {{ tasks_done }} };
@@ -420,6 +518,14 @@
     let dailyChartInstance;
     let runningChartInstance;
     let tasksChartInstance;
+    let expenseCategoryChartInstance;
+    let incomeCategoryChartInstance;
+    let activeCategoryId = null;
+    let activeCategoryLabel = '';
+    let activeType = '';
+
+    const cssRoot = getComputedStyle(document.documentElement);
+    const chartBorder = (cssRoot.getPropertyValue('--card-bg') || '#0f172a').trim();
 
     function hideSkeleton(el) {
         if (el) el.classList.add('d-none');
@@ -471,15 +577,17 @@
         return `R$ ${Number(value || 0).toFixed(2)}`;
     }
 
-    function renderChart(labels, values, colors) {
+    function renderChart(labels, values, colors, ids, overrideColor) {
         if (!ctx) return;
-        const bgColors = (colors && colors.length) ? colors : values.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)');
-        const borderColors = (colors && colors.length) ? colors : values.map(v => v >= 0 ? '#10b981' : '#ef4444');
+        const colorOverride = overrideColor && String(overrideColor).trim() ? overrideColor : '';
+        const bgColors = colorOverride ? labels.map(() => colorOverride) : (colors && colors.length) ? colors : values.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)');
+        const borderColors = colorOverride ? labels.map(() => colorOverride) : (colors && colors.length) ? colors : values.map(v => v >= 0 ? '#10b981' : '#ef4444');
         if (chartInstance) {
             chartInstance.data.labels = labels;
             chartInstance.data.datasets[0].data = values;
             chartInstance.data.datasets[0].backgroundColor = bgColors;
             chartInstance.data.datasets[0].borderColor = borderColors;
+            chartInstance.$categoryIds = ids || [];
             chartInstance.update();
             return;
         }
@@ -498,13 +606,22 @@
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { display: false }},
                 scales: {
-                    x: { grid: { display: false }},
+                    x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }},
                     y: { grid: { color: 'rgba(226,232,240,0.1)' }}
+                },
+                onClick: (_, elements) => {
+                    if (!elements || !elements.length) return;
+                    const index = elements[0].index;
+                    const categoryId = (chartInstance.$categoryIds || [])[index];
+                    const label = (chartInstance.data.labels || [])[index];
+                    if (categoryId) setCategoryFilter(categoryId, label);
                 }
             }
         });
+        chartInstance.$categoryIds = ids || [];
     }
 
     function renderTypeChart(income, expense) {
@@ -527,8 +644,16 @@
                 }]
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom' }},
-                cutout: '60%'
+                cutout: '60%',
+                onClick: (_, elements) => {
+                    if (!elements || !elements.length) return;
+                    const index = elements[0].index;
+                    const nextType = index === 0 ? 'income' : 'expense';
+                    setTypeFilter(nextType);
+                }
             }
         });
     }
@@ -555,20 +680,104 @@
                 }]
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom' }},
                 cutout: '65%'
             }
         });
     }
 
-    function renderMonthly(labels, values) {
+    function renderExpenseCategoryChart(labels, values, colors, ids, overrideColor) {
+        if (!expenseCategoryCtx) return;
+        if (expenseCategoryChartInstance) {
+            expenseCategoryChartInstance.data.labels = labels;
+            expenseCategoryChartInstance.data.datasets[0].data = values;
+            expenseCategoryChartInstance.data.datasets[0].backgroundColor = overrideColor ? labels.map(() => overrideColor) : colors;
+            expenseCategoryChartInstance.$categoryIds = ids || [];
+            expenseCategoryChartInstance.update();
+            return;
+        }
+        expenseCategoryChartInstance = new Chart(expenseCategoryCtx, {
+            type: 'pie',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: overrideColor ? labels.map(() => overrideColor) : colors,
+                    borderColor: chartBorder,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' }},
+                onClick: (_, elements) => {
+                    if (!elements || !elements.length) return;
+                    const index = elements[0].index;
+                    const categoryId = (expenseCategoryChartInstance.$categoryIds || [])[index];
+                    const label = (expenseCategoryChartInstance.data.labels || [])[index];
+                    if (categoryId) setCategoryFilter(categoryId, label);
+                }
+            }
+        });
+        expenseCategoryChartInstance.$categoryIds = ids || [];
+    }
+
+    function renderIncomeCategoryChart(labels, values, colors, ids, overrideColor) {
+        if (!incomeCategoryCtx) return;
+        if (incomeCategoryChartInstance) {
+            incomeCategoryChartInstance.data.labels = labels;
+            incomeCategoryChartInstance.data.datasets[0].data = values;
+            incomeCategoryChartInstance.data.datasets[0].backgroundColor = overrideColor ? labels.map(() => overrideColor) : colors;
+            incomeCategoryChartInstance.$categoryIds = ids || [];
+            incomeCategoryChartInstance.update();
+            return;
+        }
+        incomeCategoryChartInstance = new Chart(incomeCategoryCtx, {
+            type: 'pie',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: overrideColor ? labels.map(() => overrideColor) : colors,
+                    borderColor: chartBorder,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' }},
+                onClick: (_, elements) => {
+                    if (!elements || !elements.length) return;
+                    const index = elements[0].index;
+                    const categoryId = (incomeCategoryChartInstance.$categoryIds || [])[index];
+                    const label = (incomeCategoryChartInstance.data.labels || [])[index];
+                    if (categoryId) setCategoryFilter(categoryId, label);
+                }
+            }
+        });
+        incomeCategoryChartInstance.$categoryIds = ids || [];
+    }
+
+    function renderMonthly(labels, values, overrideColor) {
         if (!monthlyCtx) return;
         if (monthlyChartInstance) {
             monthlyChartInstance.data.labels = labels;
             monthlyChartInstance.data.datasets[0].data = values;
+            if (overrideColor) {
+                monthlyChartInstance.data.datasets[0].borderColor = overrideColor;
+                monthlyChartInstance.data.datasets[0].pointBackgroundColor = overrideColor;
+            } else {
+                monthlyChartInstance.data.datasets[0].borderColor = '#10b981';
+                monthlyChartInstance.data.datasets[0].pointBackgroundColor = values.map(v => v >= 0 ? '#10b981' : '#ef4444');
+            }
             monthlyChartInstance.update();
             return;
         }
+        const lineColor = overrideColor || '#10b981';
         monthlyChartInstance = new Chart(monthlyCtx, {
             type: 'line',
             data: {
@@ -579,26 +788,36 @@
                     tension: 0.3,
                     borderWidth: 3,
                     fill: false,
-                    borderColor: '#10b981',
-                    pointBackgroundColor: values.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+                    borderColor: lineColor,
+                    pointBackgroundColor: overrideColor ? lineColor : values.map(v => v >= 0 ? '#10b981' : '#ef4444'),
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { display: false }},
+                interaction: { mode: 'index', intersect: false },
+                elements: { point: { radius: 2 } },
                 scales: {
-                    x: { grid: { display: false }},
+                    x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }},
                     y: { grid: { color: 'rgba(226,232,240,0.1)' }}
                 }
             }
         });
     }
 
-    function renderDaily(labels, values) {
+    function renderDaily(labels, values, overrideColor) {
         if (!dailyCtx) return;
         if (dailyChartInstance) {
             dailyChartInstance.data.labels = labels;
             dailyChartInstance.data.datasets[0].data = values;
+            if (overrideColor) {
+                dailyChartInstance.data.datasets[0].backgroundColor = labels.map(() => overrideColor);
+                dailyChartInstance.data.datasets[0].borderColor = labels.map(() => overrideColor);
+            } else {
+                dailyChartInstance.data.datasets[0].backgroundColor = values.map(v => v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)');
+                dailyChartInstance.data.datasets[0].borderColor = values.map(v => v >= 0 ? '#10b981' : '#ef4444');
+            }
             dailyChartInstance.update();
             return;
         }
@@ -609,28 +828,38 @@
                 datasets: [{
                     label: 'Saldo di\u00e1rio',
                     data: values,
-                    backgroundColor: values.map(v => v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)'),
-                    borderColor: values.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+                    backgroundColor: overrideColor ? labels.map(() => overrideColor) : values.map(v => v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)'),
+                    borderColor: overrideColor ? labels.map(() => overrideColor) : values.map(v => v >= 0 ? '#10b981' : '#ef4444'),
                     borderWidth: 1.5,
                     borderRadius: 6,
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { display: false }},
-                scales: { x: { grid: { display: false }}, y: { grid: { color: 'rgba(226,232,240,0.1)' } } }
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }},
+                    y: { grid: { color: 'rgba(226,232,240,0.1)' } }
+                },
+                datasets: {
+                    bar: { categoryPercentage: 0.8, barPercentage: 0.9 }
+                }
             }
         });
     }
 
-    function renderRunning(labels, values) {
+    function renderRunning(labels, values, overrideColor) {
         if (!runningCtx) return;
         if (runningChartInstance) {
             runningChartInstance.data.labels = labels;
             runningChartInstance.data.datasets[0].data = values;
+            runningChartInstance.data.datasets[0].borderColor = overrideColor || '#3b82f6';
+            runningChartInstance.data.datasets[0].pointBackgroundColor = overrideColor || '#3b82f6';
             runningChartInstance.update();
             return;
         }
+        const lineColor = overrideColor || '#3b82f6';
         runningChartInstance = new Chart(runningCtx, {
             type: 'line',
             data: {
@@ -641,16 +870,55 @@
                     tension: 0.35,
                     borderWidth: 3,
                     fill: false,
-                    borderColor: '#3b82f6',
-                    pointBackgroundColor: '#3b82f6',
+                    borderColor: lineColor,
+                    pointBackgroundColor: lineColor,
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { display: false }},
-                scales: { x: { grid: { display: false }}, y: { grid: { color: 'rgba(226,232,240,0.1)' } } }
+                interaction: { mode: 'index', intersect: false },
+                elements: { point: { radius: 2 } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }},
+                    y: { grid: { color: 'rgba(226,232,240,0.1)' } }
+                }
             }
         });
+    }
+
+    function setTypeFilter(nextType) {
+        if (activeType === nextType) {
+            activeType = '';
+        } else {
+            activeType = nextType;
+        }
+        if (typeFilter) {
+            typeFilter.value = activeType;
+        }
+        loadChart();
+    }
+
+    function setCategoryFilter(categoryId, label) {
+        if (String(activeCategoryId) === String(categoryId)) {
+            activeCategoryId = null;
+            activeCategoryLabel = '';
+        } else {
+            activeCategoryId = categoryId;
+            activeCategoryLabel = label || '';
+        }
+        updateCategoryFilterInfo();
+        loadChart();
+    }
+
+    function updateCategoryFilterInfo() {
+        if (!categoryFilterInfo) return;
+        if (activeCategoryId && activeCategoryLabel) {
+            categoryFilterInfo.textContent = `Filtro ativo: ${activeCategoryLabel}. Clique novamente para limpar.`;
+        } else {
+            categoryFilterInfo.textContent = 'Clique em uma categoria para filtrar os gráficos.';
+        }
     }
 
     async function loadChart() {
@@ -658,18 +926,36 @@
         if (startHidden.value) params.append('start', startHidden.value);
         if (endHidden.value) params.append('end', endHidden.value);
         if (period) params.append('period', period);
-        if (typeFilter && typeFilter.value) params.append('type', typeFilter.value);
+        const typeValue = activeType || (typeFilter ? typeFilter.value : '');
+        if (typeValue) params.append('type', typeValue);
+        if (responsibleFilter && responsibleFilter.value) params.append('responsible', responsibleFilter.value);
         if (selectedOnly && selectedOnly.checked) params.append('selected_only', '1');
+        if (activeCategoryId) params.append('category_id', activeCategoryId);
 
         const res = await fetch(`${chartUrl}?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) return;
         const data = await res.json();
 
-        renderChart(data.labels || [], data.values || [], data.colors || []);
+        const activeColor = activeCategoryId ? (data.active_category_color || (data.colors && data.colors[0]) || '') : '';
+        renderChart(data.labels || [], data.values || [], data.colors || [], data.category_ids || [], activeColor);
         renderTypeChart(data.income_total || 0, data.expense_total || 0);
-        renderMonthly(data.monthly_labels || [], data.monthly_values || []);
-        renderDaily(data.daily_labels || [], data.daily_values || []);
-        renderRunning(data.running_labels || [], data.running_values || []);
+        renderMonthly(data.monthly_labels || [], data.monthly_values || [], activeColor);
+        renderDaily(data.daily_labels || [], data.daily_values || [], activeColor);
+        renderRunning(data.running_labels || [], data.running_values || [], activeColor);
+        renderExpenseCategoryChart(
+            data.expense_category_labels || [],
+            data.expense_category_values || [],
+            data.expense_category_colors || [],
+            data.expense_category_ids || [],
+            activeColor
+        );
+        renderIncomeCategoryChart(
+            data.income_category_labels || [],
+            data.income_category_values || [],
+            data.income_category_colors || [],
+            data.income_category_ids || [],
+            activeColor
+        );
         incomeEl.textContent = formatMoney(data.income_total);
         expenseEl.textContent = formatMoney(data.expense_total);
         balanceEl.textContent = formatMoney(data.balance_total);
@@ -688,12 +974,31 @@
         hideSkeleton(monthlySkeleton);
         hideSkeleton(dailySkeleton);
         hideSkeleton(runningSkeleton);
+        hideSkeleton(expenseCategorySkeleton);
+        hideSkeleton(incomeCategorySkeleton);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        updateCategoryFilterInfo();
         loadChart();
         hideSkeleton(latestTxSkeleton);
         hideSkeleton(latestTasksSkeleton);
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', () => {
+                activeType = '';
+                activeCategoryId = null;
+                activeCategoryLabel = '';
+                if (typeFilter) typeFilter.value = '';
+                if (selectedOnly) selectedOnly.checked = false;
+                if (responsibleFilter) responsibleFilter.value = '';
+                if (monthSelect) monthSelect.value = '';
+                const defaultStart = clearFiltersBtn.dataset.defaultStart || startHidden.value;
+                const defaultEnd = clearFiltersBtn.dataset.defaultEnd || endHidden.value;
+                setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
+                updateCategoryFilterInfo();
+                loadChart();
+            });
+        }
         const form = document.getElementById('rangeForm');
         if (form) {
             form.addEventListener('submit', (e) => {
@@ -751,16 +1056,47 @@
                 }
             });
         }
-        [applyBtn, typeFilter, selectedOnly].forEach(el => {
+        [applyBtn, typeFilter, selectedOnly, responsibleFilter].forEach(el => {
             if (!el) return;
             el.addEventListener(el === applyBtn ? 'click' : 'change', (ev) => {
                 if (el !== applyBtn) ev.preventDefault();
+                if (el === typeFilter) {
+                    activeType = typeFilter.value;
+                }
                 const isoStart = parseBrToIso(startDisplay.value.trim());
                 const isoEnd = parseBrToIso(endDisplay.value.trim());
                 if (isoStart || isoEnd) setRangeValues(isoStart || startHidden.value, isoEnd || endHidden.value);
                 loadChart();
             });
         });
+
+        const startTourBtn = document.getElementById('startTourBtn');
+        const modalStartBtn = document.getElementById('startTourModal');
+        const modalEl = document.getElementById('onboardingModal');
+        const userKey = `itracker:onboarding:{{ user.id }}`;
+        const promptedKey = `${userKey}:prompted`;
+        const doneKey = `${userKey}:done`;
+        const onboardingEnabled = {{ onboarding.show|yesno:"true,false" }};
+        if (startTourBtn) {
+            startTourBtn.addEventListener('click', () => {
+                if (window.iTrackerTour) {
+                    window.iTrackerTour.start(doneKey);
+                }
+            });
+        }
+        if (onboardingEnabled && modalEl && !localStorage.getItem(promptedKey) && !localStorage.getItem(doneKey)) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+            localStorage.setItem(promptedKey, '1');
+            if (modalStartBtn) {
+                modalStartBtn.addEventListener('click', () => {
+                    modal.hide();
+                    if (window.iTrackerTour) {
+                        window.iTrackerTour.start(doneKey);
+                    }
+                });
+            }
+        }
     });
 </script>
 {% endblock %}

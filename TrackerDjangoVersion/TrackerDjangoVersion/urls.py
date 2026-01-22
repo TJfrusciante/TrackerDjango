@@ -25,6 +25,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('ia/', include('assistant.urls', namespace='assistant')),
     path('pagamentos/', include('payments.urls', namespace='payments')),
+    path('whatsapp/', include('whatsapp_finance.urls', namespace='whatsapp_finance')),
     path('', include('tracker.urls', namespace='tracker')),
 ]
 

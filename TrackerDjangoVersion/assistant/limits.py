@@ -8,9 +8,9 @@ from .models import AiUsage
 
 
 DEFAULT_LIMITS = {
-    "starter": 20000,
+    "essential": 20000,
     "pro": 80000,
-    "team": 200000,
+    "master": 200000,
 }
 
 
@@ -18,13 +18,13 @@ def _plan_limit(plan: str) -> int:
     limits = getattr(settings, "AI_PLAN_TOKEN_LIMITS", DEFAULT_LIMITS)
     if not isinstance(limits, dict):
         limits = DEFAULT_LIMITS
-    return int(limits.get(plan, limits.get("starter", 0)) or 0)
+    return int(limits.get(plan, limits.get("essential", 0)) or 0)
 
 
 def get_ai_quota(user):
     window_days = int(getattr(settings, "AI_USAGE_WINDOW_DAYS", 30))
     profile = getattr(user, "profile", None)
-    plan = getattr(profile, "plan", "starter")
+    plan = getattr(profile, "plan", "essential")
 
     if user.is_superuser:
         return {

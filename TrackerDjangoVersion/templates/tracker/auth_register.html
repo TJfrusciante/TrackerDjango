@@ -96,7 +96,7 @@
                 <div class="d-flex gap-2">
                     <a class="small" href="{% url 'tracker:login' %}">J&aacute; tem login? Entrar</a>
                     <span class="text-secondary small">&middot;</span>
-                    <a class="small" href="{% url 'tracker:register_guest' %}" onclick="return confirm('Conta de convidado acessa apenas tarefas dos workspaces em que for convidado. Transa&ccedil;&otilde;es e IA ficam bloqueadas.');">Sou convidado</a>
+                    <a class="small" href="{% url 'tracker:register_guest' %}" onclick="return confirm('Conta de convidado acessa tarefas e pode lan\u00e7ar transa\u00e7\u00f5es. Dashboard, edi\u00e7\u00e3o de transa\u00e7\u00f5es e IA permanecem bloqueados.');">Sou convidado</a>
                 </div>
             </div>
             {% if form.non_field_errors %}
@@ -115,6 +115,15 @@
                             </div>
                             {{ field }}
                             <div class="form-text">Tem um c&oacute;digo? Cole aqui para ativar a assinatura sem pagamento imediato.</div>
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    {% elif field.name == 'master_guest_limit' %}
+                        <div class="col-12 d-none" id="masterGuestField">
+                            <label class="form-label">{{ field.label }}</label>
+                            {{ field }}
                             {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                             {% if field.errors %}
                                 <div class="text-danger small">{{ field.errors|striptags }}</div>
@@ -139,6 +148,7 @@
                                         <li data-rule="similar"><span class="rule-dot"></span><span>N&atilde;o ser parecida com seus dados pessoais.</span></li>
                                         <li data-rule="common"><span class="rule-dot"></span><span>N&atilde;o ser uma senha comumente utilizada.</span></li>
                                         <li data-rule="numeric"><span class="rule-dot"></span><span>N&atilde;o ser inteiramente num&eacute;rica.</span></li>
+                                        <li data-rule="special"><span class="rule-dot"></span><span>Conter ao menos 1 caractere especial.</span></li>
                                         <li data-rule="match"><span class="rule-dot"></span><span>Confirma&ccedil;&atilde;o igual &agrave; senha.</span></li>
                                     </ul>
                                 </div>
@@ -166,6 +176,9 @@
         const firstName = document.getElementById('id_first_name');
         const lastName = document.getElementById('id_last_name');
         const rulesBox = document.getElementById('passwordRules');
+        const planSelect = document.getElementById('id_plan_choice');
+        const masterField = document.getElementById('masterGuestField');
+        const masterInput = document.getElementById('id_master_guest_limit');
         if (!pwd || !rulesBox) return;
 
         const commonList = new Set([
@@ -215,13 +228,22 @@
             const numericOk = !/^\d+$/.test(value);
             const similarOk = !hasSimilarInfo(value);
             const commonOk = value.length ? !commonList.has(value.toLowerCase()) : false;
+            const specialOk = /[^A-Za-z0-9]/.test(value);
             const matchOk = confirmValue.length ? value === confirmValue : false;
 
             setRule('length', lengthOk, active);
             setRule('numeric', numericOk, active);
             setRule('similar', similarOk, active);
             setRule('common', commonOk, active);
+            setRule('special', specialOk, active);
             setRule('match', matchOk, confirmValue.length > 0);
+        }
+
+        function toggleMasterGuests() {
+            if (!planSelect || !masterField) return;
+            const isMaster = (planSelect.value || '').endsWith(':master');
+            masterField.classList.toggle('d-none', !isMaster);
+            if (!isMaster && masterInput) masterInput.value = '';
         }
 
         pwd.addEventListener('input', updateRules);
@@ -230,6 +252,10 @@
         if (email) email.addEventListener('input', updateRules);
         if (firstName) firstName.addEventListener('input', updateRules);
         if (lastName) lastName.addEventListener('input', updateRules);
+        if (planSelect) {
+            toggleMasterGuests();
+            planSelect.addEventListener('change', toggleMasterGuests);
+        }
     })();
 </script>
 {% endblock %}

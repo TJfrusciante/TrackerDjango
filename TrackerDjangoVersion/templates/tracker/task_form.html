@@ -80,6 +80,22 @@
                     {% endif %}
                 </div>
                 <div class="col-md-4">
+                    <label class="form-label">Respons&aacute;vel</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">
+                            {% if form.instance.responsible_user %}
+                                {{ form.instance.responsible_user.get_full_name|default:form.instance.responsible_user.username }}
+                            {% elif form.instance.responsible %}
+                                {{ form.instance.responsible }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        {{ form.responsible_user }}{{ form.responsible_user.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Prazo</label>
                     {% if is_detail %}
                         <p class="form-control-plaintext fw-semibold">{{ form.instance.due_date|date:"d/m/Y" }}</p>

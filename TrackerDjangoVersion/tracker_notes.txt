@@ -1,17 +1,17 @@
-Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-12)
+Diario do projeto TrackerDjangoVersion (atualizado em 2026-01-21)
 -----------------------------------------------------------------
 
 - Escopo: app Django multi-tenant para financas (transacoes) e tarefas; UI Bootstrap 5 com tema claro/escuro; graficos Chart.js.
 - Dados demo: 387 transacoes importadas de SQLite (Tracker exe) para o Postgres; intervalo 06/07/2024 a 10/11/2025. Workspace: principal (owner TJfrusciante).
 
 Modelos e infra
-- Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceInvite(workspace,invited_user,status,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar,is_guest,plan,payment_confirmed,payment_confirmed_at,payment_notes,email_verified,deletion_requested_at), SubscriptionInvite(code,plan_cycle,max_uses,used_count,is_active,expires_at), SubscriptionInviteUse(invite,user), MetricEvent(event_type,metadata,user,workspace), Assistant.ChatMessage, Assistant.AiUsage(tokens/custos).
+- Models: Category(name,color,workspace unique), Transaction(description,date,category,value,type income/expense,selected,responsible,workspace), Task(title,due_date,status,selected,progress,workspace), TaskStep(task,title,order,done,responsible,responsible_email), Workspace(name,slug,owner,is_active), WorkspaceMembership(workspace,user,role,can_edit_tasks), WorkspaceInvite(workspace,invited_user,status,role,can_edit_tasks), WorkspaceAccessRequest(workspace,user,status), UserProfile(user,avatar,is_guest,plan,master_guest_limit,payment_confirmed,payment_confirmed_at,payment_notes,email_verified,deletion_requested_at), SubscriptionInvite(code,plan_cycle,plan_tier,max_uses,used_count,is_active,expires_at), SubscriptionInviteUse(invite,user), MetricEvent(event_type,metadata,user,workspace), Assistant.ChatMessage, Assistant.AiUsage(tokens/custos).
 - Indexes adicionados em workspace/type/date/status/category para consultas mais rapidas (migration 0010_auto_indexes).
 - Requisitos: requirements.txt/requirements-dev.txt criados (inclui pdfminer.six, PyPDF2, pytest, ruff). Makefile com alvos run/lint/test/import-demo. README atualizado com setup, env vars e limites de import PDF/CSV.
 
 Funcionalidades principais
 - Dashboard `/app/`: filtros rapidos (semana/mes/trimestre/semestre/ano/tudo) e intervalo manual; graficos por categoria e saldo mensal; cards de totais; ultimas transacoes/tarefas; top receitas/despesas.
-- Transacoes/tarefas: filtros (busca, tipo/status, categoria, periodo dd/mm/aaaa), paginacao, export CSV, CRUD completo, toggles de selecao/tipo/status.
+- Transacoes/tarefas: filtros (busca, tipo/status, categoria, periodo dd/mm/aaaa), paginacao, export CSV, CRUD completo, responsavel por transacao, toggles de selecao/tipo/status.
 - Tarefas: etapas com responsavel/email, ordenacao automatica, progresso calculado; can_edit_tasks por membro controla quem edita.
 - Auth/multi-tenant: login `/login/`, cadastro `/register/`, logout. Selecao/criacao de workspace `/workspaces/select/`; troca via slug; pedidos de acesso em `/workspaces/request/`; membros e roles em `/workspaces/<slug>/members/`. Navbar mostra workspace atual.
 - Convites: owners enviam convites; usuario precisa aceitar em `/workspaces/select/` antes de virar membro.
@@ -23,6 +23,7 @@ IA e chat
 - Importacao: CSV/PDF com preview editavel. Sugestoes de categoria por IA ou heuristica retornam motivo (sem sufixo no nome) e indicacao visual. Barra de progresso fake ate 90% + final; alerta de uso de IA fica visivel por 5s. Checkboxes coloridos para destacar (amarelo) e remover (vermelho). Preview com mais espaco por linha.
 - Importacao CSV: categorias informadas no arquivo agora sao criadas automaticamente e marcadas como origem "Arquivo" no preview.
 - Importacao CSV: decode com fallback (utf-8/cp1252/latin-1) para preservar acentos nas categorias.
+- WhatsApp: app `whatsapp_finance` com webhook `/whatsapp/webhook/` via Twilio, suporte a texto/audio/imagem (OCR), confirmacao por mensagem, comandos `/resumo`, `/categorias`, `/extrato`, e aprendizado de categoria por usuario (CategoryPreference). Admin lista mensagens, perfis e parsed.
 
 Front/UX recentes
 - Login e registro redesenhados com hero, beneficios (IA, isolamento, onboarding), CTA rapido.
@@ -52,10 +53,10 @@ Front/UX recentes
 - Cadastro: nome/sobrenome obrigatorios; avatar opcional. Categorias agora usam input tipo color (seletor).
 
 Aprovacao e convidados
-- Superuser: controle de plano e pagamento confirmado no /super/users; campos no perfil incluem plano, pagamento_confirmado e observacoes.
+- Superuser: controle de plano e pagamento confirmado no /super/users; campos no perfil incluem plano (Essencial/Pro/Master), master_guest_limit, pagamento_confirmado e observacoes.
 - Aprovacao de contas: novos cadastros ficam pendentes; tela /super/users permite aprovar, renovar 30d, suspender e excluir; login bloqueia pendentes/expirados.
 - Cadastros: contas de owner ficam pendentes ate aprovacao. Conta convidado (guest) cria usuario sem workspace e sem IA/financas.
-- Guest: UserProfile.is_guest, rota `/register/guest/`, bloqueio de categorias/transacoes e IA, e nao permite criar workspace.
+- Guest: UserProfile.is_guest, rota `/register/guest/`, convidados podem lancar transacoes e gerenciar tarefas, mas nao veem dashboard, nao editam transacoes e nao acessam IA/financeiro.
 
 Pendencias e riscos
 - Tests: ainda faltam suites para import CSV/PDF, IA de categorizacao, permissao de workspace, embed do chat e views sensiveis.
@@ -68,6 +69,14 @@ Pendencias e riscos
 - Sugestao: decidir regra de progresso quando etapas estao canceladas (ignorar ou contar no total).
 
 Atualizacoes recentes
+- Transacoes: novo campo Responsavel (formulario, lista e export/import) e convidados agora podem lancar transacoes sem acessar dashboard ou edicao.
+- Dashboard: filtro por responsavel (membro) e cores de categorias mantidas ao filtrar graficos por categoria.
+- Transacoes: acao em massa permite selecionar todos os itens do filtro (alem da pagina atual) e editar responsavel/data em lote.
+- Tarefas: responsavel (membro do workspace) no formulario, lista e acao em massa; export CSV inclui responsavel.
+- Planos: Essencial/Pro/Master com limites 2/6/personalizado; escolha de plano+ciclo no cadastro; Master ajusta preco (+15% por convidado acima de 6).
+- Pagamentos: checkout MP e tela de escolha agora usam ciclo+tier; convites de assinatura exibem o tier do plano.
+- Landing/Ajuda: textos atualizados para novos planos e permissao de convidados.
+- Dependencias: requirements.txt atualizado (Django, pdfminer, dotenv, pywebpush, sentry).
 - Botoes de acao (page-action-btn) com altura maior e padrao aplicado em mais telas (usuarios, workspaces, import).
 - Botoes de acao em tabelas (tarefas/transacoes) normalizados com tamanho fixo e alinhamento do icon.
 - Footer agora usa cores do tema; titulo "Tracker" com classe dedicada para contraste no modo claro/escuro.
@@ -101,7 +110,7 @@ Atualizacoes recentes
 - Ditado: botoes renomeados para "Falar" em tarefas/transacoes/IA.
 - Header: icone de Workspaces no menu principal com acesso ao painel /workspaces/.
 - Landing/ajuda: textos atualizados para refletir painel de workspaces, Falar por voz e limites de convidados.
-- Convites: limite de 3 convidados sem assinatura aplicado na criacao/aceite; superuser e assinantes ignoram o limite.
+- Convites: limite de convidados conforme plano (Essencial 2, Pro 6, Master personalizado); superuser e assinantes com limite maior ignoram o teto antigo.
 - Tarefas: completado_at registrado ao mudar para "done" (migracao 0021) e usado para detectar atraso.
 - Seguranca: aprovar/rejeitar acesso a workspace e alternar status de etapa agora exigem POST (CSRF).
 - Categorias: delete agora respeita workspace/permissão.

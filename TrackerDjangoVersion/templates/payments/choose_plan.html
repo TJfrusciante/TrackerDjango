@@ -21,8 +21,8 @@
                     <div class="glass-card p-3 h-100 d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
-                                <h2 class="h6 fw-bold mb-1">{{ plan.name }}</h2>
-                                <p class="text-secondary small mb-0">{{ plan.subtitle }}</p>
+                                <h2 class="h6 fw-bold mb-1">{{ plan.tier_label }}</h2>
+                                <p class="text-secondary small mb-0">{{ plan.cycle_label }}</p>
                             </div>
                             <span class="badge bg-primary">{{ plan.badge }}</span>
                         </div>
@@ -31,14 +31,22 @@
                             R$ {{ plan.regular_price|floatformat:2 }}
                         </div>
                         {% endif %}
-                        <div class="display-6 fw-bold mb-3">R$ {{ plan.price|floatformat:2 }}</div>
+                        <div class="display-6 fw-bold mb-1">R$ {{ plan.price|floatformat:2 }}</div>
+                        <div class="text-secondary small mb-3">
+                            {% if plan.is_annual %}
+                                /m&ecirc;s (cobr. anual) &middot; Total: R$ {{ plan.annual_total|floatformat:2 }}
+                            {% else %}
+                                /m&ecirc;s
+                            {% endif %}
+                        </div>
                         <ul class="list-unstyled small text-secondary mb-3">
                             {% for feature in plan.features %}
                             <li class="mb-1"><i class="fa-solid fa-check text-success me-2"></i>{{ feature }}</li>
                             {% endfor %}
                         </ul>
+                        <div class="text-secondary small mb-3">{{ plan.subtitle }}</div>
                         <div class="mt-auto d-grid">
-                            <a class="btn btn-primary" href="{% url 'payments:subscription_start' %}?plan={{ plan.cycle }}">Assinar {{ plan.name }}</a>
+                            <a class="btn btn-primary" href="{% url 'payments:subscription_start' %}?plan={{ plan.cycle }}">Assinar {{ plan.tier_label }} {{ plan.cycle_label }}</a>
                         </div>
                     </div>
                 </div>

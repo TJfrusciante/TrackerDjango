@@ -16,6 +16,7 @@ from .models import (
     Workspace,
     UserProfile,
     WorkspaceAccessRequest,
+    WorkspaceMembership,
     CategoryBudget,
     BalanceGoal,
     SubscriptionInvite,
@@ -45,7 +46,7 @@ class BaseStyledForm(forms.ModelForm):
 
 
 class TransactionForm(BaseStyledForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, workspace=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['date'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
         self.fields['date'].widget.format = '%Y-%m-%d'
@@ -55,12 +56,26 @@ class TransactionForm(BaseStyledForm):
             'lang': 'pt-BR',
             'id': 'id_date',
         })
+        if workspace:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            member_ids = set(
+                WorkspaceMembership.objects.filter(workspace=workspace)
+                .values_list('user_id', flat=True)
+            )
+            if workspace.owner_id:
+                member_ids.add(workspace.owner_id)
+            if self.instance and getattr(self.instance, "responsible_id", None):
+                member_ids.add(self.instance.responsible_id)
+            self.fields['category'].queryset = Category.objects.filter(workspace=workspace)
+            self.fields['responsible'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
 
     class Meta:
         model = Transaction
-        fields = ['description', 'date', 'category', 'value', 'type']
+        fields = ['description', 'date', 'category', 'responsible', 'value', 'type']
         widgets = {
             'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'}),
+            'responsible': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def clean_value(self):
@@ -79,7 +94,7 @@ class TransactionForm(BaseStyledForm):
 
 
 class TaskForm(BaseStyledForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, workspace=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['due_date'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
         self.fields['due_date'].widget.format = '%Y-%m-%d'
@@ -89,16 +104,27 @@ class TaskForm(BaseStyledForm):
             'lang': 'pt-BR',
             'id': 'id_due_date',
         })
+        if workspace:
+            member_ids = set(
+                WorkspaceMembership.objects.filter(workspace=workspace)
+                .values_list('user_id', flat=True)
+            )
+            if workspace.owner_id:
+                member_ids.add(workspace.owner_id)
+            if self.instance and getattr(self.instance, "responsible_user_id", None):
+                member_ids.add(self.instance.responsible_user_id)
+            self.fields['responsible_user'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
 
     class Meta:
         model = Task
-        fields = ['title', 'category', 'due_date', 'status']
+        fields = ['title', 'category', 'responsible_user', 'due_date', 'status']
         widgets = {
             'due_date': forms.DateInput(
                 format='%Y-%m-%d',
                 attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'}
             ),
             'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Categoria da tarefa'}),
+            'responsible_user': forms.Select(attrs={'class': 'form-select'}),
         }
 
 
@@ -116,6 +142,12 @@ class TaskStepForm(BaseStyledForm):
 
 class TransactionBulkUpdateForm(forms.Form):
     category = forms.ModelChoiceField(queryset=Category.objects.none(), required=False, empty_label='Manter categoria')
+    responsible = forms.ModelChoiceField(queryset=User.objects.none(), required=False, empty_label='Manter responsável')
+    date = forms.DateField(
+        required=False,
+        input_formats=['%Y-%m-%d', '%d/%m/%Y'],
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'})
+    )
     type = forms.ChoiceField(
         choices=(('', 'Manter tipo'), ('income', 'Entrada'), ('expense', 'Sa\u00edda')),
         required=False,
@@ -131,12 +163,27 @@ class TransactionBulkUpdateForm(forms.Form):
         super().__init__(*args, **kwargs)
         if workspace:
             self.fields['category'].queryset = Category.objects.filter(workspace=workspace)
+            member_ids = set(
+                WorkspaceMembership.objects.filter(workspace=workspace)
+                .values_list('user_id', flat=True)
+            )
+            if workspace.owner_id:
+                member_ids.add(workspace.owner_id)
+            self.fields['responsible'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
         else:
             self.fields['category'].queryset = Category.objects.all()
+            self.fields['responsible'].queryset = User.objects.all().order_by('first_name', 'username')
         self.fields['category'].widget.attrs.setdefault('class', 'form-select')
+        self.fields['responsible'].widget.attrs.setdefault('class', 'form-select')
 
 
 class TaskBulkUpdateForm(forms.Form):
+    responsible_user = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        required=False,
+        empty_label='Manter responsável',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
     category = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nova categoria', 'list': 'taskCategoriesList'})
@@ -151,6 +198,19 @@ class TaskBulkUpdateForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+    def __init__(self, *args, workspace=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if workspace:
+            member_ids = set(
+                WorkspaceMembership.objects.filter(workspace=workspace)
+                .values_list('user_id', flat=True)
+            )
+            if workspace.owner_id:
+                member_ids.add(workspace.owner_id)
+            self.fields['responsible_user'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
+        else:
+            self.fields['responsible_user'].queryset = User.objects.all().order_by('first_name', 'username')
 
 
 class CategoryForm(BaseStyledForm):
@@ -229,12 +289,28 @@ class SignupForm(UserCreationForm):
         help_text='Cria um workspace inicial para voc\u00ea.',
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Financeiro pessoal'})
     )
-    billing_cycle = forms.ChoiceField(
-        label="Plano de cobran\u00e7a",
-        choices=UserProfile.BILLING_CHOICES,
+    PLAN_CHOICES = [
+        ('monthly:essential', 'Mensal / Essencial'),
+        ('monthly:pro', 'Mensal / Pro'),
+        ('monthly:master', 'Mensal / Master'),
+        ('annual:essential', 'Anual / Essencial'),
+        ('annual:pro', 'Anual / Pro'),
+        ('annual:master', 'Anual / Master'),
+    ]
+    plan_choice = forms.ChoiceField(
+        label="Plano e cobran\u00e7a",
+        choices=PLAN_CHOICES,
         required=True,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        help_text='Escolha entre mensal ou anual.'
+        help_text='Selecione o combo de ciclo e plano.'
+    )
+    master_guest_limit = forms.IntegerField(
+        label="Convidados no plano Master",
+        required=False,
+        min_value=6,
+        max_value=50,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '6'}),
+        help_text='Cada convidado acima de 6 adiciona 15% ao valor da assinatura.'
     )
     avatar = forms.ImageField(label="Foto", required=False)
     invite_code = forms.CharField(
@@ -246,7 +322,7 @@ class SignupForm(UserCreationForm):
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = ("username", "first_name", "last_name", "email", "password1", "password2", "workspace_name", "billing_cycle", "invite_code", "avatar")
+        fields = ("username", "first_name", "last_name", "email", "password1", "password2", "workspace_name", "plan_choice", "master_guest_limit", "invite_code", "avatar")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -265,14 +341,19 @@ class SignupForm(UserCreationForm):
         if commit:
             user.save()
         avatar = self.cleaned_data.get('avatar')
-        billing_cycle = self.cleaned_data.get('billing_cycle') or 'monthly'
+        plan_choice = self.cleaned_data.get('plan_choice') or 'monthly:essential'
+        billing_cycle, plan = plan_choice.split(':', 1)
+        master_guest_limit = self.cleaned_data.get('master_guest_limit')
         if commit:
             from .models import UserProfile
             profile, _ = UserProfile.objects.get_or_create(user=user)
             if avatar:
                 profile.avatar = avatar
             profile.billing_cycle = billing_cycle
-            profile.save(update_fields=['avatar', 'billing_cycle', 'created_at'])
+            profile.plan = plan
+            if plan == 'master' and master_guest_limit:
+                profile.master_guest_limit = master_guest_limit
+            profile.save(update_fields=['avatar', 'billing_cycle', 'plan', 'master_guest_limit', 'created_at'])
         return user
 
 
@@ -361,10 +442,11 @@ class UserAdminForm(forms.ModelForm):
 class UserProfileAdminForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['plan', 'billing_cycle', 'payment_confirmed', 'subscription_expires', 'payment_notes', 'is_approved', 'is_guest']
+        fields = ['plan', 'billing_cycle', 'master_guest_limit', 'payment_confirmed', 'subscription_expires', 'payment_notes', 'is_approved', 'is_guest']
         widgets = {
             'plan': forms.Select(attrs={'class': 'form-select'}),
             'billing_cycle': forms.Select(attrs={'class': 'form-select'}),
+            'master_guest_limit': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
             'payment_confirmed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'subscription_expires': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'payment_notes': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Observa\u00e7\u00f5es do pagamento'}),
@@ -374,6 +456,7 @@ class UserProfileAdminForm(forms.ModelForm):
         labels = {
             'plan': 'Plano',
             'billing_cycle': 'Ciclo de cobran\u00e7a',
+            'master_guest_limit': 'Limite de convidados (Master)',
             'payment_confirmed': 'Pagamento confirmado',
             'subscription_expires': 'Expira em',
             'payment_notes': 'Observa\u00e7\u00f5es',
@@ -540,10 +623,11 @@ class SubscriptionInviteForm(forms.ModelForm):
 
     class Meta:
         model = SubscriptionInvite
-        fields = ['code', 'plan_cycle', 'max_uses', 'expires_at', 'is_active']
+        fields = ['code', 'plan_cycle', 'plan_tier', 'max_uses', 'expires_at', 'is_active']
         widgets = {
             'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Deixe vazio para gerar'}),
             'plan_cycle': forms.Select(attrs={'class': 'form-select'}),
+            'plan_tier': forms.Select(attrs={'class': 'form-select'}),
             'max_uses': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
             'expires_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -559,17 +643,33 @@ class PricingConfigForm(BaseStyledForm):
             'promo_label',
             'promo_monthly_price',
             'promo_annual_price',
+            'promo_monthly_pro',
+            'promo_annual_pro',
+            'promo_monthly_master',
+            'promo_annual_master',
             'regular_monthly_price',
             'regular_annual_price',
+            'regular_monthly_pro',
+            'regular_annual_pro',
+            'regular_monthly_master',
+            'regular_annual_master',
         ]
         labels = {
             'promo_active': 'Promo\u00e7\u00e3o ativa',
             'promo_limit': 'Limite de usu\u00e1rios da promo\u00e7\u00e3o',
             'promo_label': 'R\u00f3tulo da promo\u00e7\u00e3o',
-            'promo_monthly_price': 'Pre\u00e7o mensal (promo)',
-            'promo_annual_price': 'Pre\u00e7o anual/m\u00eas (promo)',
-            'regular_monthly_price': 'Pre\u00e7o mensal padr\u00e3o',
-            'regular_annual_price': 'Pre\u00e7o anual/m\u00eas padr\u00e3o',
+            'promo_monthly_price': 'Essencial mensal (promo)',
+            'promo_annual_price': 'Essencial anual/m\u00eas (promo)',
+            'promo_monthly_pro': 'Pro mensal (promo)',
+            'promo_annual_pro': 'Pro anual/m\u00eas (promo)',
+            'promo_monthly_master': 'Master mensal (promo)',
+            'promo_annual_master': 'Master anual/m\u00eas (promo)',
+            'regular_monthly_price': 'Essencial mensal padr\u00e3o',
+            'regular_annual_price': 'Essencial anual/m\u00eas padr\u00e3o',
+            'regular_monthly_pro': 'Pro mensal padr\u00e3o',
+            'regular_annual_pro': 'Pro anual/m\u00eas padr\u00e3o',
+            'regular_monthly_master': 'Master mensal padr\u00e3o',
+            'regular_annual_master': 'Master anual/m\u00eas padr\u00e3o',
         }
 
 

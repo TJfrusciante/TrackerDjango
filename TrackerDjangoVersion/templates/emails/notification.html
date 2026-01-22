@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ subject }}</title>
+</head>
+<body style="margin:0;background-color:#0b1221;color:#e2e8f0;font-family:'Segoe UI',Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b1221;padding:24px 0;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#0f172a;border-radius:16px;overflow:hidden;border:1px solid #1f2937;">
+                    <tr>
+                        <td style="padding:24px 28px;">
+                            <div style="font-size:18px;font-weight:700;margin-bottom:8px;">iTracker</div>
+                            <h1 style="font-size:20px;margin:0 0 12px;">{{ subject }}</h1>
+                            {% if body_lines %}
+                                <ul style="margin:0 0 16px;padding-left:18px;color:#cbd5f5;">
+                                    {% for line in body_lines %}
+                                        <li style="margin-bottom:6px;">{{ line }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p style="margin:0 0 16px;color:#94a3b8;">{{ body }}</p>
+                            {% endif %}
+                            {% if action_url %}
+                                <a href="{{ action_url }}" style="background:#0f766e;color:#fff;text-decoration:none;padding:10px 16px;border-radius:10px;display:inline-block;font-weight:600;">
+                                    Ver no iTracker
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+                <div style="margin-top:14px;color:#64748b;font-size:12px;">&copy; {% now "Y" %} iTracker</div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

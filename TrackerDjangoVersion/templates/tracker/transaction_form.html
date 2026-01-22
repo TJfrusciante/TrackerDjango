@@ -81,6 +81,20 @@
                     {% endif %}
                 </div>
                 <div class="col-md-4">
+                    <label class="form-label">Respons&aacute;vel</label>
+                    {% if is_detail %}
+                        <p class="form-control-plaintext fw-semibold">
+                            {% if form.instance.responsible %}
+                                {{ form.instance.responsible.get_full_name|default:form.instance.responsible.username }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        {{ form.responsible }}{{ form.responsible.errors }}
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Tipo</label>
                     {% if is_detail %}
                         <p class="form-control-plaintext fw-semibold">{{ form.instance.get_type_display }}</p>

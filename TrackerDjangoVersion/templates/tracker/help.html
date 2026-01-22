@@ -200,14 +200,15 @@
             <div class="help-card mb-4" id="transacoes">
                 <div class="row g-3 align-items-start">
                     <div class="col-lg-7">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h4 class="fw-bold mb-0"><i class="fa-solid fa-coins me-2 text-warning"></i>Como lan&ccedil;ar transa&ccedil;&otilde;es</h4>
-                            <span class="badge bg-primary-subtle text-primary">Financeiro</span>
-                        </div>
-                        <p class="text-secondary">
-                            Use o bot&atilde;o &quot;Nova transa&ccedil;&atilde;o&quot; e escolha o tipo (entrada/sa&iacute;da).
-                            As datas seguem o formato <strong>dd/mm/aaaa</strong>.
-                        </p>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h4 class="fw-bold mb-0"><i class="fa-solid fa-coins me-2 text-warning"></i>Como lan&ccedil;ar transa&ccedil;&otilde;es</h4>
+                        <span class="badge bg-primary-subtle text-primary">Financeiro</span>
+                    </div>
+                    <p class="text-secondary">
+                        Use o bot&atilde;o &quot;Nova transa&ccedil;&atilde;o&quot; e escolha o tipo (entrada/sa&iacute;da).
+                        As datas seguem o formato <strong>dd/mm/aaaa</strong>. O campo <strong>Respons&aacute;vel</strong> define quem lan&ccedil;ou.
+                        Contas convidadas podem apenas lan&ccedil;ar transa&ccedil;&otilde;es (sem dashboard e sem edi&ccedil;&atilde;o).
+                    </p>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="help-step">
@@ -296,13 +297,13 @@
                             <div class="col-md-6">
                                 <div class="help-step">
                                     <h6 class="fw-semibold mb-1">Painel de workspaces</h6>
-                                    <p class="text-secondary small mb-0">Acesse /workspaces/ pelo header para entrar, convidar e ver convites.</p>
+                                    <p class="text-secondary small mb-0">Acesse /workspaces/ pelo menu lateral para entrar, convidar e ver convites.</p>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="help-step">
                                     <h6 class="fw-semibold mb-1">Convidar pessoas</h6>
-                                    <p class="text-secondary small mb-0">Owners convidam por username ou e-mail; at&eacute; 3 convidados sem assinatura.</p>
+                                    <p class="text-secondary small mb-0">Essencial inclui 2 convidados, Pro 6 e Master permite personalizar.</p>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -320,7 +321,7 @@
                             <div class="col-md-6">
                                 <div class="help-step">
                                     <h6 class="fw-semibold mb-1">Financeiro privado</h6>
-                                    <p class="text-secondary small mb-0">Apenas o owner do workspace e o superuser veem finan&ccedil;as.</p>
+                                    <p class="text-secondary small mb-0">Somente owner/superuser veem dashboards e listas. Convidados apenas lan&ccedil;am transa&ccedil;&otilde;es.</p>
                                 </div>
                             </div>
                         </div>
@@ -497,6 +498,46 @@
                             <img src="{% static 'help/ai.gif' %}" alt="Chat do agente de IA">
                         </div>
                         <p class="text-secondary small mt-2 mb-0">Mostra perguntas e respostas do agente.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card mb-4" id="whatsapp">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <h4 class="fw-bold mb-3"><i class="fa-brands fa-whatsapp me-2 text-success"></i>WhatsApp Finance</h4>
+                        <p class="text-secondary">Envie mensagens, &aacute;udios ou fotos de comprovantes para registrar lan&ccedil;amentos.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">1. Cadastre o n&uacute;mero</h6>
+                                    <p class="text-secondary small mb-0">O admin vincula seu WhatsApp ao workspace no painel administrativo.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">2. Envie a mensagem</h6>
+                                    <p class="text-secondary small mb-0">Ex.: &quot;Gastei 150 no mercado&quot; ou &quot;Sal&aacute;rio 5000 hoje&quot;.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">3. Confirme</h6>
+                                    <p class="text-secondary small mb-0">O bot pede confirma&ccedil;&atilde;o antes de lan&ccedil;ar valores altos.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-step">
+                                    <h6 class="fw-semibold mb-1">4. Comandos</h6>
+                                    <p class="text-secondary small mb-0">Use /resumo, /categorias e /extrato para consultas r&aacute;pidas.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <div class="help-callout small text-secondary">
+                            Dica: &aacute;udios dependem de transcri&ccedil;&atilde;o e fotos precisam de OCR habilitado.
+                        </div>
                     </div>
                 </div>
             </div>

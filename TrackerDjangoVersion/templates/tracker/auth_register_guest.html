@@ -53,7 +53,7 @@
         <div class="glass-card p-4 h-100">
             <p class="text-secondary small text-uppercase mb-1">Conta convidado</p>
             <h1 class="fw-bold h3 mb-2">Participe de um workspace sem assinatura</h1>
-            <p class="text-secondary mb-3">Contas de convidado acessam apenas tarefas do workspace. Transa&ccedil;&otilde;es e IA ficam dispon&iacute;veis somente para quem assina.</p>
+            <p class="text-secondary mb-3">Contas de convidado podem lan&ccedil;ar transa&ccedil;&otilde;es e acompanhar tarefas, mas n&atilde;o acessam dashboard, edi&ccedil;&atilde;o de transa&ccedil;&otilde;es e IA.</p>
             <div class="row g-3">
                 <div class="col-sm-6">
                     <div class="p-3 rounded-3 border border-dark-subtle h-100">
@@ -63,8 +63,8 @@
                 </div>
                 <div class="col-sm-6">
                     <div class="p-3 rounded-3 border border-dark-subtle h-100">
-                        <div class="fw-bold">Somente tarefas</div>
-                        <div class="text-secondary small">Visualize e edite etapas conforme permiss&otilde;es do owner.</div>
+                        <div class="fw-bold">Tarefas + lan&ccedil;amentos</div>
+                        <div class="text-secondary small">Lance transa&ccedil;&otilde;es e edite etapas conforme permiss&otilde;es do owner.</div>
                     </div>
                 </div>
             </div>
@@ -85,7 +85,7 @@
                     {{ form.non_field_errors|striptags }}
                 </div>
             {% endif %}
-            <form method="post" novalidate enctype="multipart/form-data" class="row g-3" onsubmit="return confirm('Conta de convidado acessa apenas tarefas dos workspaces em que for convidado. Transa&ccedil;&otilde;es e IA ficam bloqueadas.');">
+            <form method="post" novalidate enctype="multipart/form-data" class="row g-3" onsubmit="return confirm('Conta de convidado pode lan&ccedil;ar transa&ccedil;&otilde;es e ver tarefas, mas n&atilde;o acessa dashboard, edi&ccedil;&otilde;es e IA.');">
                 {% csrf_token %}
                 {% for field in form %}
                     <div class="col-12">
@@ -103,6 +103,7 @@
                                     <li data-rule="similar"><span class="rule-dot"></span><span>N&atilde;o ser parecida com seus dados pessoais.</span></li>
                                     <li data-rule="common"><span class="rule-dot"></span><span>N&atilde;o ser uma senha comumente utilizada.</span></li>
                                     <li data-rule="numeric"><span class="rule-dot"></span><span>N&atilde;o ser inteiramente num&eacute;rica.</span></li>
+                                    <li data-rule="special"><span class="rule-dot"></span><span>Conter ao menos 1 caractere especial.</span></li>
                                     <li data-rule="match"><span class="rule-dot"></span><span>Confirma&ccedil;&atilde;o igual &agrave; senha.</span></li>
                                 </ul>
                             </div>
@@ -178,12 +179,14 @@
             const numericOk = !/^\d+$/.test(value);
             const similarOk = !hasSimilarInfo(value);
             const commonOk = value.length ? !commonList.has(value.toLowerCase()) : false;
+            const specialOk = /[^A-Za-z0-9]/.test(value);
             const matchOk = confirmValue.length ? value === confirmValue : false;
 
             setRule('length', lengthOk, active);
             setRule('numeric', numericOk, active);
             setRule('similar', similarOk, active);
             setRule('common', commonOk, active);
+            setRule('special', specialOk, active);
             setRule('match', matchOk, confirmValue.length > 0);
         }
 

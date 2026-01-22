@@ -1,0 +1,19 @@
+Resumo {{ label }} - iTracker
+Período: {{ start|date:"d/m/Y" }} a {{ end|date:"d/m/Y" }}
+
+{% if has_finance %}
+Financeiro (workspaces do owner):
+- Entradas: R$ {{ income|floatformat:2 }}
+- Saídas: R$ {{ expense|floatformat:2 }}
+- Saldo: R$ {{ balance|floatformat:2 }}
+{% else %}
+Financeiro: você não possui workspaces como owner no período.
+{% endif %}
+
+{% if has_tasks %}
+Tarefas (workspaces com acesso):
+- Em andamento: {{ open_count }}
+- Concluídas: {{ done_count }}
+{% else %}
+Tarefas: nenhuma atividade registrada no período.
+{% endif %}
