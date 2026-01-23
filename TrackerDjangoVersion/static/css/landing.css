@@ -125,6 +125,8 @@
 .plan-card {
     --plan-accent: 94, 234, 212;
     position: relative;
+    display: flex;
+    flex-direction: column;
     border-radius: 16px;
     border: 1px solid transparent;
     background:

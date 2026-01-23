@@ -1074,9 +1074,39 @@
         const modalStartBtn = document.getElementById('startTourModal');
         const modalEl = document.getElementById('onboardingModal');
         const userKey = `itracker:onboarding:{{ user.id }}`;
+        const checklistKey = `${userKey}:checklist`;
         const promptedKey = `${userKey}:prompted`;
         const doneKey = `${userKey}:done`;
         const onboardingEnabled = {{ onboarding.show|yesno:"true,false" }};
+        const checklistEl = document.getElementById('onboardingChecklist');
+        const checklistToggle = document.querySelector('[data-bs-target="#onboardingChecklist"]');
+        const checklistIcon = checklistToggle ? checklistToggle.querySelector('.collapse-icon') : null;
+
+        const setChecklistIcon = (expanded) => {
+            if (!checklistIcon) return;
+            checklistIcon.classList.toggle('fa-chevron-up', expanded);
+            checklistIcon.classList.toggle('fa-chevron-down', !expanded);
+        };
+
+        if (checklistEl) {
+            const collapse = new bootstrap.Collapse(checklistEl, { toggle: false });
+            const savedState = localStorage.getItem(checklistKey);
+            if (savedState === 'collapsed') {
+                collapse.hide();
+                if (checklistToggle) checklistToggle.setAttribute('aria-expanded', 'false');
+                setChecklistIcon(false);
+            } else {
+                setChecklistIcon(true);
+            }
+            checklistEl.addEventListener('shown.bs.collapse', () => {
+                localStorage.setItem(checklistKey, 'expanded');
+                setChecklistIcon(true);
+            });
+            checklistEl.addEventListener('hidden.bs.collapse', () => {
+                localStorage.setItem(checklistKey, 'collapsed');
+                setChecklistIcon(false);
+            });
+        }
         if (startTourBtn) {
             startTourBtn.addEventListener('click', () => {
                 if (window.iTrackerTour) {

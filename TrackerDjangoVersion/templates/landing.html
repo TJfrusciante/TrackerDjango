@@ -29,7 +29,7 @@
                     <a class="btn btn-primary btn-lg" href="{% url 'tracker:register' %}">Criar conta</a>
                     <a class="btn btn-outline-light btn-lg" href="{% url 'tracker:login' %}">J&aacute; tenho acesso</a>
                 </div>
-                <p class="lp-muted mt-3 small">Somente o dono do workspace paga; Essencial inclui 2 convidados, Pro 6 e Master permite personalizar.</p>
+                <p class="lp-muted mt-3 small">Somente o dono do workspace paga; Essencial \u00e9 individual, Pro inclui at\u00e9 6 convidados e Master permite personalizar.</p>
             </div>
             <div class="col-lg-6">
                 <div class="lp-hero-card">
@@ -314,7 +314,7 @@
         <div class="row g-4 align-items-start">
             <div class="col-12">
                 <h2 class="section-title mb-3">Planos</h2>
-                <p class="lp-muted mb-4">Escolha ciclo e plano. Essencial inclui 2 convidados, Pro 6 e Master ajusta conforme sua equipe.</p>
+                <p class="lp-muted mb-4">Escolha ciclo e plano. Essencial \u00e9 individual, Pro inclui at\u00e9 6 convidados e Master ajusta conforme sua equipe.</p>
             </div>
             <div class="col-12">
                 <div class="row g-3 plan-row">
@@ -340,6 +340,7 @@
                                 <div class="plan-discount muted mb-2">Promo&ccedil;&atilde;o indispon&iacute;vel no momento.</div>
                             {% endif %}
                             <p class="lp-muted small mb-3">Total anual: R$ {{ plan.annual_total|floatformat:2 }}</p>
+                            <div class="lp-muted small mb-2">{{ plan.ideal_for }}</div>
                             <ul class="lp-muted small ps-3 mb-3">
                                 {% for f in plan.features %}
                                 <li class="mb-1">{{ f }}</li>
@@ -348,7 +349,7 @@
                             {% if plan.note %}
                                 <div class="lp-muted small mb-3">{{ plan.note }}</div>
                             {% endif %}
-                            <a class="btn btn-primary w-100" href="{% url 'tracker:register' %}">Assinar</a>
+                            <a class="btn btn-primary w-100 mt-auto" href="{% url 'tracker:register' %}">Assinar</a>
                         </div>
                     </div>
                     {% endfor %}

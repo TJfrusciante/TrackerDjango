@@ -8,17 +8,17 @@
         {
             selector: '[data-tour="nav-dashboard"]',
             title: 'Dashboard',
-            text: 'Veja indicadores, filtros e graficos do periodo.',
+            text: 'Veja indicadores, filtros e gráficos do período.',
         },
         {
             selector: '[data-tour="nav-launch"]',
-            title: 'Lancamentos',
-            text: 'Convidados podem lancar transacoes sem acessar o dashboard.',
+            title: 'Lançamentos',
+            text: 'Convidados podem lançar transações sem acessar o dashboard.',
         },
         {
             selector: '[data-tour="nav-transactions"]',
-            title: 'Transacoes',
-            text: 'Gerencie entradas e saidas com filtros e importacoes.',
+            title: 'Transações',
+            text: 'Gerencie entradas e saídas com filtros e importações.',
         },
         {
             selector: '[data-tour="nav-tasks"]',
@@ -33,16 +33,16 @@
         {
             selector: '[data-tour="nav-more"]',
             title: 'Demais funcionalidades',
-            text: 'Acesse categorias, notificacoes, workspaces e ajuda.',
+            text: 'Acesse categorias, notificações, workspaces e ajuda.',
         },
         {
             selector: '[data-tour="dashboard-filters"]',
-            title: 'Filtros de periodo',
-            text: 'Defina intervalo e tipo para refinar os graficos.',
+            title: 'Filtros de período',
+            text: 'Defina intervalo e tipo para refinar os gráficos.',
         },
         {
             selector: '[data-tour="chart-category"]',
-            title: 'Graficos interativos',
+            title: 'Gráficos interativos',
             text: 'Clique nas categorias para filtrar o dashboard.',
         },
         {
@@ -67,7 +67,7 @@
             <div class="tour-actions">
                 <span class="tour-progress"></span>
                 <button type="button" class="btn btn-sm btn-outline-light tour-prev">Voltar</button>
-                <button type="button" class="btn btn-sm btn-primary tour-next">Proximo</button>
+                <button type="button" class="btn btn-sm btn-primary tour-next">Próximo</button>
                 <button type="button" class="btn btn-sm btn-outline-light tour-close">Fechar</button>
             </div>
         `;
@@ -82,6 +82,15 @@
         const padding = 16;
         let top = rect.bottom + 12;
         let left = rect.left;
+        const sidebar = target.closest('.sidebar');
+        if (sidebar) {
+            const sidebarRect = sidebar.getBoundingClientRect();
+            const candidateLeft = sidebarRect.right + 16;
+            if (candidateLeft + tipRect.width < window.innerWidth - padding) {
+                left = candidateLeft;
+                top = rect.top;
+            }
+        }
         if (top + tipRect.height > window.innerHeight - padding) {
             top = rect.top - tipRect.height - 12;
         }
@@ -120,7 +129,7 @@
         tip.querySelector('.tour-text').textContent = step.text;
         tip.querySelector('.tour-progress').textContent = `${current + 1}/${activeSteps.length}`;
         tip.querySelector('.tour-prev').disabled = current === 0;
-        tip.querySelector('.tour-next').textContent = current === activeSteps.length - 1 ? 'Finalizar' : 'Proximo';
+        tip.querySelector('.tour-next').textContent = current === activeSteps.length - 1 ? 'Finalizar' : 'Próximo';
         tip.classList.add('show');
         requestAnimationFrame(() => positionTooltip(target));
     }

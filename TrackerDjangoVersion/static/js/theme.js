@@ -1,30 +1,41 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const themeToggles = document.querySelectorAll('.js-theme-toggle');
-    const html = document.documentElement;
-    const saved = localStorage.getItem('theme') || 'light';
+const html = document.documentElement;
 
-    if (html) {
-        html.setAttribute('data-bs-theme', saved);
-        updateIcons(saved);
-    }
-
-    themeToggles.forEach(toggle => {
-        toggle.addEventListener('click', () => {
-            const current = html.getAttribute('data-bs-theme');
-            const next = current === 'light' ? 'dark' : 'light';
-            html.setAttribute('data-bs-theme', next);
-            localStorage.setItem('theme', next);
-            updateIcons(next);
-        });
+function updateIcons(mode) {
+    document.querySelectorAll('.js-theme-toggle').forEach(toggle => {
+        const icon = toggle.querySelector('i');
+        if (!icon) return;
+        icon.className = mode === 'light' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
     });
+}
 
-    function updateIcons(mode) {
-        themeToggles.forEach(toggle => {
-            const icon = toggle.querySelector('i');
-            if (!icon) return;
-            icon.className = mode === 'light' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-        });
+function applyTheme(mode) {
+    if (!html) return;
+    html.setAttribute('data-bs-theme', mode);
+    if (document.body) {
+        document.body.setAttribute('data-bs-theme', mode);
     }
+    try {
+        localStorage.setItem('theme', mode);
+    } catch (err) {
+        // ignore storage failures
+    }
+    updateIcons(mode);
+}
+
+function toggleTheme() {
+    const current = html.getAttribute('data-bs-theme') || 'light';
+    const next = current === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+}
+
+window.iTrackerToggleTheme = toggleTheme;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('theme') || 'light';
+    applyTheme(saved);
+    document.querySelectorAll('.js-theme-toggle').forEach(toggle => {
+        toggle.addEventListener('click', toggleTheme);
+    });
 
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarClose = document.getElementById('sidebarClose');
@@ -115,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alerts.forEach(a => {
         const delay = parseInt(a.dataset.autoclose || '2000', 10);
         setTimeout(() => {
+            if (!window.bootstrap || !bootstrap.Alert) return;
             const bsAlert = bootstrap.Alert.getOrCreateInstance(a);
             bsAlert.close();
         }, delay);
@@ -149,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tooltips globais
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.forEach(el => {
+        if (!window.bootstrap || !bootstrap.Tooltip) return;
         new bootstrap.Tooltip(el);
     });
 });

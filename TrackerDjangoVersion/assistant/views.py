@@ -1,6 +1,6 @@
-import calendar
+﻿import calendar
 import datetime
-import calendar
+import hashlib
 import logging
 import os
 import re
@@ -8,12 +8,13 @@ import unicodedata
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Case, When, DecimalField, F, Prefetch
+from django.core.cache import cache
+from django.db.models import Sum, Case, When, DecimalField, F
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_exempt
 
-from tracker.models import Category, Transaction, Task, TaskStep, WorkspaceMembership
+from tracker.models import Category, Transaction, Task, TaskStep
 from tracker.metrics import record_metric
 from .models import ChatMessage, AiUsage
 from .limits import get_ai_quota
@@ -42,27 +43,6 @@ def _normalize_text(value: str) -> str:
         ch for ch in unicodedata.normalize('NFD', value.lower())
         if unicodedata.category(ch) != 'Mn'
     )
-
-
-def _finance_queryset(request, workspace):
-    qs = Transaction.objects.select_related('category')
-    if workspace:
-        if request.user.is_superuser or workspace.owner_id == request.user.id:
-            return qs.filter(workspace=workspace)
-        return qs.none()
-    if request.user.is_superuser:
-        return qs
-    return qs.none()
-
-
-def _tasks_queryset(request, workspace):
-    qs = Task.objects.all()
-    if workspace:
-        return qs.filter(workspace=workspace)
-    if request.user.is_superuser:
-        return qs
-    workspace_ids = WorkspaceMembership.objects.filter(user=request.user).values_list('workspace_id', flat=True)
-    return qs.filter(workspace_id__in=workspace_ids)
 
 
 def _parse_month_range(message: str):
@@ -120,21 +100,8 @@ def _parse_month_range(message: str):
     return start_date, end_date, label
 
 
-def _parse_year_range(message: str):
-    if not message:
-        return None
-    normalized = _normalize_text(message)
-    match = re.search(r'\b(20\d{2})\b', normalized)
-    if not match:
-        return None
-    year = int(match.group(1))
-    start_date = datetime.date(year, 1, 1)
-    end_date = datetime.date(year, 12, 31)
-    return start_date, end_date, str(year)
-
-
 def _summarize_period(workspace, request, start_date, end_date, label: str, include_tasks: bool, include_finance: bool) -> str:
-    lines = [f"Resumo de {label} ({start_date:%d/%m/%Y} a {end_date:%d/%m/%Y})"]
+    lines = [f'Resumo de {label} ({start_date:%d/%m/%Y} a {end_date:%d/%m/%Y})']
 
     if include_finance:
         finance_qs = _finance_queryset(request, workspace).filter(date__gte=start_date, date__lte=end_date)
@@ -144,9 +111,9 @@ def _summarize_period(workspace, request, start_date, end_date, label: str, incl
         tx_count = finance_qs.count()
         lines.append('')
         lines.append('Financeiro:')
-        lines.append(f'- Transa\u00e7\u00f5es: {tx_count}')
+        lines.append(f'- Transações: {tx_count}')
         lines.append(f'- Entradas: R$ {income:.2f}')
-        lines.append(f'- Sa\u00eddas: R$ {expense:.2f}')
+        lines.append(f'- Saídas: R$ {expense:.2f}')
         lines.append(f'- Saldo: R$ {balance:.2f}')
 
         per_category = finance_qs.values('category__name').annotate(
@@ -162,7 +129,7 @@ def _summarize_period(workspace, request, start_date, end_date, label: str, incl
         if per_category:
             top = per_category[:3]
             lines.append(
-                '- Top categorias (saldo l\u00edquido): '
+                '- Top categorias (saldo líquido): '
                 + ', '.join([f"{c['category__name']} ({c['total']:+.2f})" for c in top])
             )
 
@@ -173,11 +140,31 @@ def _summarize_period(workspace, request, start_date, end_date, label: str, incl
         tasks_created = tasks_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
         lines.append('')
         lines.append('Tarefas:')
-        lines.append(f'- Criadas no per\u00edodo: {tasks_created.count()}')
-        lines.append(f'- Conclu\u00eddas no per\u00edodo: {tasks_done.count()}')
-        lines.append(f'- Com prazo no per\u00edodo: {tasks_due.count()}')
+        lines.append(f'- Criadas no período: {tasks_created.count()}')
+        lines.append(f'- Com prazo no período: {tasks_due.count()}')
+        lines.append(f'- Concluídas no período: {tasks_done.count()}')
 
-    return "\n".join(lines)
+    return '\n'.join(lines)
+
+
+def _finance_queryset(request, workspace):
+    qs = Transaction.objects.all()
+    if workspace:
+        qs = qs.filter(workspace=workspace)
+    elif not request.user.is_superuser:
+        return Transaction.objects.none()
+    return qs
+
+
+def _tasks_queryset(request, workspace):
+    qs = Task.objects.all()
+    if workspace:
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(workspace=workspace)
+    if request.user.is_superuser:
+        return qs
+    return Task.objects.none()
 
 
 def _summarize(workspace, request):
@@ -222,11 +209,10 @@ def _summarize(workspace, request):
     if per_category:
         top = per_category[:3]
         summary_lines.append(
-            "Top categorias (saldo l\u00edquido): "
+            "Top categorias (saldo líquido): "
             + ", ".join([f"{c['category__name']} ({c['total']:+.2f})" for c in top])
         )
     return "\n".join(summary_lines)
-
 
 def _top_category(finance_qs, tx_type: str):
     top = (
@@ -248,107 +234,87 @@ def _wants_task_details(message: str) -> bool:
     return 'tarefa' in msg or 'tarefas' in msg
 
 
-def _task_list_summary(workspace, request, status: str | None = None, limit_tasks: int = 6, limit_steps: int = 6) -> str:
-    steps_prefetch = Prefetch('steps', queryset=TaskStep.objects.order_by('order', 'created_at'))
-    tasks_qs = _tasks_queryset(request, workspace).order_by('-due_date', '-created_at').prefetch_related(steps_prefetch)
-    status_label = None
-    if status:
-        tasks_qs = tasks_qs.filter(status=status)
-        status_label = 'em andamento' if status == 'ongoing' else 'concluídas'
-    total = tasks_qs.count()
-    if total == 0:
-        if status_label:
-            return f"Nenhuma tarefa {status_label} no momento."
-        return "Nenhuma tarefa encontrada no momento."
-
-    header = f"Tarefas {status_label} ({total}):" if status_label else f"Tarefas ({total}):"
-    lines = [header]
-    for idx, task in enumerate(tasks_qs[:limit_tasks], start=1):
-        due_label = task.due_date.strftime('%d/%m/%Y') if task.due_date else '-'
-        lines.append(f"{idx}. {task.title} (prazo {due_label})")
-        steps = list(task.steps.all())
-        if steps:
-            lines.append("   - Etapas:")
-            for step in steps[:limit_steps]:
-                lines.append(f"     - {step.title} ({step.get_status_display()})")
-        else:
-            lines.append("   - Etapas: nenhuma cadastrada")
-    if total > limit_tasks:
-        lines.append(f"Mostrando {limit_tasks} de {total} tarefas.")
-    return "\n".join(lines)
-
-
 def _help_response(message: str) -> str | None:
-    normalized = _normalize_text(message or '')
-    if not normalized:
+    msg = (message or '').lower()
+    if not msg:
         return None
 
-    def has_any(keys):
-        return any(k in normalized for k in keys)
+    def has_any(values: list[str]) -> bool:
+        return any(v in msg for v in values)
 
-    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'faco', 'fazer', 'adicionar', 'lancar', 'lan?ar'])
+    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'fa?o', 'fazer', 'adicionar', 'lan?ar', 'lancar'])
+    if not wants_howto:
+        return None
 
-    if has_any(['transa', 'entrada', 'saida', 'despesa', 'receita']):
+    if has_any(['transa', 'lan?', 'lanc', 'entrada', 'sa?da', 'saida', 'despesa', 'receita']):
         return (
-            "Para lan\u00e7ar transa\u00e7\u00f5es: v\u00e1 em Transa\u00e7\u00f5es > Nova. Informe descri\u00e7\u00e3o, data, "
-            "valor, categoria e tipo (entrada/sa\u00edda) e salve. "
-            "Voc\u00ea tamb\u00e9m pode usar o bot\u00e3o Falar para preencher por voz. "
-            "Para importar em lote, use Transa\u00e7\u00f5es > Importar CSV/PDF."
-        ) if wants_howto else None
+            "Para lançar transações: v? em Transações > Nova. Informe descrição, data, valor, categoria e tipo "
+            "(entrada/saída) e salve. Voc? tamb?m pode usar o bot?o Falar para preencher por voz. "
+            "Para importar em lote, use Transações > Importar CSV."
+        )
 
-    if has_any(['tarefa', 'etapa', 'prazo']):
+    if has_any(['tarefa', 'etapa', 'subtarefa', 'todo']):
         return (
-            "Para criar tarefas: v\u00e1 em Tarefas > Nova, defina t\u00edtulo, prazo e categoria. "
-            "Voc\u00ea pode adicionar etapas no mesmo formul\u00e1rio e depois editar/atualizar o status. "
-            "O bot\u00e3o Falar ajuda a preencher a tarefa e as etapas."
-        ) if wants_howto else None
+            "Para criar tarefas: vá em Tarefas > Nova, defina t?tulo e prazo. "
+            "Você pode adicionar etapas no mesmo formulário e depois editar/atualizar o status. "
+            "O botão Falar ajuda a preencher a tarefa e as etapas."
+        )
 
-    if has_any(['workspace', 'membro', 'convidar', 'convite']):
+    if has_any(['workspace', 'membro', 'membros', 'convidar', 'convite', 'participante']):
         return (
-            "Para convidar pessoas: abra Workspaces > Convidar e informe o usu\u00e1rio. "
-            "O convidado precisa aceitar o convite para entrar. "
-            "Voc\u00ea pode ver membros em Workspaces > Membros."
-        ) if wants_howto else None
+            "Para convidar pessoas: abra o painel de Workspaces e clique em Convites. "
+            "Informe o username e defina se pode editar tarefas. "
+            "O convidado aceita na tela de Workspaces (Convites pendentes)."
+        )
 
-    if has_any(['categoria', 'cor']):
+    if has_any(['categoria', 'categorias', 'cor']):
         return (
-            "As categorias ficam em Categorias. Voc\u00ea pode criar, editar e escolher cor. "
-            "A cor aparece nos gr\u00e1ficos do dashboard."
-        ) if wants_howto else None
+            "Para cadastrar categorias: acesse Categorias > Nova. "
+            "A cor escolhida aparece nos gr?ficos do dashboard."
+        )
 
-    if has_any(['exportar', 'csv', 'importar', 'pdf']):
+    if has_any(['exportar', 'csv', 'pdf', 'importar']):
         return (
-            "Exporta\u00e7\u00e3o: nas listas de Transa\u00e7\u00f5es ou Tarefas, use o bot\u00e3o Exportar CSV. "
-            "Importa\u00e7\u00e3o: use Transa\u00e7\u00f5es > Importar CSV ou Importar PDF."
-        ) if wants_howto else None
+            "Exportação: nas listas de Transações ou Tarefas, use o botão Exportar CSV. "
+            "Importação: use Transações > Importar CSV ou Importar PDF."
+        )
 
-    if has_any(['notificacao', 'resumo', 'semanal', 'mensal', 'alerta']):
+    if has_any(['notifica', 'email', 'alerta', 'resumo']):
         return (
-            "Notifica\u00e7\u00f5es e resumos ficam no Perfil. "
-            "Marque as op\u00e7\u00f5es de alertas, tarefas e resumos semanais/mensais e salve."
-        ) if wants_howto else None
+            "Notificações e resumos ficam no Perfil. "
+            "Marque as opções de alertas, tarefas e resumos semanais/mensais e salve."
+        )
 
-    if has_any(['ia', 'agente', 'chat', 'modelo']):
+    if has_any(['ia', 'assistente', 'agente']):
         return (
-            "O Agente de IA responde com base nos seus dados do workspace. "
-            "Use o bot\u00e3o Falar no chat ou nos formul\u00e1rios para ditado por voz."
-        ) if wants_howto else None
+            "O agente de IA responde com base no workspace atual. "
+            "Use perguntas como 'saldo', 'tarefas em andamento' ou 'top categorias'. "
+            "Você pode ativar o modo 'resumo local' se quiser evitar chamadas externas."
+        )
 
-    if wants_howto:
-        return "Voc\u00ea pode consultar a p\u00e1gina Ajuda no menu para um passo a passo completo."
+    if has_any(['plano', 'assinatura', 'mensal', 'anual', 'pagamento']):
+        return (
+            "Para assinar, acesse seu Perfil e clique em 'Assinar com Mercado Pago'. "
+            "Escolha mensal ou anual e conclua o pagamento para liberar o acesso completo."
+        )
 
-    return None
+    if has_any(['voz', 'ditado', 'falar', 'microfone']):
+        return (
+            "Use o botão Falar nos formulários ou no chat do agente. "
+            "Fale normalmente e finalize para preencher os campos automaticamente."
+        )
+
+    return "Você pode consultar a página Ajuda no menu para um passo a passo completo."
 
 
 def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: int = 6) -> str:
     tasks_qs = _tasks_queryset(request, workspace)
-    steps_prefetch = Prefetch('steps', queryset=TaskStep.objects.order_by('order', 'created_at'))
-    done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at').prefetch_related(steps_prefetch)
+    done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at')
     total_done = done_tasks.count()
     if total_done == 0:
-        return "Nenhuma tarefa conclu\u00edda no momento."
+        return "Nenhuma tarefa concluída no momento."
 
-    lines = [f"Tarefas conclu\u00eddas ({total_done}):"]
+    lines = [f"Tarefas concluídas ({total_done}):"]
     for idx, task in enumerate(done_tasks[:limit_tasks], start=1):
         completed_date = task.completed_at.date() if task.completed_at else None
         completed_label = completed_date.strftime('%d/%m/%Y') if completed_date else '-'
@@ -357,11 +323,11 @@ def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: 
         if completed_date and task.due_date and completed_date > task.due_date:
             status_label = 'com atraso'
         lines.append(f"{idx}. {task.title}")
-        lines.append(f"   - Conclu\u00edda em: {completed_label}")
+        lines.append(f"   - Concluída em: {completed_label}")
         lines.append(f"   - Prazo: {due_label}")
         lines.append(f"   - Status: {status_label}")
-        steps = list(task.steps.all())
-        if steps:
+        steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
+        if steps.exists():
             lines.append("   - Etapas:")
             for step in steps[:limit_steps]:
                 responsible = step.responsible or '-'
@@ -377,24 +343,22 @@ def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: 
         lines.append(f"Mostrando {limit_tasks} de {total_done} tarefas conclu\u00eddas.")
     return "\n".join(lines)
 
+
 def _assistant_reply(message, workspace, request, local_only: bool = False, fallback_reason: str | None = None):
     """
     Usa LLM se configurado; fallback para resumo baseado em regras.
     Retorna (reply, usage, model_name).
     """
     msg_norm = _normalize_text(message or '')
+    cache_key = None
+    if msg_norm:
+        ws_key = str(workspace.id) if workspace else 'global'
+        digest = hashlib.sha256(msg_norm.encode('utf-8')).hexdigest()
+        cache_key = f"ai:reply:{request.user.id}:{ws_key}:{digest}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached, None, None
     period_range = _parse_month_range(message)
-    year_range = _parse_year_range(message) if not period_range else None
-
-    wants_tasks = 'tarefa' in msg_norm or 'tarefas' in msg_norm
-    wants_steps = 'etapa' in msg_norm or 'etapas' in msg_norm
-    wants_ongoing = any(key in msg_norm for key in ['em andamento', 'andamento', 'pendente', 'pendentes', 'aberta', 'abertas'])
-    wants_done = any(key in msg_norm for key in ['concluida', 'concluidas', 'finalizada', 'finalizadas'])
-
-    if wants_tasks and (wants_ongoing or wants_steps):
-        return _task_list_summary(workspace, request, status='ongoing'), None, None
-    if wants_tasks and wants_done:
-        return _task_list_summary(workspace, request, status='done'), None, None
 
     if any(key in msg_norm for key in ['maior gasto', 'maior despesa', 'maior saida']):
         finance_qs = _finance_queryset(request, workspace)
@@ -403,11 +367,17 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
             finance_qs = finance_qs.filter(date__gte=start_date, date__lte=end_date)
         top = _top_category(finance_qs, 'expense')
         if not top:
-            period_label = f" no per\u00edodo {label}" if period_range else ""
-            return f"N\u00e3o encontrei despesas registradas{period_label}.", None, None
+            period_label = f" no período {label}" if period_range else ""
+            reply = f"Não encontrei despesas registradas{period_label}."
+            if cache_key:
+                cache.set(cache_key, reply, 300)
+            return reply, None, None
         name, total = top
-        period_label = f" no per\u00edodo {label}" if period_range else ""
-        return f"Seu maior gasto{period_label} foi em {name}: R$ {total:.2f}.", None, None
+        period_label = f" no período {label}" if period_range else ""
+        reply = f"Seu maior gasto{period_label} foi em {name}: R$ {total:.2f}."
+        if cache_key:
+            cache.set(cache_key, reply, 300)
+        return reply, None, None
 
     if any(key in msg_norm for key in ['maior receita', 'maior entrada']):
         finance_qs = _finance_queryset(request, workspace)
@@ -416,53 +386,71 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
             finance_qs = finance_qs.filter(date__gte=start_date, date__lte=end_date)
         top = _top_category(finance_qs, 'income')
         if not top:
-            period_label = f" no per\u00edodo {label}" if period_range else ""
-            return f"N\u00e3o encontrei receitas registradas{period_label}.", None, None
+            period_label = f" no período {label}" if period_range else ""
+            reply = f"Não encontrei receitas registradas{period_label}."
+            if cache_key:
+                cache.set(cache_key, reply, 300)
+            return reply, None, None
         name, total = top
-        period_label = f" no per\u00edodo {label}" if period_range else ""
-        return f"Sua maior receita{period_label} foi em {name}: R$ {total:.2f}.", None, None
+        period_label = f" no período {label}" if period_range else ""
+        reply = f"Sua maior receita{period_label} foi em {name}: R$ {total:.2f}."
+        if cache_key:
+            cache.set(cache_key, reply, 300)
+        return reply, None, None
 
-    if period_range or year_range:
-        if period_range:
-            start_date, end_date, label = period_range
-        else:
-            start_date, end_date, label = year_range
+    if period_range:
+        start_date, end_date, label = period_range
         wants_tasks = 'tarefa' in msg_norm
         wants_finance = any(
             key in msg_norm for key in ['transa', 'financ', 'saldo', 'entrada', 'saida', 'despesa', 'receita']
         )
         include_tasks = wants_tasks or not wants_finance
         include_finance = wants_finance or not wants_tasks
-        return _summarize_period(
+        reply = _summarize_period(
             workspace, request, start_date, end_date, label, include_tasks, include_finance
-        ), None, None
+        )
+        if cache_key:
+            cache.set(cache_key, reply, 300)
+        return reply, None, None
 
     help_text = _help_response(message)
     if help_text:
+        if cache_key:
+            cache.set(cache_key, help_text, 300)
         return help_text, None, None
 
     if _wants_task_details(message):
-        return _task_detail_summary(workspace, request), None, None
+        reply = _task_detail_summary(workspace, request)
+        if cache_key:
+            cache.set(cache_key, reply, 300)
+        return reply, None, None
 
     summary = _summarize(workspace, request)
+    summary_lines = summary.splitlines()
+    if len(summary_lines) > 14:
+        summary = "\n".join(summary_lines[:14] + ["..."])
     today = datetime.date.today().strftime("%d/%m/%Y")
     ws_name = workspace.name if workspace else "global"
     context_line = f"workspace={ws_name}; usuario={'superuser' if request.user.is_superuser else request.user.username}"
 
     system_prompt = (
-        "Voc\u00ea \u00e9 o assistente financeiro do iTracker. Responda em portugu\u00eas de forma curta. "
-        "Use apenas os dados fornecidos no resumo. Se algo n\u00e3o estiver no resumo, diga que n\u00e3o sabe. "
+        "Você é o assistente financeiro do iTracker. Responda em português de forma curta. "
+        "Use apenas os dados fornecidos no resumo. Se algo não estiver no resumo, diga que não sabe. "
         f"Contexto de workspace: {context_line}."
     )
-    user_prompt = f"Data atual: {today}. Resumo dispon\u00edvel:\n{summary}\nPergunta: {message}"
-
+    user_prompt = f"Data atual: {today}. Resumo disponível:\n{summary}\nPergunta: {message}"
     if not local_only:
         reply, usage, model_name = llm_complete(system_prompt, user_prompt)
         if reply:
+            if cache_key:
+                cache.set(cache_key, reply, 300)
             return reply, usage, model_name
     logger.info("LLM fallback usado (local_only=%s)", local_only)
-    prefix = fallback_reason or "N\u00e3o consegui consultar o modelo agora. Aqui vai um resumo r\u00e1pido:"
-    return f"{prefix}\n{summary}", None, None
+    prefix = fallback_reason or "Não consegui consultar o modelo agora. Aqui vai um resumo rápido:"
+    reply = f"{prefix}\n{summary}"
+    if cache_key:
+        cache.set(cache_key, reply, 300)
+    return reply, None, None
 
 def _record_usage(user, workspace, feature, usage, model_name):
     if not usage:
@@ -518,7 +506,7 @@ def chat(request):
     workspace = getattr(request, "workspace", None)
     profile = getattr(request.user, "profile", None)
     if profile and profile.is_guest and not request.user.is_superuser:
-        messages.error(request, "Conta de convidado n\u00e3o tem acesso ao agente de IA.")
+        messages.error(request, "Conta de convidado não tem acesso ao agente de IA.")
         return redirect('tracker:tasks_list')
     quota = get_ai_quota(request.user)
     quota_label = _format_quota_label(quota)
@@ -539,21 +527,13 @@ def chat(request):
             )
         if content:
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
-            try:
-                reply, usage, model_name = _assistant_reply(
-                    content,
-                    workspace,
-                    request,
-                    local_only=local_only,
-                    fallback_reason=fallback_reason,
-                )
-            except Exception:
-                logger.exception("Erro ao gerar resposta do assistente")
-                reply, usage, model_name = (
-                    "Tive um problema ao gerar a resposta agora. Tente novamente em instantes.",
-                    None,
-                    None,
-                )
+            reply, usage, model_name = _assistant_reply(
+                content,
+                workspace,
+                request,
+                local_only=local_only,
+                fallback_reason=fallback_reason,
+            )
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
             _record_usage(request.user, workspace, 'chat', usage, model_name)
             record_metric('ai_request', user=request.user, workspace=workspace, metadata={'local_only': local_only})
@@ -591,21 +571,13 @@ def chat_embed(request):
             )
         if content:
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='user', content=content)
-            try:
-                reply, usage, model_name = _assistant_reply(
-                    content,
-                    workspace,
-                    request,
-                    local_only=local_only,
-                    fallback_reason=fallback_reason,
-                )
-            except Exception:
-                logger.exception("Erro ao gerar resposta do assistente (embed)")
-                reply, usage, model_name = (
-                    "Tive um problema ao gerar a resposta agora. Tente novamente em instantes.",
-                    None,
-                    None,
-                )
+            reply, usage, model_name = _assistant_reply(
+                content,
+                workspace,
+                request,
+                local_only=local_only,
+                fallback_reason=fallback_reason,
+            )
             ChatMessage.objects.create(user=request.user, workspace=workspace, role='assistant', content=reply)
             _record_usage(request.user, workspace, 'chat', usage, model_name)
             record_metric('ai_request', user=request.user, workspace=workspace, metadata={'local_only': local_only})
@@ -618,8 +590,4 @@ def chat_embed(request):
         'ai_quota_blocked': quota_blocked,
     })
 
-
-
-
-
-
+    

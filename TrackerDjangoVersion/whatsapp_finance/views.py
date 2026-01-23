@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import json
+import re
 
 from django.http import HttpResponse
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
@@ -14,6 +16,23 @@ from .whatsapp import build_twiml, normalize_phone, validate_twilio_request
 
 def _reply(message: str) -> HttpResponse:
     return HttpResponse(build_twiml(message), content_type="text/xml")
+
+
+@login_required
+def agent(request):
+    profile = WhatsAppProfile.objects.filter(user=request.user).select_related("workspace").first()
+    recent_messages = (
+        WhatsAppMessage.objects.filter(user=request.user)
+        .order_by("-created_at")[:6]
+    )
+    return render(
+        request,
+        "whatsapp_finance/agent.html",
+        {
+            "profile": profile,
+            "recent_messages": list(recent_messages),
+        },
+    )
 
 
 @csrf_exempt
@@ -32,9 +51,20 @@ def webhook(request):
     media_url = payload.get("MediaUrl0", "")
     media_type = payload.get("MediaContentType0", "")
 
-    profile = WhatsAppProfile.objects.select_related("user", "workspace").filter(phone_number=from_number, is_active=True).first()
+    from_digits = re.sub(r"\D", "", from_number or "")
+    variants = {from_number}
+    if from_digits:
+        variants.update({from_digits, f"+{from_digits}", from_digits.lstrip("+")})
+    profile = (
+        WhatsAppProfile.objects.select_related("user", "workspace")
+        .filter(phone_number__in=variants, is_active=True)
+        .first()
+    )
     if not profile:
         return _reply("Numero nao autorizado. Cadastre seu WhatsApp no perfil.")
+    if profile.phone_number != from_number:
+        profile.phone_number = from_number
+        profile.save(update_fields=["phone_number"])
 
     profile.last_seen_at = timezone.now()
     profile.save(update_fields=["last_seen_at"])

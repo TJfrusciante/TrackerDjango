@@ -5,5 +5,6 @@ from . import views
 app_name = "whatsapp_finance"
 
 urlpatterns = [
+    path("agent/", views.agent, name="agent"),
     path("webhook/", views.webhook, name="webhook"),
 ]

@@ -13,12 +13,16 @@ def _download_media(url: str) -> bytes | None:
     if not url:
         return None
     req = urllib.request.Request(url)
-    account_sid = getattr(settings, "TWILIO_ACCOUNT_SID", "")
-    auth_token = getattr(settings, "TWILIO_AUTH_TOKEN", "")
-    if account_sid and auth_token:
-        auth = f"{account_sid}:{auth_token}".encode("utf-8")
-        auth_header = base64.b64encode(auth).decode("utf-8")
-        req.add_header("Authorization", f"Basic {auth_header}")
+    meta_token = getattr(settings, "META_WA_ACCESS_TOKEN", "")
+    if meta_token and any(host in url for host in ("facebook.com", "fbcdn.net", "fbsbx.com", "lookaside")):
+        req.add_header("Authorization", f"Bearer {meta_token}")
+    else:
+        account_sid = getattr(settings, "TWILIO_ACCOUNT_SID", "")
+        auth_token = getattr(settings, "TWILIO_AUTH_TOKEN", "")
+        if account_sid and auth_token:
+            auth = f"{account_sid}:{auth_token}".encode("utf-8")
+            auth_header = base64.b64encode(auth).decode("utf-8")
+            req.add_header("Authorization", f"Basic {auth_header}")
     try:
         with urllib.request.urlopen(req, timeout=15) as response:
             return response.read()

@@ -12,7 +12,7 @@ from django.db import transaction as db_transaction
 from django.db.models import Sum, Q
 from django.utils import timezone
 
-from tracker.models import Category, Transaction
+from tracker.models import Category, Transaction, Task, TaskStep, WorkspaceMembership
 from .models import CategoryPreference, ParsedTransaction, WhatsAppMessage, WhatsAppProfile
 
 
@@ -25,6 +25,14 @@ class ParsedResult:
     category: Category | None
     category_label: str
     requires_confirmation: bool
+
+
+@dataclass
+class ParsedTaskResult:
+    title: str
+    due_date: dt.date
+    category: str
+    steps: list[str]
 
 
 DEFAULT_CATEGORY_COLORS = {
@@ -118,6 +126,13 @@ EXPENSE_KEYWORDS = (
     "saque",
     "saida",
     "gasto",
+)
+
+TASK_KEYWORDS = (
+    "tarefa",
+    "task",
+    "lembrete",
+    "lembrar",
 )
 
 
@@ -222,6 +237,68 @@ def extract_description(text: str) -> str:
     return cleaned or text.strip()
 
 
+def _extract_steps(text: str) -> tuple[str, list[str]]:
+    if not text:
+        return "", []
+    pattern = re.compile(r"(?:etapa|passo)\\s*\\d*\\s*[:\\-]", re.IGNORECASE)
+    parts = pattern.split(text)
+    if len(parts) <= 1:
+        return text, []
+    steps = []
+    for part in parts[1:]:
+        step_title = part.strip(" \t\n\r.;,-")
+        if step_title:
+            steps.append(step_title)
+    return parts[0], steps
+
+
+def _extract_task_category(text: str) -> str:
+    if not text:
+        return ""
+    match = re.search(r"categoria\\s+([^,;\\n]+)", text, flags=re.IGNORECASE)
+    if not match:
+        return ""
+    return match.group(1).strip().title()
+
+
+def _clean_task_title(text: str) -> str:
+    cleaned = text or ""
+    cleaned = re.sub(r"\\b(tarefa|task|lembrete|lembrar)\\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\\b(prioridade|prazo|data|ate|at\\u00e9)\\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"categoria\\s+[^,;\\n]+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\\d{2}/\\d{2}/\\d{4}", "", cleaned)
+    cleaned = re.sub(r"\\d{4}-\\d{2}-\\d{2}", "", cleaned)
+    cleaned = re.sub(r"\\bhoje\\b|\\bontem\\b|\\bamanha\\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def is_task_intent(text: str) -> bool:
+    normalized = normalize_text(text)
+    if not normalized:
+        return False
+    if normalized.startswith("/tarefa") or normalized.startswith("/task"):
+        return True
+    return any(keyword in normalized for keyword in TASK_KEYWORDS)
+
+
+def parse_task_text(text: str) -> ParsedTaskResult | None:
+    if not is_task_intent(text):
+        return None
+    due_date = extract_date(text)
+    preface, steps = _extract_steps(text)
+    category = _extract_task_category(text)
+    title = _clean_task_title(preface)
+    if not title:
+        title = "Tarefa via WhatsApp"
+    return ParsedTaskResult(
+        title=title,
+        due_date=due_date,
+        category=category,
+        steps=steps,
+    )
+
+
 def ensure_category(workspace, name: str) -> Category:
     existing = _match_existing_category(workspace, name)
     if existing:
@@ -298,6 +375,49 @@ def _format_date(value: dt.date) -> str:
     if value == today - dt.timedelta(days=1):
         return "ontem"
     return value.strftime("%d/%m/%Y")
+
+
+def _can_create_task(user, workspace) -> bool:
+    if not workspace:
+        return False
+    if user.is_superuser or workspace.owner_id == user.id:
+        return True
+    membership = WorkspaceMembership.objects.filter(workspace=workspace, user=user).first()
+    return bool(membership and membership.can_edit_tasks)
+
+
+def _create_task_from_parsed(user, workspace, parsed: ParsedTaskResult) -> Task:
+    responsible_name = user.get_full_name() or user.username
+    task = Task.objects.create(
+        title=parsed.title,
+        category=parsed.category or "",
+        due_date=parsed.due_date,
+        workspace=workspace,
+        responsible_user=user,
+        responsible=responsible_name,
+        responsible_email=user.email or "",
+        status="ongoing",
+    )
+    if parsed.steps:
+        for idx, step_title in enumerate(parsed.steps, start=1):
+            TaskStep.objects.create(
+                task=task,
+                title=step_title,
+                order=idx,
+                responsible=responsible_name,
+                responsible_email=user.email or "",
+                status="ongoing",
+            )
+    return task
+
+
+def build_task_message(task: Task, steps_count: int) -> str:
+    due_label = _format_date(task.due_date)
+    category = task.category or "Sem categoria"
+    return (
+        f"Tarefa criada: {task.title}. Prazo: {due_label}. "
+        f"Categoria: {category}. Etapas: {steps_count}."
+    )
 
 
 def build_confirmation_message(parsed: ParsedTransaction) -> str:
@@ -500,6 +620,13 @@ def process_incoming_text(profile: WhatsAppProfile, message: WhatsAppMessage, te
     delete_response = handle_delete(user, workspace, text)
     if delete_response:
         return delete_response
+
+    task_result = parse_task_text(text)
+    if task_result:
+        if not _can_create_task(user, workspace):
+            return "Voc\\u00ea n\\u00e3o tem permiss\\u00e3o para criar tarefas neste workspace."
+        task = _create_task_from_parsed(user, workspace, task_result)
+        return build_task_message(task, len(task_result.steps))
 
     result = parse_text_to_result(user, workspace, text)
     if not result:

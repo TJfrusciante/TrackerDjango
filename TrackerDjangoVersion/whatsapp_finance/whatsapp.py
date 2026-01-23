@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from django.conf import settings
 from django.http import HttpRequest
 
@@ -8,7 +10,10 @@ def normalize_phone(value: str) -> str:
     if not value:
         return ""
     value = value.replace("whatsapp:", "").strip()
-    return value
+    digits = re.sub(r"\D", "", value)
+    if not digits:
+        return value
+    return f"+{digits}"
 
 
 def build_twiml(message: str) -> str:

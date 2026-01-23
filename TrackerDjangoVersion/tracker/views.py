@@ -107,6 +107,8 @@ from assistant.services import llm_complete, estimate_costs
 from assistant.models import AiUsage, ChatMessage
 from assistant.limits import get_ai_quota
 from payments.models import MpSubscription, MpWebhookEvent
+from whatsapp_finance.forms import WhatsAppProfileForm
+from whatsapp_finance.models import WhatsAppProfile
 
 User = get_user_model()
 
@@ -194,13 +196,13 @@ def _workspace_unpaid_invite_count(workspace) -> int:
 
 def _workspace_guest_limit(workspace) -> int:
     if not workspace:
-        return 2
+        return 0
     owner_profile = getattr(workspace.owner, 'profile', None)
     if owner_profile and owner_profile.plan == 'pro':
         return 6
     if owner_profile and owner_profile.plan == 'master':
         return max(owner_profile.master_guest_limit or 6, 6)
-    return 2
+    return 0
 
 
 def _apply_workspace_filter(queryset, workspace, user):
@@ -444,7 +446,7 @@ def home(request):
         "essential": [
             "Acessos manuais e ditados",
             "IA b\u00e1sica",
-            "At\u00e9 2 convidados por workspace",
+            "Plano individual (sem convidados)",
             "Dashboards financeiros e tarefas em etapas",
         ],
         "pro": [
@@ -459,6 +461,11 @@ def home(request):
             "Convidados personalizados (a partir de 6)",
             "Custo ajustado por convidado extra",
         ],
+    }
+    plan_ideal_for = {
+        "essential": "Ideal para gest\u00e3o pessoal.",
+        "pro": "Ideal para fam\u00edlias ou grupos pequenos.",
+        "master": "Ideal para empresas e grupos grandes; voc\u00ea define a propor\u00e7\u00e3o do seu workspace.",
     }
     discount_pct_map = {
         "essential": 38,
@@ -481,6 +488,7 @@ def home(request):
             "features": plan_features[tier],
             "note": "Master: +15% por convidado acima de 6." if tier == "master" else "",
             "discount_pct": discount_pct_map.get(tier, 0),
+            "ideal_for": plan_ideal_for.get(tier, ""),
         })
 
     feature_cards = [
@@ -521,12 +529,12 @@ def home(request):
     steps = [
         {"title": "Crie sua conta", "text": "Escolha plano e ciclo (Mensal ou Anual) para o seu workspace."},
         {"title": "Importe dados", "text": "Importe CSV/PDF ou lance com o bot\u00e3o Falar em tempo real."},
-        {"title": "Convide sua equipe", "text": "Essencial: 2 convidados. Pro: 6. Master: personalize o limite."},
+        {"title": "Convide sua equipe", "text": "Essencial: plano individual. Pro: at\u00e9 6 convidados. Master: personalize o limite."},
         {"title": "Acompanhe no painel", "text": "Troque workspaces, aprove convites e configure alertas."},
     ]
 
     faq_items = [
-        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. O limite de convidados depende do plano (2/6/personalizado)."},
+        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. O limite de convidados depende do plano (0/6/personalizado)."},
         {"question": "Posso escolher mensal ou anual?", "answer": "Sim. A escolha do ciclo \u00e9 feita no cadastro e pode ser revisada pelo admin."},
         {"question": "Meu financeiro \u00e9 privado?", "answer": "Sim. Cada workspace isola finan\u00e7as; o owner controla permiss\u00f5es de tarefas."},
         {"question": "Posso exportar dados?", "answer": "Sim, CSV das listas e endpoints JSON para gr\u00e1ficos."},
@@ -590,7 +598,7 @@ def help_page(request):
         },
         {
             "question": "Como ativar o WhatsApp?",
-            "answer": "Cadastre seu numero no perfil do WhatsApp via admin e configure o webhook Twilio em /whatsapp/webhook/. Depois envie mensagens como 'Gastei 150 no mercado'.",
+            "answer": "Cadastre seu n\u00famero na p\u00e1gina de Perfil \u2192 Agente do WhatsApp e escolha o workspace. Depois envie mensagens ao n\u00famero do iTracker.",
         },
         {
             "question": "Posso exportar dados?",
@@ -628,6 +636,7 @@ def dashboard(request):
     today = timezone.now().date()
     workspace = getattr(request, "workspace", None)
     can_finance = _user_can_view_finance(request, workspace)
+
     last30_start = today - datetime.timedelta(days=30)
     profile = getattr(request.user, "profile", None)
     if profile and profile.is_guest:
@@ -697,20 +706,31 @@ def dashboard(request):
         start_date, end_date = range_from_period(period)
 
     base_qs = _apply_workspace_filter(
-        Transaction.objects.filter(date__gte=start_date, date__lte=end_date),
+        Transaction.objects.select_related('category', 'responsible').filter(date__gte=start_date, date__lte=end_date),
         workspace,
         request.user,
     ) if can_finance else Transaction.objects.none()
     if responsible_param.isdigit():
         base_qs = base_qs.filter(responsible_id=int(responsible_param))
-    period_has_data = base_qs.exists()
-
-    income_total = base_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
-    expense_total = base_qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
-    tx_count_period = base_qs.count()
+    dash_cache_key = f"dash:{request.user.id}:{workspace.id if workspace else 'global'}:{start_date}:{end_date}:{responsible_param}"
+    dash_cached = cache.get(dash_cache_key)
+    if dash_cached:
+        period_has_data = dash_cached['period_has_data']
+        income_total = dash_cached['income_total']
+        expense_total = dash_cached['expense_total']
+        tx_count_period = dash_cached['tx_count_period']
+        chart_labels = dash_cached['chart_labels']
+        chart_values = dash_cached['chart_values']
+        top_income = dash_cached['top_income']
+        top_expense = dash_cached['top_expense']
+    else:
+        period_has_data = base_qs.exists()
+        income_total = base_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
+        expense_total = base_qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
+        tx_count_period = base_qs.count()
 
     last30_qs = _apply_workspace_filter(
-        Transaction.objects.filter(date__gte=last30_start, date__lte=today),
+        Transaction.objects.select_related('category', 'responsible').filter(date__gte=last30_start, date__lte=today),
         workspace,
         request.user,
     ) if can_finance else Transaction.objects.none()
@@ -721,31 +741,46 @@ def dashboard(request):
     net_30 = last30_income - last30_expense
     avg_daily_expense = (last30_expense / 30) if last30_expense else 0
 
-    category_net = base_qs.values('category__name').annotate(
-        total=Sum(
-            Case(
-                When(type='income', then=F('value')),
-                When(type='expense', then=F('value') * -1),
-                default=0,
-                output_field=DecimalField(max_digits=12, decimal_places=2),
+    if not dash_cached:
+        category_net = base_qs.values('category__name').annotate(
+            total=Sum(
+                Case(
+                    When(type='income', then=F('value')),
+                    When(type='expense', then=F('value') * -1),
+                    default=0,
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
             )
         )
-    )
-    chart_labels = [item['category__name'] for item in category_net]
-    chart_values = [float(item['total'] or 0) for item in category_net]
+        chart_labels = [item['category__name'] for item in category_net]
+        chart_values = [float(item['total'] or 0) for item in category_net]
 
-    top_income = (
-        base_qs.filter(type='income')
-        .values('category__name')
-        .annotate(total=Sum('value'))
-        .order_by('-total')[:5]
-    )
-    top_expense = (
-        base_qs.filter(type='expense')
-        .values('category__name')
-        .annotate(total=Sum('value'))
-        .order_by('-total')[:5]
-    )
+        top_income = list(
+            base_qs.filter(type='income')
+            .values('category__name')
+            .annotate(total=Sum('value'))
+            .order_by('-total')[:5]
+        )
+        top_expense = list(
+            base_qs.filter(type='expense')
+            .values('category__name')
+            .annotate(total=Sum('value'))
+            .order_by('-total')[:5]
+        )
+        cache.set(
+            dash_cache_key,
+            {
+                'period_has_data': period_has_data,
+                'income_total': income_total,
+                'expense_total': expense_total,
+                'tx_count_period': tx_count_period,
+                'chart_labels': chart_labels,
+                'chart_values': chart_values,
+                'top_income': top_income,
+                'top_expense': top_expense,
+            },
+            60,
+        )
     quick_ranges = [
         ('week', 'Ultima semana'),
         ('month', 'Ultimo mes'),
@@ -799,23 +834,23 @@ def dashboard(request):
     })
     if can_finance:
         onboarding_items.append({
-            'label': 'Criar primeira categoria',
+            'label': 'Criar categoria',
             'done': category_count > 0,
             'url': reverse('tracker:categories_list'),
         })
         onboarding_items.append({
-            'label': 'Lan\u00e7ar primeira transa\u00e7\u00e3o',
+            'label': 'Primeira transa\u00e7\u00e3o',
             'done': total_transactions > 0,
             'url': reverse('tracker:transaction_create'),
         })
         onboarding_items.append({
-            'label': 'Importar extrato CSV/PDF (opcional)',
+            'label': 'Importar CSV/PDF (opcional)',
             'done': total_transactions >= 5,
             'url': reverse('tracker:transaction_import'),
             'optional': True,
         })
         onboarding_items.append({
-            'label': 'Definir orcamento por categoria',
+            'label': 'Definir or\u00e7amento',
             'done': budget_count > 0,
             'url': reverse('tracker:category_budget_create'),
         })
@@ -825,25 +860,25 @@ def dashboard(request):
             'url': reverse('tracker:balance_goal_create'),
         })
     onboarding_items.append({
-        'label': 'Criar primeira tarefa',
+        'label': 'Criar tarefa',
         'done': tasks_total > 0,
         'url': reverse('tracker:task_create'),
     })
     onboarding_items.append({
-        'label': 'Concluir uma tarefa',
+        'label': 'Concluir tarefa',
         'done': tasks_done > 0,
         'url': reverse('tracker:tasks_list'),
     })
     if not (profile and profile.is_guest):
         onboarding_items.append({
-            'label': 'Conversar com o agente de IA',
+            'label': 'Usar agente de IA',
             'done': ai_message_count > 0,
             'url': reverse('assistant:chat'),
         })
     if workspace and (request.user.is_superuser or workspace.owner_id == request.user.id):
         has_members = WorkspaceMembership.objects.filter(workspace=workspace).exclude(role='owner').exists()
         onboarding_items.append({
-            'label': 'Convidar membro para seu workspace (opcional)',
+            'label': 'Convidar membro (opcional)',
             'done': has_members,
             'url': reverse('tracker:workspace_invite', args=[workspace.slug]),
             'optional': True,
@@ -1249,17 +1284,26 @@ def _parse_statement_rows(text: str, categories_qs):
         delimiter = ','
 
     try:
-        lines = list(csv.reader(io.StringIO(text, newline=''), delimiter=delimiter))
+        reader = csv.reader(io.StringIO(text, newline=''), delimiter=delimiter)
+        header = next(reader, None)
     except csv.Error:
+        header = None
+        reader = None
+    if not header:
         lines = [
             row
             for row in (line.split(delimiter) for line in text.splitlines())
             if any(cell.strip() for cell in row)
         ]
-    if not lines:
+        if not lines:
+            return []
+        header = lines[0]
+        reader = iter(lines[1:])
+
+    if not header:
         return []
 
-    header = [c.strip().lower() for c in lines[0]]
+    header = [c.strip().lower() for c in header]
     has_keywords = any(k in header for k in ('description', 'descrição', 'descrição', 'valor', 'value', 'data', 'date'))
 
     # Se tiver header, usa DictReader normalmente
@@ -1271,9 +1315,9 @@ def _parse_statement_rows(text: str, categories_qs):
             'tipo': 'type', 'type': 'type',
             'categoria': 'category', 'category': 'category',
         }
-        reader = csv.DictReader(io.StringIO(text, newline=''), delimiter=delimiter)
+        dict_reader = csv.DictReader(io.StringIO(text, newline=''), delimiter=delimiter)
         mapped_rows = []
-        for row in reader:
+        for row in dict_reader:
             mapped = {}
             for key, val in row.items():
                 if key is None:
@@ -1286,7 +1330,9 @@ def _parse_statement_rows(text: str, categories_qs):
 
     # Sem header: assume colunas [datahora, descrição, valor, tipo?, categoria?]
     data_rows = []
-    for row in lines:
+    # Sem header: assume colunas [datahora, descrição, valor, tipo?, categoria?]
+    data_rows = []
+    for row in ([header] + list(reader)):
         if len(row) < 2:
             continue
         raw_date = (row[0] or '').strip()
@@ -1775,20 +1821,39 @@ def tasks_bulk_update(request):
         if membership and not membership.can_edit_tasks:
             messages.error(request, 'Voc\u00ea n\u00e3o tem permiss\u00e3o para editar tarefas neste workspace.')
             return redirect('tracker:tasks_list')
+    select_all = request.POST.get('select_all') == '1'
     ids_raw = (request.POST.get('ids') or '').strip()
     ids = [int(val) for val in ids_raw.split(',') if val.isdigit()]
-    if not ids:
+    if not select_all and not ids:
         messages.warning(request, 'Selecione ao menos uma tarefa.')
         return redirect('tracker:tasks_list')
     form = TaskBulkUpdateForm(request.POST, workspace=workspace)
     if not form.is_valid():
-        messages.error(request, 'N\u00e3o foi poss\u00edvel aplicar as altera\u00e7\u00f5es.')
+        messages.error(request, 'Não foi possível aplicar as alterações.')
         return redirect('tracker:tasks_list')
-    qs = Task.objects.filter(id__in=ids)
-    if workspace:
-        qs = qs.filter(workspace=workspace)
-    elif not request.user.is_superuser:
-        qs = qs.none()
+    if select_all:
+        qs = _tasks_queryset(request, workspace)
+        search = (request.POST.get('q') or '').strip()
+        status = request.POST.get('status') or ''
+        category = (request.POST.get('category') or '').strip()
+        start = request.POST.get('start') or ''
+        end = request.POST.get('end') or ''
+        if search:
+            qs = qs.filter(title__icontains=search)
+        if status in ('ongoing', 'done'):
+            qs = qs.filter(status=status)
+        if category:
+            qs = qs.filter(category__iexact=category)
+        if start:
+            qs = qs.filter(due_date__gte=start)
+        if end:
+            qs = qs.filter(due_date__lte=end)
+    else:
+        qs = Task.objects.filter(id__in=ids)
+        if workspace:
+            qs = qs.filter(workspace=workspace)
+        elif not request.user.is_superuser:
+            qs = qs.none()
     updates = {}
     responsible_user = form.cleaned_data.get('responsible_user')
     category = (form.cleaned_data.get('category') or '').strip()
@@ -2408,6 +2473,15 @@ def chart_data(request):
     if not start_date or not end_date:
         start_date, end_date = range_from_period('month')
 
+    cache_key = (
+        f"chart:{request.user.id}:{workspace.id if workspace else 'global'}:"
+        f"{start_date.isoformat()}:{end_date.isoformat()}:{period}:"
+        f"{type_filter}:{selected_only}:{category_id}:{responsible_id}"
+    )
+    cached_payload = cache.get(cache_key)
+    if cached_payload:
+        return JsonResponse(cached_payload)
+
     can_finance = _user_can_view_finance(request, workspace)
 
     qs_all = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user) if can_finance else Transaction.objects.none()
@@ -2457,6 +2531,8 @@ def chart_data(request):
     colors = []
     for idx, cat_id in enumerate(category_ids):
         colors.append(color_map.get(cat_id, fallback_colors[idx % len(fallback_colors)]))
+    if category_id.isdigit() and not active_category_color and colors:
+        active_category_color = colors[0]
 
     def build_pie(qs_subset):
         data = (
@@ -2537,7 +2613,7 @@ def chart_data(request):
         running_values.append(running_total)
         cursor += datetime.timedelta(days=1)
 
-    return JsonResponse({
+    payload = {
         'labels': labels,
         'values': values,
         'colors': colors,
@@ -2564,7 +2640,9 @@ def chart_data(request):
         'expense_category_values': expense_category_values,
         'expense_category_colors': expense_category_colors,
         'expense_category_ids': expense_category_ids,
-    })
+    }
+    cache.set(cache_key, payload, 60)
+    return JsonResponse(payload)
 
 
 # -------- CSV exports --------
@@ -3289,6 +3367,8 @@ def profile_edit(request):
     form = ProfileForm(request.POST or None, instance=user)
     avatar_form = ProfileAvatarForm(request.POST or None, request.FILES or None, instance=profile)
     pref_form = NotificationPreferencesForm(request.POST or None, instance=profile, user=request.user)
+    wa_profile = WhatsAppProfile.objects.filter(user=user).first()
+    wa_form = WhatsAppProfileForm(request.POST or None, instance=wa_profile, user=user)
     quota = get_ai_quota(user)
     ai_since = timezone.now() - datetime.timedelta(days=int(quota.get("window_days") or 30))
     ai_totals = AiUsage.objects.filter(user=user, created_at__gte=ai_since).aggregate(
@@ -3305,12 +3385,17 @@ def profile_edit(request):
     if trial_expires_at:
         trial_remaining = (trial_expires_at.date() - timezone.localdate()).days
         trial_remaining = max(trial_remaining, 0)
-    if request.method == 'POST' and form.is_valid() and avatar_form.is_valid() and pref_form.is_valid():
+    if request.method == 'POST' and form.is_valid() and avatar_form.is_valid() and pref_form.is_valid() and wa_form.is_valid():
         form.save()
         avatar_form.save()
         pref_form.save()
+        if wa_form.cleaned_data.get("phone_number"):
+            wa_instance = wa_form.save(commit=False)
+            wa_instance.user = user
+            wa_instance.save()
         messages.success(request, 'Perfil atualizado.')
         return redirect('tracker:profile_edit')
+    agent_number = getattr(settings, "TWILIO_WHATSAPP_NUMBER", "").strip()
     return render(
         request,
         'tracker/profile_edit.html',
@@ -3318,6 +3403,7 @@ def profile_edit(request):
             'form': form,
             'avatar_form': avatar_form,
             'pref_form': pref_form,
+            'wa_form': wa_form,
             'show_admin_prefs': request.user.is_superuser,
             'profile': profile,
             'ai_usage': {
@@ -3334,6 +3420,7 @@ def profile_edit(request):
                 'expires_at': trial_expires_at,
                 'remaining': trial_remaining,
             },
+            'whatsapp_agent_number': agent_number,
         },
     )
 
@@ -3941,6 +4028,30 @@ def superuser_overview(request):
         .order_by('-tokens')[:5]
     )
 
+    ai_limit_alerts = []
+    ai_limits = getattr(settings, "AI_PLAN_TOKEN_LIMITS", {"essential": 20000, "pro": 80000, "master": 200000})
+    profile_plans = {
+        profile.user_id: profile.plan
+        for profile in UserProfile.objects.filter(is_guest=False).only('user_id', 'plan')
+    }
+    usage_window = timezone.now() - datetime.timedelta(days=int(getattr(settings, "AI_USAGE_WINDOW_DAYS", 30)))
+    usage_by_user = (
+        AiUsage.objects.filter(created_at__gte=usage_window)
+        .values('user_id', 'user__username')
+        .annotate(tokens=Sum('total_tokens'))
+    )
+    for row in usage_by_user:
+        limit = int(ai_limits.get(profile_plans.get(row['user_id'], 'essential'), ai_limits.get('essential', 0)) or 0)
+        if limit <= 0:
+            continue
+        tokens = int(row['tokens'] or 0)
+        if tokens >= int(limit * 0.8):
+            ai_limit_alerts.append({
+                'username': row['user__username'],
+                'tokens': tokens,
+                'limit': limit,
+            })
+
     # Global finance stats
     income_total = tx_qs.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
     expense_total = tx_qs.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
@@ -4056,6 +4167,7 @@ def superuser_overview(request):
         'pending_subs': pending_subs,
         'webhook_errors_30': webhook_errors_30,
         'ai_top_users': ai_top_users,
+        'ai_limit_alerts': ai_limit_alerts,
     }
     return render(request, 'tracker/superuser_overview.html', context)
 

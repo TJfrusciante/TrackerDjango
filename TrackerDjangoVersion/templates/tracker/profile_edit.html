@@ -110,6 +110,47 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-12">
+                    <div class="glass-card p-3 bg-dark bg-opacity-10">
+                        <h6 class="fw-bold mb-2">Agente do WhatsApp</h6>
+                        <p class="text-secondary small mb-3">
+                            Informe o seu n&uacute;mero (quem envia mensagens). O agente do iTracker &eacute; um n&uacute;mero &uacute;nico do sistema.
+                            As mensagens ficam isoladas por workspace.
+                        </p>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label small" for="{{ wa_form.phone_number.id_for_label }}">
+                                    {{ wa_form.phone_number.label }}
+                                </label>
+                                {{ wa_form.phone_number }}
+                                {{ wa_form.phone_number.errors }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small" for="{{ wa_form.workspace.id_for_label }}">
+                                    {{ wa_form.workspace.label }}
+                                </label>
+                                {{ wa_form.workspace }}
+                                {{ wa_form.workspace.errors }}
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            {{ wa_form.is_active }}
+                            <label class="form-check-label" for="{{ wa_form.is_active.id_for_label }}">
+                                {{ wa_form.is_active.label }}
+                            </label>
+                        </div>
+                        <div class="alert alert-info small mt-3 mb-0">
+                            {% if whatsapp_agent_number %}
+                                Envie mensagens para <strong>{{ whatsapp_agent_number }}</strong>. Esse &eacute; o n&uacute;mero oficial do iTracker. Seu n&uacute;mero acima &eacute; quem envia as mensagens.
+                            {% else %}
+                                Envie mensagens para o n&uacute;mero oficial do iTracker (definido pelo admin). Seu n&uacute;mero acima &eacute; quem envia as mensagens.
+                            {% endif %}
+                        </div>
+                        {% if wa_form.non_field_errors %}
+                            <div class="text-danger small mt-2">{{ wa_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
                 {% if show_admin_prefs %}
                 <div class="col-12">
                     <div class="glass-card p-3 border border-warning border-opacity-25">

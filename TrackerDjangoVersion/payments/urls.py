@@ -10,4 +10,5 @@ urlpatterns = [
     path('falha/', views.subscription_failure, name='subscription_failure'),
     path('pendente/', views.subscription_pending, name='subscription_pending'),
     path('webhook/', views.mp_webhook, name='mp_webhook'),
+    path('webhook/<int:pk>/reprocess/', views.mp_webhook_reprocess, name='mp_webhook_reprocess'),
 ]

@@ -360,6 +360,19 @@ if SENTRY_DSN:
 # WhatsApp Finance (Twilio)
 # ------------------------------------------------------------------------------
 
+# WhatsApp Cloud API (Meta)
+META_WA_BASE_URL = env("META_WA_BASE_URL", "https://graph.facebook.com")
+META_WA_API_VERSION = env("META_WA_API_VERSION", "v19.0")
+META_WA_ACCESS_TOKEN = env("META_WA_ACCESS_TOKEN", "")
+META_WA_WABA_ID = env("META_WA_WABA_ID", "")
+META_WA_PHONE_NUMBER_ID = env("META_WA_PHONE_NUMBER_ID", "")
+META_WA_VERIFY_TOKEN = env("META_WA_VERIFY_TOKEN", "")
+META_WA_APP_SECRET = env("META_WA_APP_SECRET", "")
+META_WA_VALIDATE_SIGNATURE = env_bool("META_WA_VALIDATE_SIGNATURE", True)
+META_WA_FETCH_MEDIA = env_bool("META_WA_FETCH_MEDIA", True)
+META_WA_DISPLAY_NUMBER = env("META_WA_DISPLAY_NUMBER", "")
+
+# Twilio (legado)
 TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", "")
 TWILIO_WHATSAPP_NUMBER = env("TWILIO_WHATSAPP_NUMBER", "")

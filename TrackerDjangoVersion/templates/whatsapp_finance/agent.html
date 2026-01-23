@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}WhatsApp | iTracker{% endblock %}
+
+{% block content %}
+<div class="row gy-4">
+    <div class="col-lg-7">
+        <div class="glass-card p-4 mb-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                <div>
+                    <h4 class="mb-1">ChatAgent do WhatsApp</h4>
+                    <p class="text-secondary mb-0">Lance transa&ccedil;&otilde;es e consulte resumos direto do seu WhatsApp.</p>
+                </div>
+                <span class="badge {% if profile and profile.is_active %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}">
+                    {% if profile and profile.is_active %}Ativo{% else %}N&atilde;o configurado{% endif %}
+                </span>
+            </div>
+            {% if user.is_superuser %}
+                <div class="d-flex justify-content-end mb-3">
+                    <a class="btn btn-outline-light btn-sm" href="{% url 'admin:whatsapp_finance_whatsappprofile_changelist' %}">
+                        <i class="fa-solid fa-user-gear me-1"></i>Gerenciar WhatsApp
+                    </a>
+                </div>
+            {% endif %}
+            {% if profile %}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="glass-card p-3 h-100">
+                            <p class="text-secondary small mb-1">Telefone conectado</p>
+                            <div class="fw-semibold">{{ profile.phone_number }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="glass-card p-3 h-100">
+                            <p class="text-secondary small mb-1">Workspace</p>
+                            <div class="fw-semibold">{{ profile.workspace.name }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="glass-card p-3 h-100">
+                            <p class="text-secondary small mb-1">&Uacute;ltima intera&ccedil;&atilde;o</p>
+                            <div class="fw-semibold">
+                                {% if profile.last_seen_at %}
+                                    {{ profile.last_seen_at|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    Sem registros
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info small mt-3 mb-0">
+                    Envie mensagens para o n&uacute;mero oficial do iTracker. Seu n&uacute;mero cadastrado &eacute; o que autoriza o envio e aponta o workspace.
+                </div>
+            {% else %}
+                <div class="alert alert-warning mb-0">
+                    Nenhum WhatsApp cadastrado. Cadastre seu n&uacute;mero no Perfil para ativar o ChatAgent.
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="glass-card p-4">
+            <h5 class="mb-3">Como usar</h5>
+            <div class="vstack gap-3">
+                <div class="glass-card p-3">
+                    <div class="fw-semibold mb-1">Lance uma transa&ccedil;&atilde;o por texto</div>
+                    <div class="text-secondary">Ex.: <span class="text-light">Gastei 120 no mercado dia 10/01</span></div>
+                </div>
+                <div class="glass-card p-3">
+                    <div class="fw-semibold mb-1">Envie um comprovante</div>
+                    <div class="text-secondary">Fotos ou &aacute;udios s&atilde;o convertidos em lan&ccedil;amento automaticamente.</div>
+                </div>
+                <div class="glass-card p-3">
+                    <div class="fw-semibold mb-1">Pe&ccedil;a resumos r&aacute;pidos</div>
+                    <div class="text-secondary">Use comandos como <span class="text-light">/resumo</span> e <span class="text-light">/extrato 01/01/2026 31/01/2026</span>.</div>
+                </div>
+                <div class="glass-card p-3">
+                    <div class="fw-semibold mb-1">Crie tarefas</div>
+                    <div class="text-secondary">Ex.: <span class="text-light">Tarefa revisar contrato dia 20/01/2026 etapa: validar prazo; etapa: assinar</span>.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="glass-card p-4 mb-4">
+            <h5 class="mb-3">Comandos r&aacute;pidos</h5>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge bg-primary-subtle text-primary">/resumo</span>
+                <span class="badge bg-primary-subtle text-primary">/categorias</span>
+                <span class="badge bg-primary-subtle text-primary">/extrato 01/01/2026 31/01/2026</span>
+            </div>
+        </div>
+        <div class="glass-card p-4">
+            <h5 class="mb-3">&Uacute;ltimas mensagens</h5>
+            {% if recent_messages %}
+                <div class="vstack gap-3">
+                    {% for msg in recent_messages %}
+                    <div class="glass-card p-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="badge {% if msg.direction == 'in' %}bg-info-subtle text-info{% else %}bg-success-subtle text-success{% endif %}">
+                                {% if msg.direction == 'in' %}Entrada{% else %}Resposta{% endif %}
+                            </span>
+                            <span class="text-secondary small">{{ msg.created_at|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <div class="mt-2 text-secondary">{{ msg.body|default:"(sem conte&uacute;do)" }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-secondary">Nenhuma mensagem registrada ainda.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

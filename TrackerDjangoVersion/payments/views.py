@@ -5,9 +5,9 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -278,6 +278,72 @@ def subscription_pending(request):
     return render(request, 'payments/pending.html')
 
 
+def _apply_preapproval_data(data, event: MpWebhookEvent | None = None):
+    collector_expected = (getattr(settings, 'MP_COLLECTOR_ID', '') or '').strip()
+    app_expected = (getattr(settings, 'MP_APP_ID', '') or '').strip()
+    if collector_expected and str(data.get('collector_id', '')) != collector_expected:
+        if event:
+            event.status = 'ignored'
+            event.processed_at = timezone.now()
+            event.save(update_fields=['status', 'processed_at'])
+        return None
+    if app_expected and str(data.get('application_id', '')) != app_expected:
+        if event:
+            event.status = 'ignored'
+            event.processed_at = timezone.now()
+            event.save(update_fields=['status', 'processed_at'])
+        return None
+    fields = extract_preapproval_fields(data)
+    preapproval_id = fields['preapproval_id']
+    sub = MpSubscription.objects.filter(preapproval_id=preapproval_id).first()
+    if not sub:
+        ext_ref = (fields.get('external_reference') or '').strip()
+        if ext_ref:
+            user = User.objects.filter(id=ext_ref).first()
+            if user:
+                sub, _ = MpSubscription.objects.get_or_create(user=user)
+                sub.preapproval_id = preapproval_id
+                sub.save(update_fields=['preapproval_id', 'updated_at'])
+    if not sub:
+        if event:
+            event.status = 'ignored'
+            event.processed_at = timezone.now()
+            event.save(update_fields=['status', 'processed_at'])
+        return None
+    sub.payer_email = fields['payer_email']
+    sub.reason = fields['reason']
+    sub.auto_recurring = fields['auto_recurring']
+    sub.last_payment_status = fields['last_payment_status']
+    sub.last_event_at = timezone.now()
+    next_payment_at = _parse_datetime(fields['next_payment_at'])
+    plan_cycle = sub.plan_cycle
+    auto_recurring = fields.get('auto_recurring') or {}
+    if auto_recurring.get('frequency_type') == 'months':
+        try:
+            freq = int(auto_recurring.get('frequency') or 0)
+        except (TypeError, ValueError):
+            freq = 0
+        if freq >= 12:
+            plan_cycle = 'annual'
+    _apply_subscription_to_profile(
+        sub.user,
+        sub,
+        plan_cycle or 'monthly',
+        sub.plan_tier or getattr(getattr(sub.user, 'profile', None), 'plan', 'essential'),
+        fields['status'],
+        next_payment_at,
+        sub.guest_limit,
+    )
+    sub.status = fields['status']
+    sub.next_payment_at = next_payment_at
+    sub.save(update_fields=['payer_email', 'reason', 'auto_recurring', 'last_payment_status', 'last_event_at', 'status', 'next_payment_at', 'updated_at'])
+    if event:
+        event.status = 'processed'
+        event.processed_at = timezone.now()
+        event.save(update_fields=['status', 'processed_at'])
+    return sub
+
+
 @csrf_exempt
 def mp_webhook(request):
     if request.method != 'POST':
@@ -314,54 +380,7 @@ def mp_webhook(request):
 
     try:
         data = fetch_preapproval(str(mp_id))
-        collector_expected = (getattr(settings, 'MP_COLLECTOR_ID', '') or '').strip()
-        app_expected = (getattr(settings, 'MP_APP_ID', '') or '').strip()
-        if collector_expected and str(data.get('collector_id', '')) != collector_expected:
-            event.status = 'ignored'
-            event.processed_at = timezone.now()
-            event.save(update_fields=['status', 'processed_at'])
-            return JsonResponse({'ok': True})
-        if app_expected and str(data.get('application_id', '')) != app_expected:
-            event.status = 'ignored'
-            event.processed_at = timezone.now()
-            event.save(update_fields=['status', 'processed_at'])
-            return JsonResponse({'ok': True})
-        fields = extract_preapproval_fields(data)
-        preapproval_id = fields['preapproval_id']
-        sub = MpSubscription.objects.filter(preapproval_id=preapproval_id).first()
-        if not sub:
-            ext_ref = (fields.get('external_reference') or '').strip()
-            if ext_ref:
-                user = User.objects.filter(id=ext_ref).first()
-                if user:
-                    sub, _ = MpSubscription.objects.get_or_create(user=user)
-                    sub.preapproval_id = preapproval_id
-                    sub.save(update_fields=['preapproval_id', 'updated_at'])
-        if not sub:
-            event.status = 'ignored'
-            event.processed_at = timezone.now()
-            event.save(update_fields=['status', 'processed_at'])
-            return JsonResponse({'ok': True})
-        if sub:
-            sub.payer_email = fields['payer_email']
-            sub.reason = fields['reason']
-            sub.auto_recurring = fields['auto_recurring']
-            sub.last_payment_status = fields['last_payment_status']
-            sub.last_event_at = timezone.now()
-            next_payment_at = _parse_datetime(fields['next_payment_at'])
-            plan_cycle = sub.plan_cycle
-            auto_recurring = fields.get('auto_recurring') or {}
-            if auto_recurring.get('frequency_type') == 'months':
-                try:
-                    freq = int(auto_recurring.get('frequency') or 0)
-                except (TypeError, ValueError):
-                    freq = 0
-                if freq >= 12:
-                    plan_cycle = 'annual'
-                elif freq >= 1:
-                    plan_cycle = 'monthly'
-            _apply_subscription_to_profile(sub.user, sub, plan_cycle, sub.plan_tier or getattr(getattr(sub.user, 'profile', None), 'plan', 'essential'), fields['status'], next_payment_at, sub.guest_limit)
-        event.status = 'processed'
+        _apply_preapproval_data(data, event)
     except Exception as exc:
         event.status = 'error'
         if isinstance(event.payload, dict):
@@ -372,5 +391,24 @@ def mp_webhook(request):
         update_fields.append('payload')
     event.save(update_fields=update_fields)
     return JsonResponse({'ok': True})
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def mp_webhook_reprocess(request, pk):
+    event = get_object_or_404(MpWebhookEvent, pk=pk)
+    if not event.mp_id:
+        messages.error(request, 'Webhook sem ID para reprocessar.')
+        return redirect('tracker:superuser_overview')
+    try:
+        data = fetch_preapproval(event.mp_id)
+        _apply_preapproval_data(data, event)
+        messages.success(request, 'Webhook reprocessado.')
+    except Exception as exc:
+        event.status = 'error'
+        event.processed_at = timezone.now()
+        event.save(update_fields=['status', 'processed_at'])
+        messages.error(request, f'Falha ao reprocessar: {exc}')
+    return redirect('tracker:superuser_overview')
 
 # Create your views here.

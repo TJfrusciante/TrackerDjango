@@ -206,6 +206,19 @@
                     <li class="list-group-item text-secondary">Sem consumo de IA.</li>
                 {% endfor %}
             </ul>
+            {% if ai_limit_alerts %}
+                <div class="mt-3">
+                    <p class="text-secondary small mb-2">Alertas de limite (80%)</p>
+                    <ul class="list-group list-group-flush">
+                        {% for item in ai_limit_alerts %}
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>{{ item.username }}</span>
+                                <span class="text-warning">{{ item.tokens }} / {{ item.limit }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -449,6 +462,7 @@
                             <th>T&oacute;pico</th>
                             <th>ID</th>
                             <th>Status</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -458,10 +472,18 @@
                                 <td>{{ event.topic|default:"-" }}</td>
                                 <td class="small text-secondary">{{ event.mp_id|default:"-"|slice:":10" }}</td>
                                 <td>{{ event.status|default:"-" }}</td>
+                                <td class="text-end">
+                                    {% if event.status == 'error' %}
+                                        <form method="post" action="{% url 'payments:mp_webhook_reprocess' event.id %}">
+                                            {% csrf_token %}
+                                            <button class="btn btn-sm btn-outline-warning" type="submit">Reprocessar</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="4" class="text-secondary">Sem webhooks.</td>
+                                <td colspan="5" class="text-secondary">Sem webhooks.</td>
                             </tr>
                         {% endfor %}
                     </tbody>

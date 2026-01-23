@@ -123,6 +123,23 @@
     (function() {
         const form = document.getElementById('taskFilters');
         if (!form) return;
+        const collapseEl = document.getElementById('taskFiltersCollapse');
+        const collapseToggle = document.querySelector('[data-bs-target="#taskFiltersCollapse"]');
+        const collapseKey = `itracker:filters:tasks:{{ user.id }}`;
+        if (collapseEl && window.bootstrap && bootstrap.Collapse) {
+            const collapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+            const savedState = localStorage.getItem(collapseKey);
+            if (savedState === 'collapsed') {
+                collapse.hide();
+                if (collapseToggle) collapseToggle.setAttribute('aria-expanded', 'false');
+            }
+            collapseEl.addEventListener('shown.bs.collapse', () => {
+                localStorage.setItem(collapseKey, 'expanded');
+            });
+            collapseEl.addEventListener('hidden.bs.collapse', () => {
+                localStorage.setItem(collapseKey, 'collapsed');
+            });
+        }
         const startDisplay = document.getElementById('taskStartDisplay');
         const endDisplay = document.getElementById('taskEndDisplay');
         const startHidden = document.getElementById('taskStartHidden');
@@ -165,9 +182,15 @@
 
 <div class="row g-3 mb-4">
     <div class="col-12">
-        <form id="taskBulkForm" method="post" action="{% url 'tracker:tasks_bulk_update' %}" class="glass-card p-3 bulk-actions d-none">
+        <form id="taskBulkForm" method="post" action="{% url 'tracker:tasks_bulk_update' %}" class="glass-card p-3 bulk-actions d-none" data-total="{{ tasks_total }}">
             {% csrf_token %}
             <input type="hidden" name="ids" id="taskBulkIds">
+            <input type="hidden" name="select_all" id="taskSelectAllFlag" value="0">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="status" value="{{ filters.status }}">
+            <input type="hidden" name="category" value="{{ filters.category }}">
+            <input type="hidden" name="start" value="{{ filters.start }}">
+            <input type="hidden" name="end" value="{{ filters.end }}">
             <div class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label class="form-label">A&ccedil;&atilde;o em massa</label>
@@ -210,12 +233,22 @@
 </div>
 
 <div class="glass-card p-4">
+    <div id="taskTableSkeleton" class="skeleton table-skeleton mb-3"></div>
     <div class="table-responsive">
         <table id="task-table" class="table table-borderless table-striped table-sticky align-middle mb-0">
             <thead>
                 <tr class="text-secondary">
-                    <th class="text-center" style="width: 40px;">
-                        <input class="form-check-input" type="checkbox" id="taskSelectAll" aria-label="Selecionar todas">
+                    <th class="text-center" style="width: 120px;">
+                        <div class="d-flex flex-column align-items-start gap-1 mx-auto">
+                            <div class="form-check d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="checkbox" id="taskSelectAll" aria-label="Selecionar todas as tarefas">
+                                <label class="form-check-label small text-secondary" for="taskSelectAll">Todas</label>
+                            </div>
+                            <div class="form-check d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="checkbox" id="taskSelectPage" aria-label="Selecionar tarefas desta p&aacute;gina">
+                                <label class="form-check-label small text-secondary" for="taskSelectPage">P&aacute;gina</label>
+                            </div>
+                        </div>
                     </th>
                     <th>Tarefa</th>
                     <th>Categoria</th>
@@ -361,21 +394,34 @@
 <script>
     (function() {
         const selectAll = document.getElementById('taskSelectAll');
+        const selectPage = document.getElementById('taskSelectPage');
         const checkboxes = Array.from(document.querySelectorAll('.task-select'));
         const hiddenInput = document.getElementById('taskBulkIds');
+        const selectAllFlag = document.getElementById('taskSelectAllFlag');
         const countEl = document.getElementById('taskSelectedCount');
         const form = document.getElementById('taskBulkForm');
         const applyBtn = form ? form.querySelector('button[type="submit"]') : null;
+        const totalCount = form ? parseInt(form.dataset.total || '0', 10) : 0;
         const update = () => {
             const ids = checkboxes.filter(cb => cb.checked).map(cb => cb.value);
-            if (hiddenInput) hiddenInput.value = ids.join(',');
-            if (countEl) countEl.textContent = ids.length;
-            if (applyBtn) applyBtn.disabled = ids.length === 0;
-            if (form) form.classList.toggle('d-none', ids.length === 0);
+            const allSelected = selectAllFlag && selectAllFlag.value === '1';
+            if (hiddenInput) hiddenInput.value = allSelected ? '__all__' : ids.join(',');
+            const count = allSelected ? totalCount : ids.length;
+            if (countEl) countEl.textContent = count;
+            if (applyBtn) applyBtn.disabled = count === 0;
+            if (form) form.classList.toggle('d-none', count === 0);
+        };
+        const setGlobal = (checked) => {
+            if (selectAllFlag) selectAllFlag.value = checked ? '1' : '0';
+            if (checked) {
+                checkboxes.forEach(cb => cb.checked = true);
+                if (selectPage) selectPage.checked = true;
+            }
         };
         if (form) {
             form.addEventListener('submit', (ev) => {
-                if (!hiddenInput || !hiddenInput.value) {
+                const allSelected = selectAllFlag && selectAllFlag.value === '1';
+                if (!allSelected && (!hiddenInput || !hiddenInput.value)) {
                     ev.preventDefault();
                     alert('Selecione ao menos uma tarefa para aplicar a a\u00e7\u00e3o.');
                 }
@@ -383,15 +429,27 @@
         }
         if (selectAll) {
             selectAll.addEventListener('change', () => {
-                checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                setGlobal(selectAll.checked);
+                update();
+            });
+        }
+        if (selectPage) {
+            selectPage.addEventListener('change', () => {
+                if (selectAllFlag) selectAllFlag.value = '0';
+                if (selectAll) selectAll.checked = false;
+                checkboxes.forEach(cb => cb.checked = selectPage.checked);
                 update();
             });
         }
         checkboxes.forEach(cb => cb.addEventListener('change', () => {
-            if (selectAll) selectAll.checked = checkboxes.every(item => item.checked);
+            if (selectAllFlag) selectAllFlag.value = '0';
+            if (selectAll) selectAll.checked = false;
+            if (selectPage) selectPage.checked = checkboxes.every(item => item.checked);
             update();
         }));
         update();
+        const skeleton = document.getElementById('taskTableSkeleton');
+        if (skeleton) skeleton.classList.add('d-none');
     })();
 </script>
 {% endblock %}

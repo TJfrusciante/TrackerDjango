@@ -129,6 +129,23 @@
     (function() {
         const form = document.getElementById('txFilters');
         if (!form) return;
+        const collapseEl = document.getElementById('txFiltersCollapse');
+        const collapseToggle = document.querySelector('[data-bs-target="#txFiltersCollapse"]');
+        const collapseKey = `itracker:filters:tx:{{ user.id }}`;
+        if (collapseEl && window.bootstrap && bootstrap.Collapse) {
+            const collapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+            const savedState = localStorage.getItem(collapseKey);
+            if (savedState === 'collapsed') {
+                collapse.hide();
+                if (collapseToggle) collapseToggle.setAttribute('aria-expanded', 'false');
+            }
+            collapseEl.addEventListener('shown.bs.collapse', () => {
+                localStorage.setItem(collapseKey, 'expanded');
+            });
+            collapseEl.addEventListener('hidden.bs.collapse', () => {
+                localStorage.setItem(collapseKey, 'collapsed');
+            });
+        }
         const startDisplay = document.getElementById('txStartDisplay');
         const endDisplay = document.getElementById('txEndDisplay');
         const startHidden = document.getElementById('txStartHidden');
@@ -232,18 +249,21 @@
 </div>
 
 <div class="glass-card p-4">
+    <div id="txTableSkeleton" class="skeleton table-skeleton mb-3"></div>
     <div class="table-responsive">
         <table id="tx-table" class="table table-borderless table-striped table-sticky align-middle mb-0">
             <thead>
                 <tr class="text-secondary">
-                    <th class="text-center" style="width: 110px;">
-                        <div class="form-check d-flex align-items-center justify-content-center gap-2 mb-1">
-                            <input class="form-check-input" type="checkbox" id="txSelectAll" aria-label="Selecionar todas as transações">
-                            <label class="form-check-label small text-secondary" for="txSelectAll">Todas</label>
-                        </div>
-                        <div class="form-check d-flex align-items-center justify-content-center gap-2">
-                            <input class="form-check-input" type="checkbox" id="txSelectPage" aria-label="Selecionar transações desta página">
-                            <label class="form-check-label small text-secondary" for="txSelectPage">P&aacute;gina</label>
+                    <th class="text-center" style="width: 120px;">
+                        <div class="d-flex flex-column align-items-start gap-1 mx-auto">
+                            <div class="form-check d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="checkbox" id="txSelectAll" aria-label="Selecionar todas as transa&ccedil;&otilde;es">
+                                <label class="form-check-label small text-secondary" for="txSelectAll">Todas</label>
+                            </div>
+                            <div class="form-check d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="checkbox" id="txSelectPage" aria-label="Selecionar transa&ccedil;&otilde;es desta p&aacute;gina">
+                                <label class="form-check-label small text-secondary" for="txSelectPage">P&aacute;gina</label>
+                            </div>
                         </div>
                     </th>
                     <th>Descri&ccedil;&atilde;o</th>
@@ -401,6 +421,8 @@
             update();
         }));
         update();
+        const skeleton = document.getElementById('txTableSkeleton');
+        if (skeleton) skeleton.classList.add('d-none');
     })();
 </script>
 {% endblock %}
