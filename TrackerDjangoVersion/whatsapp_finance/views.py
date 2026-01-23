@@ -4,6 +4,7 @@ import re
 
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -11,6 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .media import ocr_image, transcribe_audio
 from .models import WhatsAppMessage, WhatsAppProfile
 from .services import process_incoming_text
+from .forms import WhatsAppProfileForm
 from .whatsapp import build_twiml, normalize_phone, validate_twilio_request
 
 
@@ -33,6 +35,25 @@ def agent(request):
             "recent_messages": list(recent_messages),
         },
     )
+
+
+@login_required
+def config(request):
+    profile = WhatsAppProfile.objects.filter(user=request.user).first()
+    form = WhatsAppProfileForm(request.POST or None, instance=profile, user=request.user)
+    if request.method == "POST" and form.is_valid():
+        if form.cleaned_data.get("phone_number"):
+            wa_instance = form.save(commit=False)
+            wa_instance.user = request.user
+            wa_instance.save()
+            messages.success(request, "WhatsApp configurado com sucesso.")
+            return render(
+                request,
+                "whatsapp_finance/config.html",
+                {"form": form, "profile": wa_instance, "saved": True},
+            )
+        messages.error(request, "Informe seu número do WhatsApp para ativar.")
+    return render(request, "whatsapp_finance/config.html", {"form": form, "profile": profile})
 
 
 @csrf_exempt

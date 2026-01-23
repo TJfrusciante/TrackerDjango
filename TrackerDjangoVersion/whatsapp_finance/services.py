@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import datetime as dt
+import json
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -12,6 +13,9 @@ from django.db import transaction as db_transaction
 from django.db.models import Sum, Q
 from django.utils import timezone
 
+from assistant.limits import get_ai_quota
+from assistant.models import AiUsage
+from assistant.services import llm_complete, estimate_costs
 from tracker.models import Category, Transaction, Task, TaskStep, WorkspaceMembership
 from .models import CategoryPreference, ParsedTransaction, WhatsAppMessage, WhatsAppProfile
 
@@ -176,7 +180,7 @@ def _clean_amount(raw: str) -> Decimal | None:
 def extract_amount(text: str) -> Decimal | None:
     if not text:
         return None
-    candidates = re.findall(r"(?:r\\$|rs|reais)?\\s*(-?\\d+(?:[\\.,]\\d{3})*(?:[\\.,]\\d{2})?)", text, flags=re.IGNORECASE)
+    candidates = re.findall(r"(?:r\$|rs|reais)?\s*(-?\d+(?:[\.,]\d{3})*(?:[\.,]\d{2})?)", text, flags=re.IGNORECASE)
     if not candidates:
         return None
     amounts = [_clean_amount(item) for item in candidates]
@@ -196,13 +200,13 @@ def extract_date(text: str) -> dt.date:
     if "amanha" in normalized:
         return now + dt.timedelta(days=1)
 
-    match = re.search(r"(\\d{2})/(\\d{2})/(\\d{4})", normalized)
+    match = re.search(r"(\d{2})/(\d{2})/(\d{4})", normalized)
     if match:
         return dt.date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
-    match = re.search(r"(\\d{4})-(\\d{2})-(\\d{2})", normalized)
+    match = re.search(r"(\d{4})-(\d{2})-(\d{2})", normalized)
     if match:
         return dt.date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
-    match = re.search(r"dia\\s+(\\d{1,2})", normalized)
+    match = re.search(r"dia\s+(\d{1,2})", normalized)
     if match:
         day = int(match.group(1))
         month = now.month
@@ -229,10 +233,10 @@ def infer_type(text: str) -> str:
 def extract_description(text: str) -> str:
     if not text:
         return ""
-    cleaned = re.sub(r"(r\\$|rs)\\s*\\d[\\d\\.,]+", "", text, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\\d{2}/\\d{2}/\\d{4}", "", cleaned)
-    cleaned = re.sub(r"\\d{4}-\\d{2}-\\d{2}", "", cleaned)
-    cleaned = re.sub(r"\\bhoje\\b|\\bontem\\b|\\bamanha\\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"(r\$|rs)\s*\d[\d\.,]+", "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\d{2}/\d{2}/\d{4}", "", cleaned)
+    cleaned = re.sub(r"\d{4}-\d{2}-\d{2}", "", cleaned)
+    cleaned = re.sub(r"\bhoje\b|\bontem\b|\bamanha\b", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\\s+", " ", cleaned).strip()
     return cleaned or text.strip()
 
@@ -240,7 +244,7 @@ def extract_description(text: str) -> str:
 def _extract_steps(text: str) -> tuple[str, list[str]]:
     if not text:
         return "", []
-    pattern = re.compile(r"(?:etapa|passo)\\s*\\d*\\s*[:\\-]", re.IGNORECASE)
+    pattern = re.compile(r"(?:etapa|passo)\s*\d*\s*[:\-]", re.IGNORECASE)
     parts = pattern.split(text)
     if len(parts) <= 1:
         return text, []
@@ -255,7 +259,7 @@ def _extract_steps(text: str) -> tuple[str, list[str]]:
 def _extract_task_category(text: str) -> str:
     if not text:
         return ""
-    match = re.search(r"categoria\\s+([^,;\\n]+)", text, flags=re.IGNORECASE)
+    match = re.search(r"categoria\s+([^,;\n]+)", text, flags=re.IGNORECASE)
     if not match:
         return ""
     return match.group(1).strip().title()
@@ -263,12 +267,12 @@ def _extract_task_category(text: str) -> str:
 
 def _clean_task_title(text: str) -> str:
     cleaned = text or ""
-    cleaned = re.sub(r"\\b(tarefa|task|lembrete|lembrar)\\b", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\\b(prioridade|prazo|data|ate|at\\u00e9)\\b", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"categoria\\s+[^,;\\n]+", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\\d{2}/\\d{2}/\\d{4}", "", cleaned)
-    cleaned = re.sub(r"\\d{4}-\\d{2}-\\d{2}", "", cleaned)
-    cleaned = re.sub(r"\\bhoje\\b|\\bontem\\b|\\bamanha\\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(tarefa|task|lembrete|lembrar)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(prioridade|prazo|data|ate)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"categoria\s+[^,;\n]+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\d{2}/\d{2}/\d{4}", "", cleaned)
+    cleaned = re.sub(r"\d{4}-\d{2}-\d{2}", "", cleaned)
+    cleaned = re.sub(r"\bhoje\b|\bontem\b|\bamanha\b", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\\s+", " ", cleaned).strip()
     return cleaned
 
@@ -362,6 +366,145 @@ def parse_text_to_result(user, workspace, text: str) -> ParsedResult | None:
         category_label=category_label,
         requires_confirmation=requires_confirmation,
     )
+
+
+def _record_ai_usage(user, workspace, usage, model_name: str | None) -> None:
+    if not usage:
+        return
+    total = int(usage.get("total_tokens") or 0)
+    prompt_tokens = int(usage.get("prompt_tokens") or 0)
+    completion_tokens = int(usage.get("completion_tokens") or 0)
+    if total <= 0 and prompt_tokens <= 0 and completion_tokens <= 0:
+        return
+    cost_usd, cost_brl = estimate_costs(usage)
+    AiUsage.objects.create(
+        user=user,
+        workspace=workspace,
+        feature="whatsapp",
+        model_name=model_name or "",
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total,
+        cost_usd=cost_usd,
+        cost_brl=cost_brl,
+    )
+
+
+def _extract_json_payload(text: str) -> dict | None:
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except Exception:
+            return None
+    return None
+
+
+def _parse_llm_date(value) -> dt.date | None:
+    if not value:
+        return None
+    if isinstance(value, dt.date):
+        return value
+    raw = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return dt.datetime.strptime(raw, fmt).date()
+        except Exception:
+            continue
+    return None
+
+
+def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None, ParsedTaskResult | None, str | None]:
+    quota = get_ai_quota(user)
+    if not quota.get("allowed", True):
+        return None, None, "Limite de IA atingido. Reescreva informando valor e data."
+    categories = list(Category.objects.filter(workspace=workspace).values_list("name", flat=True))
+    categories_label = ", ".join(categories[:30]) if categories else "nenhuma"
+    system_prompt = (
+        "Você extrai dados de uma mensagem do WhatsApp para o iTracker. "
+        "Use SOMENTE categorias da lista fornecida; se nenhuma servir, deixe category vazio. "
+        "Responda APENAS em JSON com as chaves: "
+        "intent (transaction|task|unknown), "
+        "description, amount, date (YYYY-MM-DD), type (income|expense), category, "
+        "confidence (0-1), needs_confirmation (true/false), "
+        "task_title, task_due_date (YYYY-MM-DD), task_steps (array), task_category."
+    )
+    user_prompt = (
+        f"Categorias disponíveis: {categories_label}\n"
+        f"Mensagem: {text}"
+    )
+    reply, usage, model_name = llm_complete(system_prompt, user_prompt)
+    _record_ai_usage(user, workspace, usage, model_name)
+    if not reply:
+        return None, None, "Nao consegui interpretar. Envie o valor e a data."
+    payload = _extract_json_payload(reply)
+    if not payload:
+        return None, None, "Nao consegui interpretar. Envie o valor e a data."
+
+    intent = (payload.get("intent") or "").lower().strip()
+    if intent == "task":
+        title = (payload.get("task_title") or "").strip()
+        if not title:
+            title = "Tarefa via WhatsApp"
+        due_date = _parse_llm_date(payload.get("task_due_date")) or extract_date(text)
+        steps = payload.get("task_steps") or []
+        if isinstance(steps, str):
+            steps = [s.strip() for s in steps.split(";") if s.strip()]
+        category = (payload.get("task_category") or "").strip().title()
+        return None, ParsedTaskResult(title=title, due_date=due_date, category=category, steps=steps), None
+
+    if intent in ("transaction", "unknown", ""):
+        raw_amount = payload.get("amount")
+        amount = None
+        if isinstance(raw_amount, (int, float, Decimal)):
+            amount = Decimal(str(raw_amount))
+        else:
+            amount = _clean_amount(str(raw_amount)) if raw_amount is not None else None
+        if amount is None:
+            return None, None, "Nao consegui identificar o valor. Envie novamente com o valor da transacao."
+        tx_type = (payload.get("type") or "").strip().lower()
+        if tx_type not in ("income", "expense"):
+            tx_type = infer_type(text)
+        tx_date = _parse_llm_date(payload.get("date")) or extract_date(text)
+        description = (payload.get("description") or "").strip() or extract_description(text)
+        category_name = (payload.get("category") or "").strip()
+        category = None
+        category_label = ""
+        if category_name:
+            category = _match_existing_category(workspace, category_name)
+            category_label = category.name if category else category_name
+        else:
+            category, category_label = suggest_category(user, workspace, text)
+        if not category:
+            category, category_label = suggest_category(user, workspace, text)
+        confidence = payload.get("confidence")
+        try:
+            confidence = float(confidence) if confidence is not None else 0.0
+        except Exception:
+            confidence = 0.0
+        needs_confirmation = confidence < 0.6
+        if not category:
+            return None, None, "Nao consegui identificar a categoria. Use uma das seguintes: " + ", ".join(categories[:8])
+        return (
+            ParsedResult(
+                description=description,
+                amount=abs(amount),
+                tx_type=tx_type,
+                tx_date=tx_date,
+                category=category,
+                category_label=category_label,
+                requires_confirmation=needs_confirmation,
+            ),
+            None,
+            None,
+        )
+    return None, None, "Nao consegui interpretar. Envie o valor e a data."
 
 
 def _format_currency(value: Decimal) -> str:
@@ -490,7 +633,7 @@ def handle_correction(user, workspace, text: str) -> str | None:
     normalized = normalize_text(text)
     if "corrige" not in normalized and "corrigir" not in normalized:
         return None
-    match = re.search(r"categoria\\s+(.+)$", normalized)
+    match = re.search(r"categoria\s+(.+)$", normalized)
     if not match:
         return "Informe a categoria para corrigir. Ex.: corrige ultimo lancamento para categoria Alimentacao."
     category_name = match.group(1).strip().title()
@@ -559,12 +702,12 @@ def _command_categories(workspace) -> str:
 
 def _parse_period(text: str) -> tuple[dt.date, dt.date] | None:
     normalized = normalize_text(text)
-    match = re.findall(r"(\\d{2})/(\\d{2})/(\\d{4})", normalized)
+    match = re.findall(r"(\d{2})/(\d{2})/(\d{4})", normalized)
     if len(match) >= 2:
         start = dt.date(int(match[0][2]), int(match[0][1]), int(match[0][0]))
         end = dt.date(int(match[1][2]), int(match[1][1]), int(match[1][0]))
         return start, end
-    match = re.findall(r"(\\d{4})-(\\d{2})-(\\d{2})", normalized)
+    match = re.findall(r"(\d{4})-(\d{2})-(\d{2})", normalized)
     if len(match) >= 2:
         start = dt.date(int(match[0][0]), int(match[0][1]), int(match[0][2]))
         end = dt.date(int(match[1][0]), int(match[1][1]), int(match[1][2]))
@@ -624,13 +767,22 @@ def process_incoming_text(profile: WhatsAppProfile, message: WhatsAppMessage, te
     task_result = parse_task_text(text)
     if task_result:
         if not _can_create_task(user, workspace):
-            return "Voc\\u00ea n\\u00e3o tem permiss\\u00e3o para criar tarefas neste workspace."
+        return "Voce nao tem permissao para criar tarefas neste workspace."
         task = _create_task_from_parsed(user, workspace, task_result)
         return build_task_message(task, len(task_result.steps))
 
     result = parse_text_to_result(user, workspace, text)
     if not result:
-        return "Nao consegui identificar o valor. Envie novamente com o valor da transacao."
+        llm_result, llm_task, llm_error = _llm_fallback_parse(user, workspace, text)
+        if llm_task:
+            if not _can_create_task(user, workspace):
+                return "Voce nao tem permissao para criar tarefas neste workspace."
+            task = _create_task_from_parsed(user, workspace, llm_task)
+            return build_task_message(task, len(llm_task.steps))
+        if llm_result:
+            result = llm_result
+        else:
+            return llm_error or "Nao consegui identificar o valor. Envie novamente com o valor da transacao."
 
     with db_transaction.atomic():
         parsed = ParsedTransaction.objects.create(

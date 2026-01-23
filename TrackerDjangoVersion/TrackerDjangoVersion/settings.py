@@ -131,24 +131,25 @@ WSGI_APPLICATION = 'TrackerDjangoVersion.wsgi.application'
 # DB_PASSWORD=...
 # DB_HOST=127.0.0.1
 # DB_PORT=5432
-#DB POSTGRESQL
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': env('DB_NAME_TRACKER', 'tracker'),
-#         'USER': env('DB_USER_TRACKER', 'postgres'),
-#         'PASSWORD': env('DB_PASSWORD_TRACKER', ''),
-#         'HOST': env('DB_HOST_TRACKER', 'localhost'),
-#         'PORT': env('DB_PORT_TRACKER', '5432'),
-#     }
-# }
-#DB SQLITE3
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DB_NAME = env("DB_NAME_TRACKER", "")
+if DB_NAME:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": DB_NAME,
+            "USER": env("DB_USER_TRACKER", "postgres"),
+            "PASSWORD": env("DB_PASSWORD_TRACKER", ""),
+            "HOST": env("DB_HOST_TRACKER", "localhost"),
+            "PORT": env("DB_PORT_TRACKER", "5432"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # ------------------------------------------------------------------------------
 # Password validation

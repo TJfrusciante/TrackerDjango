@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Configurar WhatsApp | iTracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="glass-card p-4 mb-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                <div>
+                    <h4 class="mb-1">Configurar WhatsApp</h4>
+                    <p class="text-secondary mb-0">Conecte seu número ao agente do iTracker para lançar transações e tarefas.</p>
+                </div>
+                {% if profile and profile.is_active %}
+                    <span class="badge bg-success-subtle text-success">Ativo</span>
+                {% else %}
+                    <span class="badge bg-warning-subtle text-warning">Não configurado</span>
+                {% endif %}
+            </div>
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-md-6">
+                    <label class="form-label small" for="{{ form.phone_number.id_for_label }}">
+                        {{ form.phone_number.label }}
+                    </label>
+                    {{ form.phone_number }}
+                    {{ form.phone_number.errors }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small" for="{{ form.workspace.id_for_label }}">
+                        {{ form.workspace.label }}
+                    </label>
+                    {{ form.workspace }}
+                    {{ form.workspace.errors }}
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                            {{ form.is_active.label }}
+                        </label>
+                    </div>
+                </div>
+                {% if form.non_field_errors %}
+                    <div class="col-12 text-danger small">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="col-12 d-flex gap-2">
+                    <a class="btn btn-outline-light" href="{% url 'whatsapp_finance:agent' %}">Voltar</a>
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+        <div class="glass-card p-4">
+            <h5 class="mb-3">Como funciona</h5>
+            <div class="vstack gap-3">
+                <div class="glass-card p-3">
+                    <div class="fw-semibold mb-1">1) Conecte seu número</div>
+                    <div class="text-secondary">Use o número que envia mensagens pelo WhatsApp.</div>
+                </div>
+                <div class="glass-card p-3">
+                    <div class="fw-semibold mb-1">2) Escolha o workspace</div>
+                    <div class="text-secondary">As mensagens serão lançadas apenas no workspace selecionado.</div>
+                </div>
+                <div class="glass-card p-3">
+                    <div class="fw-semibold mb-1">3) Ative o agente</div>
+                    <div class="text-secondary">Depois disso é só enviar mensagens para o número do iTracker.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
