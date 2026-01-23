@@ -21,6 +21,8 @@ from django.db import transaction as db_transaction
 from django.db.models import (
     Case,
     Count,
+    CharField,
+    DateTimeField,
     DecimalField,
     ExpressionWrapper,
     F,
@@ -684,6 +686,8 @@ def dashboard(request):
     end_param = request.GET.get('end')
     responsible_param = request.GET.get('responsible') or ''
 
+    start_date = None
+    end_date = None
     try:
         start_date = datetime.date.fromisoformat(start_param) if start_param else None
     except ValueError:
@@ -1082,6 +1086,26 @@ def transactions_bulk_update(request):
     new_date = form.cleaned_data.get('date')
     tx_type = form.cleaned_data.get('type')
     selected_action = form.cleaned_data.get('selected_action')
+    if request.POST.get('bulk_delete') == '1':
+        deleted_count = qs.count()
+        qs.delete()
+        messages.success(request, f'{deleted_count} transa\u00e7\u00f5es exclu\u00eddas.')
+        return redirect('tracker:transactions_list')
+    if request.POST.get('bulk_mark') == '1':
+        qs.update(selected=True)
+        messages.success(request, 'Transa\u00e7\u00f5es destacadas.')
+        return redirect('tracker:transactions_list')
+    if request.POST.get('bulk_convert') == '1':
+        qs.update(
+            type=Case(
+                When(type='income', then=Value('expense')),
+                When(type='expense', then=Value('income')),
+                default=Value('expense'),
+                output_field=CharField(),
+            )
+        )
+        messages.success(request, 'Transa\u00e7\u00f5es convertidas.')
+        return redirect('tracker:transactions_list')
     if category:
         updates['category'] = category
     if responsible:
@@ -1122,11 +1146,9 @@ def transaction_create(request):
             check_category_budgets(workspace)
             check_balance_goals(workspace)
         messages.success(request, 'Transação criada com sucesso.')
-        if request.POST.get('save_new'):
-            profile = getattr(request.user, "profile", None)
-        if profile and profile.is_guest:
+        profile = getattr(request.user, "profile", None)
+        if request.POST.get('save_new') or (profile and profile.is_guest):
             return redirect('tracker:transaction_create')
-
         return redirect('tracker:transactions_list')
     return render(request, 'tracker/transaction_form.html', {'form': form, 'is_edit': False})
 
@@ -1238,6 +1260,14 @@ def transaction_undo_delete(request):
     request.session.pop('undo_tx_expires', None)
     messages.success(request, 'Transa\u00e7\u00e3o restaurada.')
     return redirect('tracker:transactions_list')
+
+
+@login_required
+def transaction_undo_clear(request):
+    if request.method == 'POST':
+        request.session.pop('undo_tx', None)
+        request.session.pop('undo_tx_expires', None)
+    return JsonResponse({'ok': True})
 
 
 def transaction_toggle_selected(request, pk):
@@ -1861,6 +1891,34 @@ def tasks_bulk_update(request):
     category = (form.cleaned_data.get('category') or '').strip()
     due_date = form.cleaned_data.get('due_date')
     status = form.cleaned_data.get('status')
+    selected_action = form.cleaned_data.get('selected_action')
+    if request.POST.get('bulk_delete') == '1':
+        deleted_count = qs.count()
+        qs.delete()
+        messages.success(request, f'{deleted_count} tarefas exclu\u00eddas.')
+        return redirect('tracker:tasks_list')
+    if request.POST.get('bulk_mark') == '1':
+        qs.update(selected=True)
+        messages.success(request, 'Tarefas destacadas.')
+        return redirect('tracker:tasks_list')
+    if request.POST.get('bulk_convert') == '1':
+        now = timezone.now()
+        qs.update(
+            status=Case(
+                When(status='ongoing', then=Value('done')),
+                When(status='done', then=Value('ongoing')),
+                default=Value('ongoing'),
+                output_field=CharField(),
+            ),
+            completed_at=Case(
+                When(status='ongoing', then=Value(now)),
+                When(status='done', then=Value(None)),
+                default=Value(None),
+                output_field=DateTimeField(),
+            ),
+        )
+        messages.success(request, 'Tarefas convertidas.')
+        return redirect('tracker:tasks_list')
     if responsible_user:
         updates['responsible_user'] = responsible_user
     if category:
@@ -2267,6 +2325,14 @@ def task_undo_delete(request):
     return redirect('tracker:tasks_list')
 
 
+@login_required
+def task_undo_clear(request):
+    if request.method == 'POST':
+        request.session.pop('undo_task', None)
+        request.session.pop('undo_task_expires', None)
+    return JsonResponse({'ok': True})
+
+
 def task_toggle_status(request, pk):
     workspace = getattr(request, "workspace", None)
     qs = Task.objects.prefetch_related('steps')
@@ -2475,14 +2541,16 @@ def chart_data(request):
     if not start_date or not end_date:
         start_date, end_date = range_from_period('month')
 
-    cache_key = (
-        f"chart:{request.user.id}:{workspace.id if workspace else 'global'}:"
-        f"{start_date.isoformat()}:{end_date.isoformat()}:{period}:"
-        f"{type_filter}:{selected_only}:{category_id}:{responsible_id}"
-    )
-    cached_payload = cache.get(cache_key)
-    if cached_payload:
-        return JsonResponse(cached_payload)
+    cache_key = None
+    if start_date and end_date:
+        cache_key = (
+            f"chart:{request.user.id}:{workspace.id if workspace else 'global'}:"
+            f"{start_date.isoformat()}:{end_date.isoformat()}:{period}:"
+            f"{type_filter}:{selected_only}:{category_id}:{responsible_id}"
+        )
+        cached_payload = cache.get(cache_key)
+        if cached_payload:
+            return JsonResponse(cached_payload)
 
     can_finance = _user_can_view_finance(request, workspace)
 
@@ -2643,7 +2711,8 @@ def chart_data(request):
         'expense_category_colors': expense_category_colors,
         'expense_category_ids': expense_category_ids,
     }
-    cache.set(cache_key, payload, 60)
+    if cache_key:
+        cache.set(cache_key, payload, 60)
     return JsonResponse(payload)
 
 

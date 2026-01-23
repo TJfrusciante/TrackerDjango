@@ -245,7 +245,7 @@
             {% if undo_tx or undo_task %}
             <div class="toast-container position-fixed bottom-0 end-0 p-3">
                 {% if undo_tx %}
-                <div class="toast undo-toast text-bg-dark border-0 mb-2" role="alert" aria-live="polite" aria-atomic="true">
+                <div class="toast undo-toast text-bg-dark border-0 mb-2" role="alert" aria-live="polite" aria-atomic="true" data-clear-url="{% url 'tracker:transaction_undo_clear' %}">
                     <div class="d-flex align-items-center gap-2">
                         <div class="toast-body">Transa&ccedil;&atilde;o exclu&iacute;da.</div>
                         <form method="post" action="{% url 'tracker:transaction_undo_delete' %}" class="d-inline-flex">
@@ -257,7 +257,7 @@
                 </div>
                 {% endif %}
                 {% if undo_task %}
-                <div class="toast undo-toast text-bg-dark border-0" role="alert" aria-live="polite" aria-atomic="true">
+                <div class="toast undo-toast text-bg-dark border-0" role="alert" aria-live="polite" aria-atomic="true" data-clear-url="{% url 'tracker:task_undo_clear' %}">
                     <div class="d-flex align-items-center gap-2">
                         <div class="toast-body">Tarefa exclu&iacute;da.</div>
                         <form method="post" action="{% url 'tracker:task_undo_delete' %}" class="d-inline-flex">
@@ -317,8 +317,23 @@
             if (!window.bootstrap || !bootstrap.Tooltip) return;
             new bootstrap.Tooltip(el);
         });
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        };
+        const csrfToken = getCookie('csrftoken');
         document.querySelectorAll('.undo-toast').forEach(el => {
             const toast = new bootstrap.Toast(el, { delay: 6000 });
+            el.addEventListener('hidden.bs.toast', () => {
+                const url = el.dataset.clearUrl;
+                if (!url) return;
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                });
+            });
             toast.show();
         });
     </script>

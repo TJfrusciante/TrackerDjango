@@ -78,6 +78,7 @@ def llm_complete(system_prompt: str, user_message: str) -> Tuple[Optional[str], 
     }
     url = "https://api.openai.com/v1/chat/completions"
     timeout = float(os.getenv("OPENAI_TIMEOUT", "8"))
+    retries = int(os.getenv("OPENAI_RETRIES", "2"))
 
     result = _post_with_requests(url, headers, payload, timeout=timeout)
     if result is not None:

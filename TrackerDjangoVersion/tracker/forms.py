@@ -154,7 +154,11 @@ class TransactionBulkUpdateForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     selected_action = forms.ChoiceField(
-        choices=(('', 'Manter destaque'), ('mark', 'Marcar destaque'), ('unmark', 'Remover destaque')),
+        choices=(
+            ('', 'Manter destaque'),
+            ('mark', 'Marcar destaque'),
+            ('unmark', 'Remover destaque'),
+        ),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
@@ -197,6 +201,15 @@ class TaskBulkUpdateForm(forms.Form):
         choices=(('', 'Manter status'), ('ongoing', 'Em andamento'), ('done', 'Finalizada')),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    selected_action = forms.ChoiceField(
+        choices=(
+            ('', 'Manter destaque'),
+            ('mark', 'Marcar destaque'),
+            ('unmark', 'Remover destaque'),
+        ),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )
 
     def __init__(self, *args, workspace=None, **kwargs):
