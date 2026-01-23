@@ -442,10 +442,10 @@ def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None
     reply, usage, model_name = llm_complete(system_prompt, user_prompt)
     _record_ai_usage(user, workspace, usage, model_name)
     if not reply:
-        return None, None, "Nao consegui interpretar. Envie o valor e a data."
+        return None, None, "Não consegui interpretar. Envie o valor e a data."
     payload = _extract_json_payload(reply)
     if not payload:
-        return None, None, "Nao consegui interpretar. Envie o valor e a data."
+        return None, None, "Não consegui interpretar. Envie o valor e a data."
 
     intent = (payload.get("intent") or "").lower().strip()
     if intent == "task":
@@ -467,7 +467,7 @@ def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None
         else:
             amount = _clean_amount(str(raw_amount)) if raw_amount is not None else None
         if amount is None:
-            return None, None, "Nao consegui identificar o valor. Envie novamente com o valor da transacao."
+            return None, None, "Não consegui identificar o valor. Envie novamente com o valor da transação."
         tx_type = (payload.get("type") or "").strip().lower()
         if tx_type not in ("income", "expense"):
             tx_type = infer_type(text)
@@ -490,7 +490,7 @@ def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None
             confidence = 0.0
         needs_confirmation = confidence < 0.6
         if not category:
-            return None, None, "Nao consegui identificar a categoria. Use uma das seguintes: " + ", ".join(categories[:8])
+            return None, None, "Não consegui identificar a categoria. Use uma das seguintes: " + ", ".join(categories[:8])
         return (
             ParsedResult(
                 description=description,
@@ -504,7 +504,7 @@ def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None
             None,
             None,
         )
-    return None, None, "Nao consegui interpretar. Envie o valor e a data."
+    return None, None, "Não consegui interpretar. Envie o valor e a data."
 
 
 def _format_currency(value: Decimal) -> str:
@@ -620,7 +620,7 @@ def handle_confirmation(user, workspace, text: str) -> str | None:
         return None
     parsed = _last_pending(user, workspace)
     if not parsed:
-        return "Nao encontrei nenhum lancamento pendente para confirmar."
+        return "Não encontrei nenhum lançamento pendente para confirmar."
     if normalized in ("nao", "não"):
         parsed.status = 'rejected'
         parsed.save(update_fields=['status'])
@@ -635,7 +635,7 @@ def handle_correction(user, workspace, text: str) -> str | None:
         return None
     match = re.search(r"categoria\s+(.+)$", normalized)
     if not match:
-        return "Informe a categoria para corrigir. Ex.: corrige ultimo lancamento para categoria Alimentacao."
+        return "Informe a categoria para corrigir. Ex.: corrige último lançamento para categoria Alimentação."
     category_name = match.group(1).strip().title()
     category = ensure_category(workspace, category_name)
     parsed = (
@@ -644,7 +644,7 @@ def handle_correction(user, workspace, text: str) -> str | None:
         .first()
     )
     if not parsed or not parsed.transaction:
-        return "Nao encontrei um lancamento recente para corrigir."
+        return "Não encontrei um lançamento recente para corrigir."
     parsed.transaction.category = category
     parsed.transaction.save(update_fields=['category'])
     parsed.status = 'corrected'
@@ -672,7 +672,7 @@ def handle_delete(user, workspace, text: str) -> str | None:
         qs = qs.filter(date=tx_date)
     tx = qs.order_by('-created_at').first()
     if not tx:
-        return "Nao encontrei nenhum lancamento com esses dados."
+        return "Não encontrei nenhum lançamento com esses dados."
     tx.delete()
     return f"Lancamento removido: {_format_currency(abs(tx.value))} em {tx.date.strftime('%d/%m/%Y')}."
 
@@ -697,7 +697,7 @@ def _command_summary(workspace) -> str:
 def _command_categories(workspace) -> str:
     categories = Category.objects.filter(workspace=workspace).order_by('name')[:20]
     names = ", ".join(cat.name for cat in categories) or "Nenhuma categoria cadastrada."
-    return f"Categorias disponiveis: {names}."
+    return f"Categorias disponíveis: {names}."
 
 
 def _parse_period(text: str) -> tuple[dt.date, dt.date] | None:
@@ -725,7 +725,7 @@ def _command_statement(workspace, text: str) -> str:
         end = today.replace(day=calendar.monthrange(today.year, today.month)[1])
     qs = Transaction.objects.filter(workspace=workspace, date__range=(start, end)).order_by('-date')[:8]
     if not qs:
-        return "Nenhuma transacao no periodo."
+        return "Nenhuma transação no período."
     lines = [f"{tx.date.strftime('%d/%m')}: {_format_currency(tx.value)} - {tx.description}" for tx in qs]
     return "Extrato:\\n" + "\\n".join(lines)
 
@@ -740,7 +740,7 @@ def handle_command(workspace, text: str) -> str | None:
         return _command_categories(workspace)
     if normalized.startswith("/extrato"):
         return _command_statement(workspace, text)
-    return "Comando nao reconhecido. Use /resumo, /categorias ou /extrato."
+    return "Comando não reconhecido. Use /resumo, /categorias ou /extrato."
 
 
 def process_incoming_text(profile: WhatsAppProfile, message: WhatsAppMessage, text: str) -> str:
@@ -767,7 +767,7 @@ def process_incoming_text(profile: WhatsAppProfile, message: WhatsAppMessage, te
     task_result = parse_task_text(text)
     if task_result:
         if not _can_create_task(user, workspace):
-            return "Voce nao tem permissao para criar tarefas neste workspace."
+            return "Você não tem permissão para criar tarefas neste workspace."
         task = _create_task_from_parsed(user, workspace, task_result)
         return build_task_message(task, len(task_result.steps))
 
@@ -776,13 +776,13 @@ def process_incoming_text(profile: WhatsAppProfile, message: WhatsAppMessage, te
         llm_result, llm_task, llm_error = _llm_fallback_parse(user, workspace, text)
         if llm_task:
             if not _can_create_task(user, workspace):
-                return "Voce nao tem permissao para criar tarefas neste workspace."
+                return "Você não tem permissão para criar tarefas neste workspace."
             task = _create_task_from_parsed(user, workspace, llm_task)
             return build_task_message(task, len(llm_task.steps))
         if llm_result:
             result = llm_result
         else:
-            return llm_error or "Nao consegui identificar o valor. Envie novamente com o valor da transacao."
+            return llm_error or "Não consegui identificar o valor. Envie novamente com o valor da transação."
 
     with db_transaction.atomic():
         parsed = ParsedTransaction.objects.create(
