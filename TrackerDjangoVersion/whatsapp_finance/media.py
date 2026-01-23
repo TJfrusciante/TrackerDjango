@@ -51,6 +51,34 @@ def transcribe_audio(url: str, content_type: str) -> str | None:
             model = whisper.load_model(model_name)
             result = model.transcribe(tmp_path)
             return (result or {}).get("text", "").strip() or None
+        if provider == "openai":
+            api_key = getattr(settings, "OPENAI_API_KEY", "")
+            if not api_key:
+                return None
+            model = getattr(settings, "WHATSAPP_OPENAI_MODEL", "whisper-1")
+            try:
+                import requests  # type: ignore
+            except Exception:
+                return None
+            headers = {"Authorization": f"Bearer {api_key}"}
+            with open(tmp_path, "rb") as audio_file:
+                files = {"file": (os.path.basename(tmp_path), audio_file, content_type or "audio/mpeg")}
+                data = {"model": model, "language": "pt"}
+                try:
+                    resp = requests.post(
+                        "https://api.openai.com/v1/audio/transcriptions",
+                        headers=headers,
+                        files=files,
+                        data=data,
+                        timeout=30,
+                    )
+                    if resp.status_code >= 400:
+                        return None
+                    payload = resp.json()
+                    text = payload.get("text") or ""
+                    return text.strip() or None
+                except Exception:
+                    return None
         if provider == "google":
             try:
                 from google.cloud import speech  # type: ignore

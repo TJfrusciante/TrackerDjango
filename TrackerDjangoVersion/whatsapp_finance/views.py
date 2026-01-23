@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from django.http import HttpResponse
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render
@@ -33,6 +34,7 @@ def agent(request):
         {
             "profile": profile,
             "recent_messages": list(recent_messages),
+            "whatsapp_feature_enabled": getattr(settings, "WHATSAPP_FEATURE_ENABLED", False),
         },
     )
 

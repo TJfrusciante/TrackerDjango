@@ -63,6 +63,33 @@
         </div>
     </div>
     <div class="col-lg-5">
+        {% if admin_broadcast_form %}
+        <div class="glass-card p-4 mb-3">
+            <h2 class="h6 fw-bold mb-2">Enviar comunicado para todos</h2>
+            <form method="post" action="{% url 'tracker:notifications_broadcast' %}" class="row g-2">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label class="form-label small">{{ admin_broadcast_form.title.label }}</label>
+                    {{ admin_broadcast_form.title }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">{{ admin_broadcast_form.message.label }}</label>
+                    {{ admin_broadcast_form.message }}
+                </div>
+                <div class="col-12 form-check">
+                    {{ admin_broadcast_form.send_email }}
+                    <label class="form-check-label" for="{{ admin_broadcast_form.send_email.id_for_label }}">{{ admin_broadcast_form.send_email.label }}</label>
+                </div>
+                <div class="col-12 form-check">
+                    {{ admin_broadcast_form.send_push }}
+                    <label class="form-check-label" for="{{ admin_broadcast_form.send_push.id_for_label }}">{{ admin_broadcast_form.send_push.label }}</label>
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary btn-sm" type="submit">Enviar agora</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
         <div class="glass-card p-4 mb-3">
             <h2 class="h6 fw-bold mb-2">Alertas financeiros</h2>
             {% if current_workspace and can_manage_finance %}

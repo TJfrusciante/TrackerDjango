@@ -71,6 +71,7 @@ from .forms import (
     PricingConfigForm,
     TransactionBulkUpdateForm,
     TaskBulkUpdateForm,
+    AdminBroadcastForm,
 )
 from .models import (
     Category,
@@ -100,6 +101,7 @@ from .notifications import (
     notify_task_completed,
     check_category_budgets,
     check_balance_goals,
+    broadcast_message,
 )
 from .metrics import record_metric
 from .pricing import get_pricing_state, plan_label, plan_price
@@ -3582,6 +3584,8 @@ def notifications_center(request):
         budgets = CategoryBudget.objects.filter(workspace=workspace).select_related('category').order_by('category__name')
         goals = BalanceGoal.objects.filter(workspace=workspace).order_by('period')
 
+    admin_broadcast_form = AdminBroadcastForm() if user.is_superuser else None
+
     context = {
         'notifications': notifications,
         'budget_form': budget_form,
@@ -3591,8 +3595,28 @@ def notifications_center(request):
         'current_workspace': workspace,
         'can_manage_finance': can_manage_finance,
         'vapid_public_key': getattr(settings, 'VAPID_PUBLIC_KEY', ''),
+        'admin_broadcast_form': admin_broadcast_form,
     }
     return render(request, 'tracker/notifications_center.html', context)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def notifications_broadcast(request):
+    if request.method != 'POST':
+        return redirect('tracker:notifications')
+    form = AdminBroadcastForm(request.POST)
+    if form.is_valid():
+        total = broadcast_message(
+            title=form.cleaned_data['title'],
+            body=form.cleaned_data['message'],
+            send_email=form.cleaned_data.get('send_email', False),
+            send_push=form.cleaned_data.get('send_push', False),
+        )
+        messages.success(request, f'Notificação enviada para {total} usuário(s).')
+    else:
+        messages.error(request, 'Não foi possível enviar a notificação. Verifique os campos.')
+    return redirect('tracker:notifications')
 
 
 @login_required

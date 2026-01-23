@@ -42,6 +42,7 @@ urlpatterns = [
     path('notificacoes/<int:pk>/lida/', views.notifications_mark_read, name='notifications_mark_read'),
     path('notificacoes/<int:pk>/excluir/', views.notifications_delete, name='notifications_delete'),
     path('notificacoes/lidas/', views.notifications_mark_all, name='notifications_mark_all'),
+    path('notificacoes/enviar/', views.notifications_broadcast, name='notifications_broadcast'),
     path('notificacoes/push/subscribe/', views.push_subscribe, name='push_subscribe'),
     path('notificacoes/push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
     path('alertas/orcamento/', views.category_budget_create, name='category_budget_create'),

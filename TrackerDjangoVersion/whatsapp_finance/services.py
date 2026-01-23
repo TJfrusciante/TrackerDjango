@@ -180,7 +180,11 @@ def _clean_amount(raw: str) -> Decimal | None:
 def extract_amount(text: str) -> Decimal | None:
     if not text:
         return None
-    candidates = re.findall(r"(?:r\$|rs|reais)?\s*(-?\d+(?:[\.,]\d{3})*(?:[\.,]\d{2})?)", text, flags=re.IGNORECASE)
+    cleaned = text
+    cleaned = re.sub(r"\b\d{2}/\d{2}/\d{2,4}\b", "", cleaned)
+    cleaned = re.sub(r"\b\d{4}-\d{2}-\d{2}\b", "", cleaned)
+    cleaned = re.sub(r"\bdia\s+\d{1,2}\b", "", cleaned, flags=re.IGNORECASE)
+    candidates = re.findall(r"(?:r\$|rs|reais)?\s*(-?\d+(?:[\.,]\d{3})*(?:[\.,]\d{2})?)", cleaned, flags=re.IGNORECASE)
     if not candidates:
         return None
     amounts = [_clean_amount(item) for item in candidates]
@@ -203,6 +207,11 @@ def extract_date(text: str) -> dt.date:
     match = re.search(r"(\d{2})/(\d{2})/(\d{4})", normalized)
     if match:
         return dt.date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+    match = re.search(r"(\d{2})/(\d{2})/(\d{2})", normalized)
+    if match:
+        year = int(match.group(3))
+        year += 2000
+        return dt.date(year, int(match.group(2)), int(match.group(1)))
     match = re.search(r"(\d{4})-(\d{2})-(\d{2})", normalized)
     if match:
         return dt.date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
@@ -320,6 +329,8 @@ def ensure_default_categories(workspace) -> None:
 
 
 def suggest_category(user, workspace, text: str) -> tuple[Category | None, str]:
+    if not workspace:
+        return None, ""
     normalized = normalize_text(text)
     prefs = CategoryPreference.objects.filter(user=user, workspace=workspace)
     for pref in prefs.order_by("-usage_count"):
@@ -332,7 +343,7 @@ def suggest_category(user, workspace, text: str) -> tuple[Category | None, str]:
                 category = ensure_category(workspace, category_label)
             else:
                 category = _match_existing_category(workspace, category_label)
-            return category, category_label
+            return category, category.name if category else ""
 
     for category in Category.objects.filter(workspace=workspace):
         if normalize_text(category.name) in normalized:
@@ -349,6 +360,8 @@ def _confirmation_threshold() -> Decimal:
 
 
 def parse_text_to_result(user, workspace, text: str) -> ParsedResult | None:
+    if not workspace:
+        return None
     amount = extract_amount(text)
     if amount is None:
         return None
@@ -746,6 +759,8 @@ def handle_command(workspace, text: str) -> str | None:
 def process_incoming_text(profile: WhatsAppProfile, message: WhatsAppMessage, text: str) -> str:
     user = profile.user
     workspace = profile.workspace
+    if not workspace:
+        return "Selecione um workspace no seu perfil do WhatsApp antes de enviar mensagens."
     ensure_default_categories(workspace)
 
     command_response = handle_command(workspace, text)

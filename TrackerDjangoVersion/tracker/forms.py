@@ -605,6 +605,27 @@ class ContactAdminForm(forms.Form):
     message = forms.CharField(label='Mensagem', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Escreva sua mensagem'}))
 
 
+class AdminBroadcastForm(forms.Form):
+    title = forms.CharField(
+        label='Título',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Título da notificação'}),
+    )
+    message = forms.CharField(
+        label='Mensagem',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Escreva a mensagem para todos os usuários'}),
+    )
+    send_email = forms.BooleanField(
+        label='Enviar também por e-mail',
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+    send_push = forms.BooleanField(
+        label='Enviar também por push',
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+
 class InviteByUsernameForm(forms.Form):
     username = forms.CharField(label="Username", widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'username'}))
     role = forms.ChoiceField(choices=(('member', 'Membro'), ('owner', 'Owner')), widget=forms.Select(attrs={'class': 'form-select'}))

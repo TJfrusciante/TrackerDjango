@@ -109,6 +109,18 @@ def _notify_superusers(pref_field: str, subject: str, body: str, level: str = 'i
             _send_push(admin, subject, body, action_url)
 
 
+def broadcast_message(title: str, body: str, send_email: bool = False, send_push: bool = False) -> int:
+    count = 0
+    for user in User.objects.filter(is_active=True).select_related('profile'):
+        _create_notification(user, title, body, level='info')
+        if send_email:
+            _send_email(user.email, title, body, action_url=reverse('tracker:notifications'))
+        if send_push:
+            _send_push(user, title, body, action_url=reverse('tracker:notifications'))
+        count += 1
+    return count
+
+
 def notify_new_account(user) -> None:
     subject = 'Novo cadastro pendente de aprova\u00e7\u00e3o'
     body = (
