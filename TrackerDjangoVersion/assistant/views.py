@@ -242,20 +242,20 @@ def _help_response(message: str) -> str | None:
     def has_any(values: list[str]) -> bool:
         return any(v in msg for v in values)
 
-    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'fa?o', 'fazer', 'adicionar', 'lan?ar', 'lancar'])
+    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'faço', 'fazer', 'adicionar', 'lançar', 'lancar'])
     if not wants_howto:
         return None
 
-    if has_any(['transa', 'lan?', 'lanc', 'entrada', 'sa?da', 'saida', 'despesa', 'receita']):
+    if has_any(['transa', 'lançar', 'lancar', 'lanc', 'entrada', 'saída', 'saida', 'despesa', 'receita']):
         return (
-            "Para lançar transações: v? em Transações > Nova. Informe descrição, data, valor, categoria e tipo "
-            "(entrada/saída) e salve. Voc? tamb?m pode usar o bot?o Falar para preencher por voz. "
+            "Para lançar transações: vá em Transações > Nova. Informe descrição, data, valor, categoria e tipo "
+            "(entrada/saída) e salve. Você também pode usar o botão Falar para preencher por voz. "
             "Para importar em lote, use Transações > Importar CSV."
         )
 
     if has_any(['tarefa', 'etapa', 'subtarefa', 'todo']):
         return (
-            "Para criar tarefas: vá em Tarefas > Nova, defina t?tulo e prazo. "
+            "Para criar tarefas: vá em Tarefas > Nova, defina título e prazo. "
             "Você pode adicionar etapas no mesmo formulário e depois editar/atualizar o status. "
             "O botão Falar ajuda a preencher a tarefa e as etapas."
         )
@@ -270,7 +270,7 @@ def _help_response(message: str) -> str | None:
     if has_any(['categoria', 'categorias', 'cor']):
         return (
             "Para cadastrar categorias: acesse Categorias > Nova. "
-            "A cor escolhida aparece nos gr?ficos do dashboard."
+            "A cor escolhida aparece nos gráficos do dashboard."
         )
 
     if has_any(['exportar', 'csv', 'pdf', 'importar']):

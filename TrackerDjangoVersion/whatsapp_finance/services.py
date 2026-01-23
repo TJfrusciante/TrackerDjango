@@ -767,7 +767,7 @@ def process_incoming_text(profile: WhatsAppProfile, message: WhatsAppMessage, te
     task_result = parse_task_text(text)
     if task_result:
         if not _can_create_task(user, workspace):
-        return "Voce nao tem permissao para criar tarefas neste workspace."
+            return "Voce nao tem permissao para criar tarefas neste workspace."
         task = _create_task_from_parsed(user, workspace, task_result)
         return build_task_message(task, len(task_result.steps))
 
