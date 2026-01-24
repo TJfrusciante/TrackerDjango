@@ -449,7 +449,7 @@ def home(request):
     plan_features = {
         "essential": [
             "Acessos manuais e ditados",
-            "IA b\u00e1sica",
+            "IA b\u00e1sica no painel",
             "Plano individual (sem convidados)",
             "Dashboards financeiros e tarefas em etapas",
         ],
@@ -457,13 +457,13 @@ def home(request):
             "Tudo do Essencial",
             "Maior limite de tokens da IA",
             "At\u00e9 6 convidados por workspace",
-            "ChatAgent no WhatsApp",
+            "ChatAgent no WhatsApp (texto, \u00e1udio e foto)",
         ],
         "master": [
             "Tudo do Pro",
             "Limites m\u00e1ximos de IA",
             "Convidados personalizados (a partir de 6)",
-            "Custo ajustado por convidado extra",
+            "ChatAgent no WhatsApp + prioridade",
         ],
     }
     plan_ideal_for = {
@@ -517,6 +517,11 @@ def home(request):
             "description": "Responde sobre seu workspace; superuser enxerga tudo.",
         },
         {
+            "icon": "fa-brands fa-whatsapp",
+            "title": "ChatAgent no WhatsApp",
+            "description": "Lance transa\u00e7\u00f5es e tarefas direto do WhatsApp com texto, \u00e1udio ou foto.",
+        },
+        {
             "icon": "fa-solid fa-cloud-arrow-down",
             "title": "Importa\u00e7\u00e3o e exporta\u00e7\u00e3o",
             "description": "CSV/PDF com preview e integra\u00e7\u00e3o via endpoint JSON.",
@@ -532,8 +537,8 @@ def home(request):
 
     steps = [
         {"title": "Crie sua conta", "text": "Escolha plano e ciclo (Mensal ou Anual) para o seu workspace."},
-        {"title": "Importe dados", "text": "Importe CSV/PDF ou lance com o bot\u00e3o Falar em tempo real."},
-        {"title": "Convide sua equipe", "text": "Essencial: plano individual. Pro: at\u00e9 6 convidados. Master: personalize o limite."},
+        {"title": "Importe ou dite", "text": "CSV/PDF, Falar por voz e lan\u00e7amento r\u00e1pido."},
+        {"title": "Conecte o WhatsApp", "text": "No Pro/Master, lance transa\u00e7\u00f5es e tarefas pelo ChatAgent."},
         {"title": "Acompanhe no painel", "text": "Troque workspaces, aprove convites e configure alertas."},
     ]
 
@@ -541,7 +546,10 @@ def home(request):
         {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. O limite de convidados depende do plano (0/6/personalizado)."},
         {"question": "Posso escolher mensal ou anual?", "answer": "Sim. A escolha do ciclo \u00e9 feita no cadastro e pode ser revisada pelo admin."},
         {"question": "Meu financeiro \u00e9 privado?", "answer": "Sim. Cada workspace isola finan\u00e7as; o owner controla permiss\u00f5es de tarefas."},
-        {"question": "Posso exportar dados?", "answer": "Sim, CSV das listas e endpoints JSON para gr\u00e1ficos."},
+        {"question": "O agente de IA usa meus dados?", "answer": "Sim, ele responde sempre dentro do contexto do seu workspace e respeita permiss\u00f5es."},
+        {"question": "Como funciona o WhatsApp?", "answer": "No Pro/Master, o ChatAgent recebe texto, \u00e1udio ou foto e lan\u00e7a no seu workspace."},
+        {"question": "Posso falar por voz?", "answer": "Sim, use o bot\u00e3o Falar em transa\u00e7\u00f5es, tarefas e no agente de IA."},
+        {"question": "Existe limite de IA?", "answer": "Cada plano tem um limite mensal de tokens; o painel mostra consumo e data de renova\u00e7\u00e3o."},
     ]
 
     context = {
@@ -559,16 +567,16 @@ def home(request):
 
 def help_page(request):
     quick_links = [
-        {"id": "transacoes", "label": "Transa\u00e7\u00f5es", "icon": "fa-coins"},
-        {"id": "tarefas", "label": "Tarefas", "icon": "fa-list-check"},
-        {"id": "workspaces", "label": "Workspaces", "icon": "fa-users"},
-        {"id": "notificacoes", "label": "Notifica\u00e7\u00f5es", "icon": "fa-bell"},
-        {"id": "alertas", "label": "Or\u00e7amentos e metas", "icon": "fa-bullseye"},
-        {"id": "voz", "label": "Falar por voz", "icon": "fa-microphone"},
-        {"id": "ia", "label": "Agente de IA", "icon": "fa-robot"},
-        {"id": "whatsapp", "label": "WhatsApp", "icon": "fa-whatsapp"},
-        {"id": "filtros", "label": "Filtros e exporta\u00e7\u00e3o", "icon": "fa-filter"},
-        {"id": "faq", "label": "FAQ", "icon": "fa-circle-question"},
+        {"id": "transacoes", "label": "Transa\u00e7\u00f5es", "icon": "fa-solid fa-coins"},
+        {"id": "tarefas", "label": "Tarefas", "icon": "fa-solid fa-list-check"},
+        {"id": "workspaces", "label": "Workspaces", "icon": "fa-solid fa-users"},
+        {"id": "notificacoes", "label": "Notifica\u00e7\u00f5es", "icon": "fa-solid fa-bell"},
+        {"id": "alertas", "label": "Or\u00e7amentos e metas", "icon": "fa-solid fa-bullseye"},
+        {"id": "voz", "label": "Falar por voz", "icon": "fa-solid fa-microphone"},
+        {"id": "ia", "label": "Agente de IA", "icon": "fa-solid fa-robot"},
+        {"id": "whatsapp", "label": "WhatsApp", "icon": "fa-brands fa-whatsapp"},
+        {"id": "filtros", "label": "Filtros e exporta\u00e7\u00e3o", "icon": "fa-solid fa-filter"},
+        {"id": "faq", "label": "FAQ", "icon": "fa-solid fa-circle-question"},
     ]
 
     faq_items = [

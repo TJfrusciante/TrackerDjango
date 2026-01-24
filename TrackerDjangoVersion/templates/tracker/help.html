@@ -163,7 +163,7 @@
 <section class="py-3 d-lg-none">
     <div class="help-scroll">
         {% for link in quick_links %}
-            <a class="help-chip" href="#{{ link.id }}"><i class="fa-solid {{ link.icon }}"></i>{{ link.label }}</a>
+            <a class="help-chip" href="#{{ link.id }}"><i class="{{ link.icon }}"></i>{{ link.label }}</a>
         {% endfor %}
     </div>
 </section>
@@ -174,7 +174,7 @@
         <div class="col-6 col-lg-4">
             <a class="text-decoration-none" href="#{{ link.id }}">
                 <div class="help-card h-100">
-                    <div class="help-icon"><i class="fa-solid {{ link.icon }}"></i></div>
+                    <div class="help-icon"><i class="{{ link.icon }}"></i></div>
                     <h6 class="fw-bold mb-1">{{ link.label }}</h6>
                     <p class="text-secondary small mb-0">Veja instru&ccedil;&otilde;es r&aacute;pidas e exemplos.</p>
                 </div>
@@ -506,12 +506,12 @@
                 <div class="row g-3 align-items-start">
                     <div class="col-lg-7">
                         <h4 class="fw-bold mb-3"><i class="fa-brands fa-whatsapp me-2 text-success"></i>WhatsApp Finance</h4>
-                        <p class="text-secondary">Envie mensagens, &aacute;udios ou fotos de comprovantes para registrar lan&ccedil;amentos.</p>
+                        <p class="text-secondary">Envie mensagens, &aacute;udios ou fotos de comprovantes para registrar lan&ccedil;amentos e tarefas direto no seu workspace.</p>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="help-step">
-                                    <h6 class="fw-semibold mb-1">1. Cadastre o n&uacute;mero</h6>
-                                    <p class="text-secondary small mb-0">O admin vincula seu WhatsApp ao workspace no painel administrativo.</p>
+                                    <h6 class="fw-semibold mb-1">1. Conecte o WhatsApp</h6>
+                                    <p class="text-secondary small mb-0">Vincule seu n&uacute;mero no painel do WhatsApp (quando habilitado no seu plano).</p>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -522,8 +522,8 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="help-step">
-                                    <h6 class="fw-semibold mb-1">3. Confirme</h6>
-                                    <p class="text-secondary small mb-0">O bot pede confirma&ccedil;&atilde;o antes de lan&ccedil;ar valores altos.</p>
+                                    <h6 class="fw-semibold mb-1">3. &Aacute;udio ou foto</h6>
+                                    <p class="text-secondary small mb-0">O bot transcreve &aacute;udios e faz OCR de comprovantes.</p>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -536,7 +536,7 @@
                     </div>
                     <div class="col-12 mt-3">
                         <div class="help-callout small text-secondary">
-                            Dica: &aacute;udios dependem de transcri&ccedil;&atilde;o e fotos precisam de OCR habilitado.
+                            Dica: se o parser local falhar, o agente usa IA para entender valor, data, tipo e categoria.
                         </div>
                     </div>
                 </div>

@@ -16,12 +16,13 @@
                 <h1 class="fw-bold mb-3">Controle financeiro e to-do list modernos, multi-tenant.</h1>
                 <p class="lead lp-muted mb-4">
                     Painel de workspaces, permiss&otilde;es por membro, alertas inteligentes, resumos autom&aacute;ticos e um agente de IA
-                    que responde sobre per&iacute;odo, categorias e tarefas.
+                    que responde sobre per&iacute;odo, categorias e tarefas — agora com lan&ccedil;amentos via WhatsApp.
                 </p>
                 <div class="lp-badges mb-4">
                     <span class="lp-badge"><i class="fa-solid fa-bell"></i>Alertas inteligentes</span>
                     <span class="lp-badge"><i class="fa-solid fa-bullseye"></i>Or&ccedil;amentos e metas</span>
                     <span class="lp-badge"><i class="fa-solid fa-microphone"></i>Falar por voz</span>
+                    <span class="lp-badge"><i class="fa-brands fa-whatsapp"></i>ChatAgent WhatsApp</span>
                     <span class="lp-badge"><i class="fa-solid fa-robot"></i>IA contextual</span>
                     <span class="lp-badge"><i class="fa-solid fa-briefcase"></i>Painel de workspaces</span>
                 </div>
@@ -241,15 +242,57 @@
             </div>
             <div class="col-lg-6">
                 <div class="lp-card h-100">
-                    <h3 class="fw-bold mb-2">IA + Falar por voz</h3>
-                    <p class="lp-muted mb-3">Ganhe velocidade com comandos de voz e um agente que interpreta dados do seu workspace.</p>
+                    <h3 class="fw-bold mb-2">Agente de IA</h3>
+                    <p class="lp-muted mb-3">Pergunte sobre per&iacute;odos, categorias, tarefas e status de etapas. Respostas sempre no contexto do seu workspace.</p>
                     <ul class="lp-checklist">
-                        <li><i class="fa-solid fa-check"></i><div>Falar para transa&ccedil;&otilde;es e tarefas com pr&eacute;-visualiza&ccedil;&atilde;o.</div></li>
-                        <li><i class="fa-solid fa-check"></i><div>Respostas com saldo, top categorias e status das etapas.</div></li>
-                        <li><i class="fa-solid fa-check"></i><div>Texto aparece em tempo real e pode enviar automaticamente.</div></li>
-                        <li><i class="fa-solid fa-check"></i><div>Superuser enxerga vis&atilde;o global do sistema.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Resumos por m&ecirc;s/ano e compara&ccedil;&otilde;es.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Top categorias, maiores gastos e saldo do per&iacute;odo.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Entende tarefas e etapas conclu&iacute;das ou em andamento.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Superuser pode visualizar indicadores globais.</div></li>
                     </ul>
-                    <a class="btn btn-outline-light w-100 mt-3" href="{% url 'tracker:register' %}">Ativar agora</a>
+                    <a class="btn btn-outline-light w-100 mt-3" href="{% url 'tracker:register' %}">Quero usar IA</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5 lp-section">
+    <div class="container">
+        <div class="row g-4 align-items-center">
+            <div class="col-lg-6">
+                <div class="lp-card h-100">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-success-subtle text-success">Novo</span>
+                        <h3 class="fw-bold mb-0">ChatAgent no WhatsApp</h3>
+                    </div>
+                    <p class="lp-muted mb-3">Lance transa&ccedil;&otilde;es e tarefas com texto, &aacute;udio ou foto. O bot interpreta e sugere confirma&ccedil;&atilde;o.</p>
+                    <ul class="lp-checklist">
+                        <li><i class="fa-solid fa-check"></i><div>Texto direto: “Gastei 50 no mercado”.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>&Aacute;udio com transcri&ccedil;&atilde;o inteligente.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>OCR para recibos e comprovantes.</div></li>
+                        <li><i class="fa-solid fa-check"></i><div>Fallback IA quando o parser n&atilde;o entende.</div></li>
+                    </ul>
+                    <a class="btn btn-success w-100 mt-3" href="{% url 'tracker:register' %}">Ativar WhatsApp</a>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="lp-hero-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <p class="lp-muted mb-1 small">Exemplo real</p>
+                            <h5 class="mb-0">WhatsApp conectado ao workspace</h5>
+                        </div>
+                        <span class="badge bg-success text-white">ChatAgent</span>
+                    </div>
+                    <div class="lp-stat mb-3">
+                        <div class="lp-muted small">Mensagem</div>
+                        <div class="lp-number">“Gastei 120 no mercado hoje”</div>
+                    </div>
+                    <div class="lp-stat">
+                        <div class="lp-muted small">Resposta</div>
+                        <div class="lp-number">Sa&iacute;da R$ 120,00 &middot; Categoria Mercado</div>
+                    </div>
                 </div>
             </div>
         </div>

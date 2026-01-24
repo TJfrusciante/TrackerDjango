@@ -162,3 +162,11 @@ Mapa rapido (onde mexer)
 - Categorias: edição agora recebe paleta de cores (30 swatches) igual à lista; template `TrackerDjangoVersion/templates/tracker/category_form.html` usa palette + JS para selecionar cor.
 - Categorias: mensagem de permissão no delete normalizada (unicode escapes) para evitar mojibake.
 - Assistente: `assistant/views.py` com tabs convertidos para espaços para evitar `IndentationError`.
+
+- WhatsApp (Twilio): fallback LLM obrigatório quando parser local falha (texto/áudio/OCR); categorias agora limitadas ao workspace do perfil; respostas pedem confirmação.
+- WhatsApp UI: painel do ChatAgent mostra status/última interação e instruções; modo “Em desenvolvimento” pode ser ativado via flag no template.
+- Notificações: superuser pode enviar comunicado para todos em `/notificacoes/` (card “Enviar comunicado para todos”).
+- Ações em massa: botões “Excluir selecionadas”, “Converter selecionadas” e “Destacar selecionadas” em transações e tarefas; apenas exibidos quando há seleção.
+- Undo de exclusões: toasts limpam sessão ao fechar (evita reaparecer após trocar de tela).
+- Cache: chart_data e dashboard usam chave de cache por workspace/periodo para reduzir carga (corrigir NameError se reaparecer).
+- Landing: seção dedicada do Agente de IA + seção dedicada do WhatsApp; FAQ ampliado (IA, voz, limites).
