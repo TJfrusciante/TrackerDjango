@@ -217,6 +217,15 @@ def _apply_workspace_filter(queryset, workspace, user):
     return queryset
 
 
+def _tasks_queryset(request, workspace):
+    qs = Task.objects.all()
+    if workspace:
+        return qs.filter(workspace=workspace)
+    if request.user.is_superuser:
+        return qs
+    return qs.none()
+
+
 def _build_filter_chips(request, items):
     chips = []
     for key, label, value in items:
@@ -639,6 +648,22 @@ def terms_page(request):
 
 def privacy_page(request):
     return render(request, 'tracker/privacy.html')
+
+
+# -------- Utils --------
+
+def _parse_date_input(value):
+    if not value:
+        return None
+    if isinstance(value, datetime.date):
+        return value
+    raw = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"):
+        try:
+            return datetime.datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 # -------- Dashboard --------
@@ -1072,16 +1097,18 @@ def transactions_bulk_update(request):
         category_id = request.POST.get('category', '')
         start = request.POST.get('start', '')
         end = request.POST.get('end', '')
+        start_date = _parse_date_input(start)
+        end_date = _parse_date_input(end)
         if search:
             qs = qs.filter(Q(description__icontains=search) | Q(category__name__icontains=search))
         if tx_type in ('income', 'expense'):
             qs = qs.filter(type=tx_type)
         if category_id:
             qs = qs.filter(category_id=category_id)
-        if start:
-            qs = qs.filter(date__gte=start)
-        if end:
-            qs = qs.filter(date__lte=end)
+        if start_date:
+            qs = qs.filter(date__gte=start_date)
+        if end_date:
+            qs = qs.filter(date__lte=end_date)
     else:
         qs = Transaction.objects.filter(id__in=ids)
         if workspace:
@@ -1878,16 +1905,18 @@ def tasks_bulk_update(request):
         category = (request.POST.get('category') or '').strip()
         start = request.POST.get('start') or ''
         end = request.POST.get('end') or ''
+        start_date = _parse_date_input(start)
+        end_date = _parse_date_input(end)
         if search:
             qs = qs.filter(title__icontains=search)
         if status in ('ongoing', 'done'):
             qs = qs.filter(status=status)
         if category:
             qs = qs.filter(category__iexact=category)
-        if start:
-            qs = qs.filter(due_date__gte=start)
-        if end:
-            qs = qs.filter(due_date__lte=end)
+        if start_date:
+            qs = qs.filter(due_date__gte=start_date)
+        if end_date:
+            qs = qs.filter(due_date__lte=end_date)
     else:
         qs = Task.objects.filter(id__in=ids)
         if workspace:
