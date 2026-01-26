@@ -72,7 +72,14 @@
                 {% endif %}
 
                 <div class="col-md-4">
-                    <label class="form-label">Categoria</label>
+                    <label class="form-label">
+                        Categoria
+                        {% if not is_detail %}
+                        <span class="text-secondary ms-1" data-bs-toggle="tooltip" title="Selecionar categoria da tarefa. Se faltar, crie na tela de categorias.">
+                            <i class="fa-solid fa-circle-info"></i>
+                        </span>
+                        {% endif %}
+                    </label>
                     {% if is_detail %}
                         <p class="form-control-plaintext fw-semibold">
                             {% if form.instance.task_category %}
@@ -85,13 +92,16 @@
                         </p>
                     {% else %}
                         {{ form.task_category }}{{ form.task_category.errors }}
+                        {% if task_category_count == 0 %}
+                            <div class="small text-secondary mt-2">
+                                Nenhuma categoria de tarefas cadastrada.
+                                <a href="{% url 'tracker:categories_list' %}#categorias-tarefas">Criar categoria</a>
+                            </div>
+                        {% endif %}
                     {% endif %}
                 </div>
                 {% if not is_detail %}
-                <div class="col-md-4">
-                    <label class="form-label">Outra categoria (opcional)</label>
-                    {{ form.category }}{{ form.category.errors }}
-                </div>
+                <div class="col-md-4 d-none"></div>
                 {% endif %}
                 <div class="col-md-4">
                     <label class="form-label">Respons&aacute;vel</label>
@@ -400,7 +410,6 @@
         const dateInput = document.getElementById('id_due_date');
         const dateDisplay = document.getElementById('taskDateDisplay');
         const categorySelect = document.getElementById('id_task_category');
-        const categoryInput = document.getElementById('id_category');
         const stepContainer = document.getElementById('stepContainer');
         const addBtn = document.getElementById('addStepRow');
         const preview = document.getElementById('taskVoicePreview');
@@ -434,7 +443,6 @@
         const normalize = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
         const hasCategorySelection = () => {
-            if (categoryInput && categoryInput.value.trim()) return true;
             if (categorySelect && categorySelect.value) return true;
             return false;
         };

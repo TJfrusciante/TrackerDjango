@@ -125,25 +125,20 @@ class TaskForm(BaseStyledForm):
 
     class Meta:
         model = Task
-        fields = ['title', 'task_category', 'category', 'responsible_user', 'due_date', 'status']
+        fields = ['title', 'task_category', 'responsible_user', 'due_date', 'status']
         widgets = {
             'due_date': forms.DateInput(
                 format='%Y-%m-%d',
                 attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'}
             ),
             'task_category': forms.Select(attrs={'class': 'form-select'}),
-            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Outra categoria (opcional)'}),
             'responsible_user': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def clean(self):
         cleaned = super().clean()
-        custom_category = (cleaned.get('category') or '').strip()
         selected_category = cleaned.get('task_category')
-        if custom_category:
-            cleaned['task_category'] = None
-            cleaned['category'] = custom_category
-        elif selected_category:
+        if selected_category:
             cleaned['category'] = selected_category.name
         return cleaned
 

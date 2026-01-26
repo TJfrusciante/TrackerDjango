@@ -590,13 +590,16 @@ def home(request):
     ]
 
     faq_items = [
-        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. O limite de convidados depende do plano (0/6/personalizado)."},
+        {"question": "Quem paga o plano?", "answer": "Apenas o dono do workspace. O limite de convidados depende do plano."},
         {"question": "Posso escolher mensal ou anual?", "answer": "Sim. A escolha do ciclo \u00e9 feita no cadastro e pode ser revisada pelo admin."},
+        {"question": "Tenho per\u00edodo de teste?", "answer": "Sim, novas contas iniciam com trial de 7 dias. Depois \u00e9 preciso ativar a assinatura."},
+        {"question": "O que acontece se o pagamento vencer?", "answer": "Voc\u00ea entra em car\u00eancia: tarefas continuam dispon\u00edveis, mas finan\u00e7as e IA ficam bloqueadas at\u00e9 regularizar."},
         {"question": "Meu financeiro \u00e9 privado?", "answer": "Sim. Cada workspace isola finan\u00e7as; o owner controla permiss\u00f5es de tarefas."},
         {"question": "O agente de IA usa meus dados?", "answer": "Sim, ele responde sempre dentro do contexto do seu workspace e respeita permiss\u00f5es."},
         {"question": "Como funciona o WhatsApp?", "answer": "No Pro/Master, o ChatAgent recebe texto, \u00e1udio ou foto e lan\u00e7a no seu workspace."},
         {"question": "Posso falar por voz?", "answer": "Sim, use o bot\u00e3o Falar em transa\u00e7\u00f5es, tarefas e no agente de IA."},
         {"question": "Existe limite de IA?", "answer": "Cada plano tem um limite mensal de tokens; o painel mostra consumo e data de renova\u00e7\u00e3o."},
+        {"question": "Posso exportar meus dados?", "answer": "Sim. Existem exports CSV e o bot\u00e3o de exportar dados no perfil (LGPD)."},
     ]
 
     context = {
@@ -2082,6 +2085,7 @@ def task_create(request):
         initial['responsible_user'] = workspace.owner_id
     form = TaskForm(request.POST or None, initial=initial, workspace=workspace)
     step_form = TaskStepForm()
+    task_category_count = form.fields['task_category'].queryset.count() if 'task_category' in form.fields else 0
     if request.method == 'POST' and form.is_valid():
         obj = form.save(commit=False)
         if workspace:
@@ -2126,6 +2130,7 @@ def task_create(request):
         'step_form': step_form,
         'is_edit': False,
         'steps': [],
+        'task_category_count': task_category_count,
         'workspace_members': workspace_members,
         'workspace_member_names': member_names,
         'workspace_member_emails': member_emails,
@@ -2145,6 +2150,7 @@ def task_update(request, pk):
     form = TaskForm(request.POST or None, instance=task, workspace=workspace)
     steps = task.steps.all()
     step_form = TaskStepForm()
+    task_category_count = form.fields['task_category'].queryset.count() if 'task_category' in form.fields else 0
     prev_status = task.status
     if request.method == 'POST' and form.is_valid():
         if workspace and not request.user.is_superuser:
@@ -2173,6 +2179,7 @@ def task_update(request, pk):
         'is_detail': request.GET.get('detail') == '1',
         'steps': steps,
         'step_form': step_form,
+        'task_category_count': task_category_count,
         'workspace_members': workspace_members,
         'workspace_member_names': member_names,
         'workspace_member_emails': member_emails,
