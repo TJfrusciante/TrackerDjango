@@ -6,6 +6,11 @@
             text: 'Troque de workspace ou entre no modo global quando precisar.',
         },
         {
+            selector: '[data-tour="theme-toggle"]',
+            title: 'Modo claro/escuro',
+            text: 'Escolha o tema que prefere para trabalhar.',
+        },
+        {
             selector: '[data-tour="nav-dashboard"]',
             title: 'Dashboard',
             text: 'Veja indicadores, filtros e gráficos do período.',
@@ -31,9 +36,34 @@
             text: 'Pergunte sobre categorias, saldo e tarefas.',
         },
         {
+            selector: '[data-tour="nav-whatsapp"]',
+            title: 'ChatAgent no WhatsApp',
+            text: 'Lance transações e tarefas direto do WhatsApp.',
+        },
+        {
             selector: '[data-tour="nav-more"]',
             title: 'Demais funcionalidades',
             text: 'Acesse categorias, notificações, workspaces e ajuda.',
+        },
+        {
+            selector: '[data-tour="nav-notifications"]',
+            title: 'Notificações',
+            text: 'Veja alertas, resumos e mensagens do sistema.',
+        },
+        {
+            selector: '[data-tour="nav-categories"]',
+            title: 'Categorias',
+            text: 'Organize transações e tarefas com cores.',
+        },
+        {
+            selector: '[data-tour="nav-workspaces"]',
+            title: 'Workspaces',
+            text: 'Gerencie membros, convites e acessos.',
+        },
+        {
+            selector: '[data-tour="nav-help"]',
+            title: 'Ajuda',
+            text: 'Confira guias rápidos e exemplos de uso.',
         },
         {
             selector: '[data-tour="dashboard-filters"]',
@@ -49,6 +79,7 @@
             selector: '[data-tour="agent-fab"]',
             title: 'Atalho do agente',
             text: 'Abra o assistente flutuante de qualquer tela.',
+            placement: 'floating-right',
         },
     ];
 
@@ -75,13 +106,68 @@
         return tooltip;
     }
 
-    function positionTooltip(target) {
+    function positionTooltip(target, step) {
         if (!tooltip || !target) return;
         const rect = target.getBoundingClientRect();
-        const tipRect = tooltip.getBoundingClientRect();
         const padding = 16;
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            tooltip.style.maxWidth = `${window.innerWidth - padding * 2}px`;
+        }
+        const tipRect = tooltip.getBoundingClientRect();
         let top = rect.bottom + 12;
         let left = rect.left;
+        if (isMobile) {
+            top = window.innerHeight - tipRect.height - padding;
+            if (top < padding) top = padding;
+            left = (window.innerWidth - tipRect.width) / 2;
+            if (left < padding) left = padding;
+            tooltip.style.top = `${top}px`;
+            tooltip.style.left = `${left}px`;
+            return;
+        }
+        if (step && step.placement === 'floating-right') {
+            let left = window.innerWidth - tipRect.width - padding;
+            let top = rect.top - tipRect.height - 16;
+            if (top + tipRect.height > window.innerHeight - padding) {
+                top = window.innerHeight - tipRect.height - padding;
+            }
+            if (top < padding) top = padding;
+            tooltip.style.top = `${top}px`;
+            tooltip.style.left = `${left}px`;
+            return;
+        }
+
+        if (step && step.placement === 'left') {
+            let top = rect.top + (rect.height - tipRect.height) / 2;
+            let left = rect.left - tipRect.width - 16;
+            if (left < padding) {
+                left = rect.right + 16;
+            }
+            if (top + tipRect.height > window.innerHeight - padding) {
+                top = window.innerHeight - tipRect.height - padding;
+            }
+            if (top < padding) top = padding;
+            tooltip.style.top = `${top}px`;
+            tooltip.style.left = `${left}px`;
+            return;
+        }
+
+        if (step && step.placement === 'left-bottom') {
+            let left = rect.left - tipRect.width - 16;
+            if (left < padding) {
+                left = rect.right + 16;
+            }
+            let top = rect.bottom - tipRect.height;
+            if (top + tipRect.height > window.innerHeight - padding) {
+                top = window.innerHeight - tipRect.height - padding;
+            }
+            if (top < padding) top = padding;
+            tooltip.style.top = `${top}px`;
+            tooltip.style.left = `${left}px`;
+            return;
+        }
+
         const sidebar = target.closest('.sidebar');
         if (sidebar) {
             const sidebarRect = sidebar.getBoundingClientRect();
@@ -106,6 +192,7 @@
     function clearHighlight() {
         if (highlighted) {
             highlighted.classList.remove('tour-highlight');
+            highlighted.classList.remove('tour-highlight-relative');
             highlighted = null;
         }
     }
@@ -122,7 +209,13 @@
         clearHighlight();
         highlighted = target;
         highlighted.classList.add('tour-highlight');
-        highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (window.getComputedStyle(highlighted).position === 'static') {
+            highlighted.classList.add('tour-highlight-relative');
+        }
+        const isFixed = window.getComputedStyle(highlighted).position === 'fixed';
+        if (!isFixed) {
+            highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
 
         const tip = ensureTooltip();
         tip.querySelector('.tour-title').textContent = step.title;
@@ -131,7 +224,7 @@
         tip.querySelector('.tour-prev').disabled = current === 0;
         tip.querySelector('.tour-next').textContent = current === activeSteps.length - 1 ? 'Finalizar' : 'Próximo';
         tip.classList.add('show');
-        requestAnimationFrame(() => positionTooltip(target));
+        requestAnimationFrame(() => positionTooltip(target, step));
     }
 
     function finishTour(storeKey) {
@@ -155,8 +248,8 @@
             showStep(current + 1);
         };
         tip.querySelector('.tour-close').onclick = () => finishTour(storeKey);
-        window.addEventListener('resize', () => positionTooltip(highlighted));
-        window.addEventListener('scroll', () => positionTooltip(highlighted), { passive: true });
+        window.addEventListener('resize', () => positionTooltip(highlighted, activeSteps[current]));
+        window.addEventListener('scroll', () => positionTooltip(highlighted, activeSteps[current]), { passive: true });
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') finishTour(storeKey);
         }, { once: true });

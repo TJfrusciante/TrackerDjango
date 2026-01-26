@@ -162,6 +162,46 @@
     </div>
 </div>
 
+<div class="glass-card p-3 mb-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+        <div>
+            <p class="text-secondary small mb-1">Ganho estimado</p>
+            <h5 class="mb-0">Mensal e anual por plano</h5>
+            <div class="text-secondary small">Valores anuais consideram 12 meses.</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <span class="badge bg-success-subtle text-success">Total m&ecirc;s: R$ {{ revenue_totals.monthly_equiv|floatformat:2 }}</span>
+            <span class="badge bg-primary-subtle text-primary">Total ano: R$ {{ revenue_totals.annual_equiv|floatformat:2 }}</span>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle table-striped mb-0">
+            <thead class="text-secondary">
+                <tr>
+                    <th>Plano</th>
+                    <th>Mensal</th>
+                    <th>Anual</th>
+                    <th>Total m&ecirc;s</th>
+                    <th>Total ano</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in revenue_rows %}
+                    <tr>
+                        <td class="fw-semibold">{{ row.plan }}</td>
+                        <td>{{ row.monthly_count }} x R$ {{ row.monthly_price|floatformat:2 }} = <strong>R$ {{ row.monthly_total|floatformat:2 }}</strong></td>
+                        <td>{{ row.annual_count }} x R$ {{ row.annual_price|floatformat:2 }} = <strong>R$ {{ row.annual_total|floatformat:2 }}</strong></td>
+                        <td><strong>R$ {{ row.total_monthly_equiv|floatformat:2 }}</strong></td>
+                        <td><strong>R$ {{ row.total_annual_equiv|floatformat:2 }}</strong></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-secondary">Nenhuma assinatura ativa.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <div class="row g-3 mb-3">
     <div class="col-md-4">
         <div class="glass-card p-3 h-100">

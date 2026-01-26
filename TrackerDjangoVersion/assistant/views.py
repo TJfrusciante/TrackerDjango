@@ -51,18 +51,72 @@ def _parse_month_range(message: str):
     normalized = _normalize_text(message)
     today = timezone.localdate()
 
-    month = None
-    year = None
+    def _year_from_text(text: str):
+        match = re.search(r'\b(20\d{2})\b', text)
+        if match:
+            return int(match.group(1))
+        if 'ano passado' in text or 'ano anterior' in text or 'last year' in text:
+            return today.year - 1
+        if 'este ano' in text or 'ano atual' in text:
+            return today.year
+        return None
 
+    def _safe_year(year_val: int) -> int:
+        return year_val + 2000 if year_val < 100 else year_val
+
+    def _last_day(year_val: int, month_val: int) -> int:
+        return calendar.monthrange(year_val, month_val)[1]
+
+    year = _year_from_text(normalized)
+
+    # Ranges explícitos (ex.: 01/2025 até 06/2025, 10/01/2025 a 20/01/2025)
+    range_tokens = re.findall(r'\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b', normalized)
+    month_tokens = re.findall(r'\b(0?[1-9]|1[0-2])[\/-](\d{4})\b', normalized)
+    if range_tokens and len(range_tokens) >= 2:
+        d1, m1, y1 = range_tokens[0]
+        d2, m2, y2 = range_tokens[1]
+        start_date = datetime.date(_safe_year(int(y1)), int(m1), int(d1))
+        end_date = datetime.date(_safe_year(int(y2)), int(m2), int(d2))
+        label = f"{start_date:%d/%m/%Y} a {end_date:%d/%m/%Y}"
+        return start_date, end_date, label
+    if len(month_tokens) >= 2:
+        m1, y1 = month_tokens[0]
+        m2, y2 = month_tokens[1]
+        y1 = _safe_year(int(y1))
+        y2 = _safe_year(int(y2))
+        m1 = int(m1)
+        m2 = int(m2)
+        start_date = datetime.date(y1, m1, 1)
+        end_date = datetime.date(y2, m2, _last_day(y2, m2))
+        label = f"{m1:02d}/{y1} a {m2:02d}/{y2}"
+        return start_date, end_date, label
+
+    # Semestres / metades do ano
+    if any(key in normalized for key in ['primeira metade', '1 metade', 'primeiro semestre', '1 semestre', 'h1']):
+        if year is None:
+            year = today.year - 1 if 'ano passado' in normalized else today.year
+        start_date = datetime.date(year, 1, 1)
+        end_date = datetime.date(year, 6, _last_day(year, 6))
+        label = f"1º semestre/{year}"
+        return start_date, end_date, label
+    if any(key in normalized for key in ['segunda metade', '2 metade', 'segundo semestre', '2 semestre', 'h2']):
+        if year is None:
+            year = today.year - 1 if 'ano passado' in normalized else today.year
+        start_date = datetime.date(year, 7, 1)
+        end_date = datetime.date(year, 12, _last_day(year, 12))
+        label = f"2º semestre/{year}"
+        return start_date, end_date, label
+
+    month = None
     if 'mes passado' in normalized or 'ultimo mes' in normalized:
         month = today.month - 1
-        year = today.year
+        year = year or today.year
         if month <= 0:
             month = 12
-            year -= 1
+            year = (year or today.year) - 1
     if 'este mes' in normalized or 'mes atual' in normalized:
         month = today.month
-        year = today.year
+        year = year or today.year
 
     if month is None:
         name_match = re.search(
@@ -87,7 +141,13 @@ def _parse_month_range(message: str):
             month = int(inv_match.group(2))
 
     if month is None:
-        return None
+        if year is None:
+            return None
+        # Ano inteiro (ex.: "ano passado")
+        start_date = datetime.date(year, 1, 1)
+        end_date = datetime.date(year, 12, _last_day(year, 12))
+        label = f"{year}"
+        return start_date, end_date, label
 
     if year is None:
         year = today.year
@@ -95,7 +155,7 @@ def _parse_month_range(message: str):
             year -= 1
 
     start_date = datetime.date(year, month, 1)
-    end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
+    end_date = datetime.date(year, month, _last_day(year, month))
     label = f'{month:02d}/{year}'
     return start_date, end_date, label
 
@@ -508,6 +568,9 @@ def chat(request):
     if profile and profile.is_guest and not request.user.is_superuser:
         messages.error(request, "Conta de convidado não tem acesso ao agente de IA.")
         return redirect('tracker:tasks_list')
+    if getattr(request, "subscription_grace", False) and not request.user.is_superuser:
+        messages.warning(request, "Assinatura em carência: IA bloqueada até a regularização.")
+        return redirect('tracker:tasks_list')
     quota = get_ai_quota(request.user)
     quota_label = _format_quota_label(quota)
     quota_blocked = not quota.get("allowed", True)
@@ -555,6 +618,8 @@ def chat_embed(request):
     profile = getattr(request.user, "profile", None)
     if profile and profile.is_guest and not request.user.is_superuser:
         return render(request, 'assistant/embed.html', {'history': [], 'guest_blocked': True})
+    if getattr(request, "subscription_grace", False) and not request.user.is_superuser:
+        return render(request, 'assistant/embed.html', {'history': [], 'grace_blocked': True})
     quota = get_ai_quota(request.user)
     quota_label = _format_quota_label(quota)
     quota_blocked = not quota.get("allowed", True)

@@ -66,12 +66,8 @@ def mp_request(method: str, path: str, payload: dict | None = None, retries: int
 
 
 def build_preapproval_payload(*, reason: str, external_reference: str, back_url: str, plan_cycle: str, payer_email: str | None, amount: float) -> dict:
-    if plan_cycle == 'annual':
-        frequency = 12
-        frequency_type = 'months'
-    else:
-        frequency = 1
-        frequency_type = 'months'
+    frequency = 1
+    frequency_type = 'months'
     payload = {
         'reason': reason,
         'external_reference': external_reference,
@@ -101,6 +97,10 @@ def fetch_preapproval(preapproval_id: str) -> dict:
 
 def cancel_preapproval(preapproval_id: str) -> dict:
     return mp_request('PUT', f'/preapproval/{preapproval_id}', {'status': 'cancelled'})
+
+
+def update_preapproval(preapproval_id: str, payload: dict) -> dict:
+    return mp_request('PUT', f'/preapproval/{preapproval_id}', payload)
 
 
 def extract_preapproval_fields(data: dict[str, Any]) -> dict[str, Any]:

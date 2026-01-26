@@ -74,11 +74,25 @@
                 <div class="col-md-4">
                     <label class="form-label">Categoria</label>
                     {% if is_detail %}
-                        <p class="form-control-plaintext fw-semibold">{{ form.instance.category|default:"-" }}</p>
+                        <p class="form-control-plaintext fw-semibold">
+                            {% if form.instance.task_category %}
+                                {{ form.instance.task_category.name }}
+                            {% elif form.instance.category %}
+                                {{ form.instance.category }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </p>
                     {% else %}
-                        {{ form.category }}{{ form.category.errors }}
+                        {{ form.task_category }}{{ form.task_category.errors }}
                     {% endif %}
                 </div>
+                {% if not is_detail %}
+                <div class="col-md-4">
+                    <label class="form-label">Outra categoria (opcional)</label>
+                    {{ form.category }}{{ form.category.errors }}
+                </div>
+                {% endif %}
                 <div class="col-md-4">
                     <label class="form-label">Respons&aacute;vel</label>
                     {% if is_detail %}
@@ -385,6 +399,7 @@
         const titleInput = document.getElementById('id_title');
         const dateInput = document.getElementById('id_due_date');
         const dateDisplay = document.getElementById('taskDateDisplay');
+        const categorySelect = document.getElementById('id_task_category');
         const categoryInput = document.getElementById('id_category');
         const stepContainer = document.getElementById('stepContainer');
         const addBtn = document.getElementById('addStepRow');
@@ -414,9 +429,37 @@
         let manualTitle = titleInput ? !!titleInput.value.trim() : false;
         let manualDate = false;
         let manualDateDisplay = false;
-        let manualCategory = categoryInput ? !!categoryInput.value.trim() : false;
+        let manualCategory = false;
 
         const normalize = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+        const hasCategorySelection = () => {
+            if (categoryInput && categoryInput.value.trim()) return true;
+            if (categorySelect && categorySelect.value) return true;
+            return false;
+        };
+
+        const applyCategoryValue = (value) => {
+            if (!value) return;
+            const normalizedValue = normalize(value);
+            if (categorySelect) {
+                const options = Array.from(categorySelect.options);
+                const match = options.find((opt) => normalize(opt.textContent) === normalizedValue);
+                if (match) {
+                    categorySelect.value = match.value;
+                    if (categoryInput) categoryInput.value = '';
+                    manualCategory = true;
+                    return;
+                }
+            }
+            if (categoryInput) {
+                categoryInput.value = value;
+                if (categorySelect) categorySelect.value = '';
+                manualCategory = true;
+            }
+        };
+
+        manualCategory = hasCategorySelection();
 
         const setButtonState = (active) => {
             if (active) {
@@ -682,7 +725,9 @@
                 dateInput.value = data.dateIso;
                 if (dateDisplay) dateDisplay.value = formatIsoToBr(data.dateIso);
             }
-            if (categoryInput && data.category && !manualCategory) categoryInput.value = data.category;
+            if (data.category && !manualCategory) {
+                applyCategoryValue(data.category);
+            }
             if (data.stepsDetected) syncSteps(data.steps || []);
             if (options.clearPreview) updatePreview(null);
         };
@@ -788,7 +833,18 @@
         }
         if (categoryInput) {
             categoryInput.addEventListener('input', () => {
-                manualCategory = !!categoryInput.value.trim();
+                if (categoryInput.value.trim() && categorySelect) {
+                    categorySelect.value = '';
+                }
+                manualCategory = hasCategorySelection();
+            });
+        }
+        if (categorySelect) {
+            categorySelect.addEventListener('change', () => {
+                if (categorySelect.value && categoryInput) {
+                    categoryInput.value = '';
+                }
+                manualCategory = hasCategorySelection();
             });
         }
 

@@ -360,3 +360,21 @@ def notify_account_deletion_request(user) -> None:
         f'E-mail: {user.email or "-"}\n'
     )
     _notify_superusers('notify_admin_contact', subject, body, level='warning', action_url=reverse('tracker:user_admin_list'))
+
+
+def notify_subscription_grace(user, grace_until) -> None:
+    if not user:
+        return
+    today = timezone.localdate()
+    remaining = (grace_until - today).days if grace_until else 0
+    subject = 'Assinatura em car\u00eancia'
+    body = (
+        'Sua assinatura expirou e entrou no per\u00edodo de car\u00eancia.\n\n'
+        'Durante a car\u00eancia, voc\u00ea pode continuar usando as tarefas, '
+        'mas as fun\u00e7\u00f5es financeiras e o agente de IA ficam bloqueados.\n\n'
+        f'Fim da car\u00eancia: {grace_until:%d/%m/%Y} '
+        f'({remaining} dia(s) restantes).\n\n'
+        'Regularize o pagamento para liberar o acesso completo.'
+    )
+    _send_email(user.email, subject, body, action_url=reverse('payments:subscription_start'))
+    _create_notification(user, subject, body, level='warning', action_url=reverse('payments:subscription_start'))

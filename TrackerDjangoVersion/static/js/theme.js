@@ -1,4 +1,23 @@
 const html = document.documentElement;
+const THEMES = [
+    'dark-teal',
+    'dark-orange',
+    'dark-purple',
+    'light-teal',
+    'light-orange',
+    'light-purple'
+];
+
+function normalizeTheme(value) {
+    if (!value) return 'light-teal';
+    if (value === 'light') return 'light-teal';
+    if (value === 'dark') return 'dark-teal';
+    return THEMES.includes(value) ? value : 'light-teal';
+}
+
+function themeMode(theme) {
+    return theme.startsWith('light') ? 'light' : 'dark';
+}
 
 function updateIcons(mode) {
     document.querySelectorAll('.js-theme-toggle').forEach(toggle => {
@@ -8,30 +27,52 @@ function updateIcons(mode) {
     });
 }
 
-function applyTheme(mode) {
+function labelForTheme(theme) {
+    const map = {
+        'dark-teal': 'Dark/Teal',
+        'dark-orange': 'Dark/Orange',
+        'dark-purple': 'Dark/Purple',
+        'light-teal': 'Light/Teal',
+        'light-orange': 'Light/Orange',
+        'light-purple': 'Light/Purple'
+    };
+    return map[theme] || theme;
+}
+
+function applyTheme(theme) {
     if (!html) return;
+    const normalized = normalizeTheme(theme);
+    const mode = themeMode(normalized);
+    html.setAttribute('data-itracker-theme', normalized);
     html.setAttribute('data-bs-theme', mode);
     if (document.body) {
         document.body.setAttribute('data-bs-theme', mode);
+        document.body.setAttribute('data-itracker-theme', normalized);
     }
     try {
-        localStorage.setItem('theme', mode);
+        localStorage.setItem('theme', normalized);
     } catch (err) {
         // ignore storage failures
     }
     updateIcons(mode);
+    const label = document.getElementById('currentThemeLabel');
+    if (label) {
+        label.textContent = labelForTheme(normalized);
+    }
 }
 
 function toggleTheme() {
-    const current = html.getAttribute('data-bs-theme') || 'light';
-    const next = current === 'light' ? 'dark' : 'light';
+    const currentAttr = html.getAttribute('data-itracker-theme');
+    const current = normalizeTheme(currentAttr || localStorage.getItem('theme'));
+    const index = THEMES.indexOf(current);
+    const next = THEMES[(index + 1) % THEMES.length];
     applyTheme(next);
 }
 
 window.iTrackerToggleTheme = toggleTheme;
 
 document.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('theme') || 'light';
+    const saved = normalizeTheme(localStorage.getItem('theme'));
     applyTheme(saved);
     document.querySelectorAll('.js-theme-toggle').forEach(toggle => {
         toggle.addEventListener('click', toggleTheme);

@@ -34,7 +34,7 @@ def _build_pricing_plans(pricing_state):
         "essential": [
             "Acessos manuais e ditados",
             "IA básica",
-            "Até 2 convidados por workspace",
+            "Plano individual (sem convidados)",
         ],
         "pro": [
             "Tudo do Essencial",
@@ -87,30 +87,36 @@ def _apply_subscription_to_profile(user, sub: MpSubscription, plan_cycle: str, p
         sub.next_payment_at = next_payment_at
         profile.subscription_expires = next_payment_at.date()
     else:
-        profile.subscription_expires = today + timedelta(days=365 if plan_cycle == 'annual' else 30)
+        profile.subscription_expires = today + timedelta(days=30)
     sub.grace_until = profile.subscription_expires + timedelta(days=grace_days)
     profile.billing_cycle = plan_cycle
     profile.plan = plan_tier
-    if plan_tier == 'master' and guest_limit:
-        profile.master_guest_limit = max(guest_limit, 6)
     profile.payment_confirmed = status in ('authorized', 'active')
+    if plan_tier == 'master' and profile.payment_confirmed:
+        if profile.master_guest_limit_pending and profile.master_guest_limit_pending > profile.master_guest_limit:
+            profile.master_guest_limit = profile.master_guest_limit_pending
+            profile.master_guest_limit_pending = 0
+        elif guest_limit:
+            profile.master_guest_limit = max(guest_limit, 6)
     if profile.payment_confirmed:
         profile.payment_confirmed_at = timezone.now()
         profile.is_approved = True
         if not profile.approved_at:
             profile.approved_at = timezone.now()
             profile.approved_by = None
-    profile.save(update_fields=[
+    update_fields = [
         'billing_cycle',
         'plan',
         'master_guest_limit',
+        'master_guest_limit_pending',
         'payment_confirmed',
         'payment_confirmed_at',
         'subscription_expires',
         'is_approved',
         'approved_at',
         'approved_by',
-    ])
+    ]
+    profile.save(update_fields=update_fields)
     sub.save(update_fields=['plan_cycle', 'plan_tier', 'guest_limit', 'status', 'next_payment_at', 'grace_until', 'updated_at'])
 
 
@@ -160,7 +166,7 @@ def subscription_start(request):
         guest_limit = int(getattr(profile, 'master_guest_limit', 6) or 6)
 
     unit_price = plan_price(pricing_state, plan_tier, plan_cycle, guest_limit=guest_limit)
-    amount = unit_price * (12 if plan_cycle == 'annual' else 1)
+    amount = unit_price
 
     reason = f"iTracker {plan_label(plan_tier)} {('Anual' if plan_cycle == 'annual' else 'Mensal')}"
     if plan_tier == 'master' and guest_limit:

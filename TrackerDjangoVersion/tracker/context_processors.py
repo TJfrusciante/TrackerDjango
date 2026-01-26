@@ -29,6 +29,9 @@ def workspace_context(request):
 
     undo_tx = _get_undo_payload(request, 'undo_tx')
     undo_task = _get_undo_payload(request, 'undo_task')
+    grace_active = bool(getattr(request, "subscription_grace", False))
+    grace_until = getattr(request, "subscription_grace_until", None)
+    grace_remaining = getattr(request, "subscription_grace_remaining", None)
     return {
         "current_workspace": current,
         "available_workspaces": available,
@@ -39,6 +42,9 @@ def workspace_context(request):
         "app_version": getattr(settings, "APP_VERSION", ""),
         "undo_tx": undo_tx,
         "undo_task": undo_task,
+        "subscription_grace_active": grace_active,
+        "subscription_grace_until": grace_until,
+        "subscription_grace_remaining": grace_remaining,
     }
 
 

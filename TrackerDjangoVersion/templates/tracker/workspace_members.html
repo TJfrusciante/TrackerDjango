@@ -48,6 +48,33 @@
                     <span class="badge text-bg-secondary">Visualiza&ccedil;&atilde;o somente</span>
                 {% endif %}
             </div>
+            <form method="get" class="row g-2 align-items-end mb-3">
+                <div class="col-md-7">
+                    <label class="form-label small">Buscar</label>
+                    <input type="text" name="q" class="form-control" placeholder="Nome, usu\u00e1rio ou e-mail" value="{{ filters.q }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Papel</label>
+                    <select name="role" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="owner" {% if filters.role == 'owner' %}selected{% endif %}>Owner</option>
+                        <option value="member" {% if filters.role == 'member' %}selected{% endif %}>Membro</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-outline-light btn-sm" type="submit">Filtrar</button>
+                </div>
+            </form>
+            {% if filter_chips %}
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% for chip in filter_chips %}
+                        <a class="filter-chip" href="{{ chip.url }}" data-bs-toggle="tooltip" title="Remover filtro">
+                            {{ chip.label }}
+                            <span class="ms-2">&times;</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% endif %}
             {% if memberships %}
             <div class="list-group">
                 {% for member in memberships %}

@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="pt-br" data-bs-theme="light">
+<html lang="pt-br" data-bs-theme="light" data-itracker-theme="light-teal">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -62,6 +62,8 @@
     <div class="chat-shell p-3">
         {% if guest_blocked %}
             <div class="alert alert-warning mb-0">Conta de convidado n&atilde;o tem acesso ao agente de IA.</div>
+        {% elif grace_blocked %}
+            <div class="alert alert-warning mb-0">Assinatura em car&ecirc;ncia: IA bloqueada at&eacute; a regulariza&ccedil;&atilde;o.</div>
         {% else %}
         <div class="d-flex align-items-center justify-content-between mb-2">
             <div>
@@ -108,8 +110,12 @@
     </div>
 
     <script>
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+        let savedTheme = localStorage.getItem('theme') || 'light-teal';
+        if (savedTheme === 'light') savedTheme = 'light-teal';
+        if (savedTheme === 'dark') savedTheme = 'dark-teal';
+        const mode = savedTheme.startsWith('light') ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-itracker-theme', savedTheme);
+        document.documentElement.setAttribute('data-bs-theme', mode);
 
         const chatBox = document.getElementById('chatBox');
         if (chatBox) {

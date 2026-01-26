@@ -224,6 +224,53 @@
             </div>
             {% endif %}
             <div class="glass-card p-3 bg-dark bg-opacity-10 mb-2">
+                <h6 class="fw-bold mb-2">Plano e uso</h6>
+                <div class="text-secondary small">Plano: {{ plan_info.plan_label }}</div>
+                <div class="text-secondary small">Ciclo: {{ plan_info.billing_cycle }}</div>
+                <div class="text-secondary small">
+                    Status:
+                    {% if plan_info.trial_active %}Trial{% elif plan_info.payment_confirmed %}Ativo{% else %}Pendente{% endif %}
+                </div>
+                {% if plan_info.subscription_expires %}
+                    <div class="text-secondary small">Renova em {{ plan_info.subscription_expires|date:"d/m/Y" }}</div>
+                {% endif %}
+            </div>
+            {% if profile.plan == 'master' and not profile.is_guest %}
+            <div class="glass-card p-3 bg-dark bg-opacity-10 mb-2">
+                <h6 class="fw-bold mb-2">
+                    Convidados adicionais (Master)
+                    <button type="button" class="btn btn-link p-0 ms-1 text-decoration-none text-secondary"
+                            data-bs-toggle="tooltip"
+                            title="Cada convidado acima de 6 aumenta 15% sobre o valor anterior. O ajuste vale na próxima cobrança.">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                </h6>
+                <div class="text-secondary small mb-2">
+                    Limite atual: {{ profile.master_guest_limit|default:6 }} convidados.
+                </div>
+                {% if profile.master_guest_limit_pending and profile.master_guest_limit_pending > profile.master_guest_limit %}
+                    <div class="alert alert-warning small mb-2">
+                        Aguardando confirma&ccedil;&atilde;o de cobran&ccedil;a para liberar {{ profile.master_guest_limit_pending }} convidados.
+                    </div>
+                {% endif %}
+                <form method="post" class="d-flex flex-column gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="master_guest">
+                    <div>
+                        <label class="form-label small" for="{{ master_guest_form.master_guest_limit.id_for_label }}">
+                            {{ master_guest_form.master_guest_limit.label }}
+                        </label>
+                        {{ master_guest_form.master_guest_limit }}
+                        {% if master_guest_form.master_guest_limit.errors %}
+                            <div class="text-danger small">{{ master_guest_form.master_guest_limit.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">{{ master_guest_form.master_guest_limit.help_text }}</div>
+                    </div>
+                    <button class="btn btn-outline-light w-100" type="submit">Atualizar limite</button>
+                </form>
+            </div>
+            {% endif %}
+            <div class="glass-card p-3 bg-dark bg-opacity-10 mb-2">
                 <h6 class="fw-bold mb-2">Uso de IA</h6>
                 {% if ai_usage.unlimited %}
                     <div class="text-secondary small">Uso ilimitado para este plano.</div>
@@ -240,9 +287,11 @@
                         </div>
                     {% endif %}
                 {% endif %}
+                {% if user.is_superuser %}
                 <div class="text-secondary small">
                     Custo estimado (R$): {{ ai_usage.cost|floatformat:2 }}
                 </div>
+                {% endif %}
             </div>
             <a class="btn btn-outline-light page-action-btn w-100" href="{% url 'tracker:contact_admin' %}?topic=payment">
                 Avisar pagamento

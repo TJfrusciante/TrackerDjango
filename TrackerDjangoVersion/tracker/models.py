@@ -21,6 +21,21 @@ class Category(models.Model):
         return self.name
 
 
+class TaskCategory(models.Model):
+    name = models.CharField(max_length=80)
+    color = models.CharField(max_length=20, blank=True, default='')
+    workspace = models.ForeignKey('Workspace', null=True, blank=True, on_delete=models.SET_NULL, related_name='task_categories')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ('workspace', 'name')
+        indexes = [models.Index(fields=['workspace', 'name'])]
+
+    def __str__(self):
+        return self.name
+
+
 class Task(models.Model):
     STATUS_CHOICES = [
         ('ongoing', 'Em andamento'),
@@ -29,6 +44,7 @@ class Task(models.Model):
 
     title = models.CharField(max_length=180)
     category = models.CharField(max_length=80, blank=True, default='')
+    task_category = models.ForeignKey(TaskCategory, null=True, blank=True, on_delete=models.SET_NULL, related_name='tasks')
     due_date = models.DateField()
     selected = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ongoing')
@@ -192,6 +208,7 @@ class UserProfile(models.Model):
     is_guest = models.BooleanField(default=False)
     plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='essential')
     master_guest_limit = models.PositiveIntegerField(default=6)
+    master_guest_limit_pending = models.PositiveIntegerField(default=0)
     billing_cycle = models.CharField(max_length=20, choices=BILLING_CHOICES, default='monthly')
     payment_confirmed = models.BooleanField(default=False)
     payment_confirmed_at = models.DateTimeField(null=True, blank=True)
@@ -199,6 +216,7 @@ class UserProfile(models.Model):
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='approved_profiles')
     subscription_expires = models.DateField(null=True, blank=True)
+    grace_notified_at = models.DateTimeField(null=True, blank=True)
     notify_balance_threshold = models.BooleanField(default=False)
     balance_threshold = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     balance_alert_last_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)

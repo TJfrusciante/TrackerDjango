@@ -10,6 +10,7 @@ from django.utils.text import slugify
 
 from .models import (
     Category,
+    TaskCategory,
     Task,
     TaskStep,
     Transaction,
@@ -114,18 +115,37 @@ class TaskForm(BaseStyledForm):
             if self.instance and getattr(self.instance, "responsible_user_id", None):
                 member_ids.add(self.instance.responsible_user_id)
             self.fields['responsible_user'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
+            self.fields['task_category'].queryset = TaskCategory.objects.filter(workspace=workspace)
+        else:
+            self.fields['task_category'].queryset = TaskCategory.objects.all()
+        self.fields['task_category'].required = False
+        self.fields['task_category'].empty_label = 'Selecione a categoria'
+        if self.instance and getattr(self.instance, 'task_category_id', None):
+            self.fields['category'].initial = ''
 
     class Meta:
         model = Task
-        fields = ['title', 'category', 'responsible_user', 'due_date', 'status']
+        fields = ['title', 'task_category', 'category', 'responsible_user', 'due_date', 'status']
         widgets = {
             'due_date': forms.DateInput(
                 format='%Y-%m-%d',
                 attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'}
             ),
-            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Categoria da tarefa'}),
+            'task_category': forms.Select(attrs={'class': 'form-select'}),
+            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Outra categoria (opcional)'}),
             'responsible_user': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def clean(self):
+        cleaned = super().clean()
+        custom_category = (cleaned.get('category') or '').strip()
+        selected_category = cleaned.get('task_category')
+        if custom_category:
+            cleaned['task_category'] = None
+            cleaned['category'] = custom_category
+        elif selected_category:
+            cleaned['category'] = selected_category.name
+        return cleaned
 
 
 class TaskStepForm(BaseStyledForm):
@@ -188,9 +208,15 @@ class TaskBulkUpdateForm(forms.Form):
         empty_label='Manter responsável',
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+    task_category = forms.ModelChoiceField(
+        queryset=TaskCategory.objects.none(),
+        required=False,
+        empty_label='Manter categoria',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
     category = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nova categoria', 'list': 'taskCategoriesList'})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Outra categoria (opcional)'})
     )
     due_date = forms.DateField(
         required=False,
@@ -222,13 +248,24 @@ class TaskBulkUpdateForm(forms.Form):
             if workspace.owner_id:
                 member_ids.add(workspace.owner_id)
             self.fields['responsible_user'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
+            self.fields['task_category'].queryset = TaskCategory.objects.filter(workspace=workspace)
         else:
             self.fields['responsible_user'].queryset = User.objects.all().order_by('first_name', 'username')
+            self.fields['task_category'].queryset = TaskCategory.objects.all()
 
 
 class CategoryForm(BaseStyledForm):
     class Meta:
         model = Category
+        fields = ['name', 'color']
+        widgets = {
+            'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color', 'title': 'Selecionar cor'}),
+        }
+
+
+class TaskCategoryForm(BaseStyledForm):
+    class Meta:
+        model = TaskCategory
         fields = ['name', 'color']
         widgets = {
             'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color', 'title': 'Selecionar cor'}),
@@ -323,7 +360,7 @@ class SignupForm(UserCreationForm):
         min_value=6,
         max_value=50,
         widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '6'}),
-        help_text='Cada convidado acima de 6 adiciona 15% ao valor da assinatura.'
+        help_text='Cada convidado acima de 6 aumenta 15% sobre o valor anterior.'
     )
     avatar = forms.ImageField(label="Foto", required=False)
     invite_code = forms.CharField(
@@ -455,11 +492,12 @@ class UserAdminForm(forms.ModelForm):
 class UserProfileAdminForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['plan', 'billing_cycle', 'master_guest_limit', 'payment_confirmed', 'subscription_expires', 'payment_notes', 'is_approved', 'is_guest']
+        fields = ['plan', 'billing_cycle', 'master_guest_limit', 'master_guest_limit_pending', 'payment_confirmed', 'subscription_expires', 'payment_notes', 'is_approved', 'is_guest']
         widgets = {
             'plan': forms.Select(attrs={'class': 'form-select'}),
             'billing_cycle': forms.Select(attrs={'class': 'form-select'}),
             'master_guest_limit': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'master_guest_limit_pending': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'payment_confirmed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'subscription_expires': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'payment_notes': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Observa\u00e7\u00f5es do pagamento'}),
@@ -470,6 +508,7 @@ class UserProfileAdminForm(forms.ModelForm):
             'plan': 'Plano',
             'billing_cycle': 'Ciclo de cobran\u00e7a',
             'master_guest_limit': 'Limite de convidados (Master)',
+            'master_guest_limit_pending': 'Limite pendente (Master)',
             'payment_confirmed': 'Pagamento confirmado',
             'subscription_expires': 'Expira em',
             'payment_notes': 'Observa\u00e7\u00f5es',
@@ -488,6 +527,16 @@ class ProfileForm(forms.ModelForm):
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
         }
+
+
+class MasterGuestLimitRequestForm(forms.Form):
+    master_guest_limit = forms.IntegerField(
+        label="Convidados no plano Master",
+        min_value=6,
+        max_value=50,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '6', 'max': '50'}),
+        help_text='Cada convidado acima de 6 aumenta 15% sobre o valor anterior.',
+    )
 
 
 class ProfileAvatarForm(forms.ModelForm):

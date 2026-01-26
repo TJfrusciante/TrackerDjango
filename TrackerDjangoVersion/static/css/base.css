@@ -3,6 +3,8 @@
     --primary-strong: #0b5c56;
     --primary-soft: #5eead4;
     --accent: #f59e0b;
+    --primary-glow: rgba(94, 234, 212, 0.14);
+    --accent-glow: rgba(245, 158, 11, 0.1);
     --bg: #0b1221;
     --card-bg: #0f172a;
     --text-color: #e2e8f0;
@@ -20,13 +22,97 @@
     --bs-tooltip-color: #f8fafc;
 }
 
+[data-itracker-theme="dark-teal"] {
+    --primary-color: #0f766e;
+    --primary-strong: #0b5c56;
+    --primary-soft: #5eead4;
+    --accent: #f59e0b;
+    --primary-glow: rgba(94, 234, 212, 0.14);
+    --accent-glow: rgba(245, 158, 11, 0.1);
+    --bg: #0b1221;
+    --card-bg: #0f172a;
+    --text-color: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #1f2937;
+}
+
+[data-itracker-theme="dark-orange"] {
+    --primary-color: #f97316;
+    --primary-strong: #c2410c;
+    --primary-soft: #fdba74;
+    --accent: #38bdf8;
+    --primary-glow: rgba(249, 115, 22, 0.14);
+    --accent-glow: rgba(56, 189, 248, 0.12);
+    --bg: #0b1221;
+    --card-bg: #0f172a;
+    --text-color: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #1f2937;
+}
+
+[data-itracker-theme="dark-purple"] {
+    --primary-color: #7c3aed;
+    --primary-strong: #5b21b6;
+    --primary-soft: #c4b5fd;
+    --accent: #f472b6;
+    --primary-glow: rgba(124, 58, 237, 0.18);
+    --accent-glow: rgba(244, 114, 182, 0.12);
+    --bg: #0b1221;
+    --card-bg: #0f172a;
+    --text-color: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #1f2937;
+}
+
+[data-itracker-theme="light-teal"] {
+    --primary-color: #0f766e;
+    --primary-strong: #0b5c56;
+    --primary-soft: #5eead4;
+    --accent: #f59e0b;
+    --primary-glow: rgba(94, 234, 212, 0.22);
+    --accent-glow: rgba(245, 158, 11, 0.14);
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text-color: #0f172a;
+    --muted: #475569;
+    --border: #e2e8f0;
+}
+
+[data-itracker-theme="light-orange"] {
+    --primary-color: #ea580c;
+    --primary-strong: #c2410c;
+    --primary-soft: #fdba74;
+    --accent: #0ea5e9;
+    --primary-glow: rgba(234, 88, 12, 0.18);
+    --accent-glow: rgba(14, 165, 233, 0.14);
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text-color: #0f172a;
+    --muted: #475569;
+    --border: #e2e8f0;
+}
+
+[data-itracker-theme="light-purple"] {
+    --primary-color: #7c3aed;
+    --primary-strong: #6d28d9;
+    --primary-soft: #c4b5fd;
+    --accent: #ec4899;
+    --primary-glow: rgba(124, 58, 237, 0.18);
+    --accent-glow: rgba(236, 72, 153, 0.14);
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text-color: #0f172a;
+    --muted: #475569;
+    --border: #e2e8f0;
+}
+
 * {
     transition: background-color .3s ease, color .3s ease, border-color .3s ease;
 }
 
 body {
-    background: radial-gradient(circle at 20% 20%, rgba(94, 234, 212, 0.12), transparent 30%),
-                radial-gradient(circle at 80% 0%, rgba(245, 158, 11, 0.1), transparent 25%),
+    background: radial-gradient(circle at 20% 20%, var(--primary-glow), transparent 30%),
+                radial-gradient(circle at 80% 0%, var(--accent-glow), transparent 25%),
                 var(--bg);
     color: var(--text-color);
     min-height: 100vh;
@@ -374,6 +460,22 @@ body.sidebar-collapsed .sidebar-panel {
     backdrop-filter: blur(12px);
 }
 
+.grace-banner {
+    position: sticky;
+    top: 0;
+    z-index: 1031;
+    background: linear-gradient(120deg, rgba(234, 179, 8, 0.18), rgba(248, 113, 113, 0.15));
+    border-bottom: 1px solid rgba(234, 179, 8, 0.3);
+    color: var(--text-color);
+    padding: 0.6rem 0;
+    backdrop-filter: blur(12px);
+}
+
+[data-bs-theme="light"] .grace-banner {
+    background: #fff7ed;
+    border-bottom-color: #fdba74;
+}
+
 .main-shell {
     flex: 1 1 auto;
 }
@@ -692,10 +794,13 @@ body.sidebar-collapsed .sidebar-panel {
 }
 
 .tour-highlight {
-    position: relative;
     z-index: 1105;
     border-radius: 14px;
     box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.7), 0 0 0 9999px rgba(2, 6, 23, 0.65);
+}
+
+.tour-highlight-relative {
+    position: relative;
 }
 
 .tour-tooltip {
@@ -761,6 +866,22 @@ body.sidebar-collapsed .sidebar-panel {
 .tour-tooltip .btn-primary:hover {
     background: var(--primary-strong);
     border-color: var(--primary-strong);
+}
+
+@media (max-width: 768px) {
+    .tour-tooltip {
+        max-width: calc(100vw - 2rem);
+        padding: 0.85rem;
+    }
+    .tour-tooltip .tour-actions {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        justify-content: flex-start;
+    }
+    .tour-tooltip .tour-progress {
+        width: 100%;
+        margin: 0 0 0.25rem;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

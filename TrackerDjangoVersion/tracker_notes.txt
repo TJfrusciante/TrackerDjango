@@ -73,7 +73,7 @@ Atualizacoes recentes
 - Dashboard: filtro por responsavel (membro) e cores de categorias mantidas ao filtrar graficos por categoria.
 - Transacoes: acao em massa permite selecionar todos os itens do filtro (alem da pagina atual) e editar responsavel/data em lote.
 - Tarefas: responsavel (membro do workspace) no formulario, lista e acao em massa; export CSV inclui responsavel.
-- Planos: Essencial/Pro/Master com limites 2/6/personalizado; escolha de plano+ciclo no cadastro; Master ajusta preco (+15% por convidado acima de 6).
+- Planos: Essencial/Pro/Master com limites 0/6/personalizado; escolha de plano+ciclo no cadastro; Master ajusta preco (+R$ 15 por convidado acima de 6).
 - Pagamentos: checkout MP e tela de escolha agora usam ciclo+tier; convites de assinatura exibem o tier do plano.
 - Landing/Ajuda: textos atualizados para novos planos e permissao de convidados.
 - Dependencias: requirements.txt atualizado (Django, pdfminer, dotenv, pywebpush, sentry).
@@ -170,3 +170,7 @@ Mapa rapido (onde mexer)
 - Undo de exclusões: toasts limpam sessão ao fechar (evita reaparecer após trocar de tela).
 - Cache: chart_data e dashboard usam chave de cache por workspace/periodo para reduzir carga (corrigir NameError se reaparecer).
 - Landing: seção dedicada do Agente de IA + seção dedicada do WhatsApp; FAQ ampliado (IA, voz, limites).
+- Temas: 6 skins (dark/light x teal/orange/purple) com CSS vars via `data-itracker-theme`; toggle agora cicla temas e salva `theme` no localStorage (ex.: light-teal). Sidebar mostra “Tema atual: …”. Embed do IA respeita o tema.
+- Categorias: barra de navegação fixa (sticky) abaixo do título com 4 botões em grid (âncoras #categorias-transacoes/#categorias-tarefas + ir para transações/tarefas).
+- Perfil: dono do plano Master pode solicitar mais convidados; fica pendente até cobrança confirmar e só então aumenta limite (atualiza preapproval no MP para o próximo ciclo).
+- Assinaturas: período de carência (SUBSCRIPTION_GRACE_DAYS) envia e-mail/alerta, mostra banner fixo e bloqueia IA+financeiro; tarefas continuam acessíveis. Após carência, acesso total bloqueado até renovar.

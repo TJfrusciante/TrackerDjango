@@ -203,6 +203,10 @@ CACHES = {
     }
 }
 
+# Cache TTLs (segundos)
+DASHBOARD_CACHE_TTL = int(env("DASHBOARD_CACHE_TTL", "300"))
+CHART_CACHE_TTL = int(env("CHART_CACHE_TTL", "300"))
+
 # ------------------------------------------------------------------------------
 # Auth redirects
 # ------------------------------------------------------------------------------

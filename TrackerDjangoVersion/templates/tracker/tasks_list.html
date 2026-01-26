@@ -119,6 +119,13 @@
     {% endfor %}
 </div>
 {% endif %}
+{% if tasks_total == 0 %}
+<div class="glass-card p-4 text-center mb-4">
+    <h5 class="mb-2">Nenhuma tarefa encontrada</h5>
+    <p class="text-secondary mb-3">Crie sua primeira tarefa e acompanhe o progresso em etapas.</p>
+    <a class="btn btn-primary" href="{% url 'tracker:task_create' %}">Criar tarefa</a>
+</div>
+{% endif %}
 <script>
     (function() {
         const form = document.getElementById('taskFilters');
@@ -206,6 +213,8 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Categoria</label>
+                    {{ bulk_form.task_category }}
+                    <div class="form-text small text-secondary">ou</div>
                     {{ bulk_form.category }}
                 </div>
                 <div class="col-md-2">
@@ -285,7 +294,13 @@
                             <input class="form-check-input task-select" type="checkbox" value="{{ task.id }}" aria-label="Selecionar tarefa">
                         </td>
                         <td class="fw-semibold">{{ task.title }}</td>
-                        <td class="text-secondary">{{ task.category|default:"-" }}</td>
+                        <td class="text-secondary">
+                            {% if task.task_category %}
+                                {{ task.task_category.name }}
+                            {% else %}
+                                {{ task.category|default:"-" }}
+                            {% endif %}
+                        </td>
                         <td class="text-secondary">
                             {% if task.responsible_user %}
                                 {{ task.responsible_user.get_full_name|default:task.responsible_user.username }}

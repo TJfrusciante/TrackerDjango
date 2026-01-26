@@ -102,4 +102,6 @@ urlpatterns = [
     path('categorias/', views.categories_list, name='categories_list'),
     path('categorias/<int:pk>/editar/', views.category_edit, name='category_edit'),
     path('categorias/<int:pk>/excluir/', views.category_delete, name='category_delete'),
+    path('categorias/tarefas/<int:pk>/editar/', views.task_category_edit, name='task_category_edit'),
+    path('categorias/tarefas/<int:pk>/excluir/', views.task_category_delete, name='task_category_delete'),
 ]

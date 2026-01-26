@@ -125,6 +125,16 @@
     {% endfor %}
 </div>
 {% endif %}
+{% if transactions_total == 0 %}
+<div class="glass-card p-4 text-center mb-4">
+    <h5 class="mb-2">Nenhuma transa&ccedil;&atilde;o encontrada</h5>
+    <p class="text-secondary mb-3">Crie sua primeira transa&ccedil;&atilde;o ou importe um extrato.</p>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+        <a class="btn btn-primary" href="{% url 'tracker:transaction_create' %}">Criar transa&ccedil;&atilde;o</a>
+        <a class="btn btn-outline-light" href="{% url 'tracker:transaction_import' %}">Importar CSV</a>
+    </div>
+</div>
+{% endif %}
 <script>
     (function() {
         const form = document.getElementById('txFilters');

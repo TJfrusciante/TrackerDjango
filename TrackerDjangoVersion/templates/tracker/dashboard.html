@@ -187,6 +187,44 @@
     </div>
 
     <div class="col-12">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="glass-card p-3 h-100">
+                    <p class="text-secondary small mb-1">Maior receita</p>
+                    {% if insights.top_income_label %}
+                        <h4 class="mb-0 text-success">{{ insights.top_income_label }}</h4>
+                        <div class="text-secondary small">R$ {{ insights.top_income_value|floatformat:2 }}</div>
+                    {% else %}
+                        <div class="text-secondary small">Sem dados no per&iacute;odo.</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card p-3 h-100">
+                    <p class="text-secondary small mb-1">Maior gasto</p>
+                    {% if insights.top_expense_label %}
+                        <h4 class="mb-0 text-danger">{{ insights.top_expense_label }}</h4>
+                        <div class="text-secondary small">R$ {{ insights.top_expense_value|floatformat:2 }}</div>
+                    {% else %}
+                        <div class="text-secondary small">Sem dados no per&iacute;odo.</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card p-3 h-100">
+                    <p class="text-secondary small mb-1">Categoria com maior impacto</p>
+                    {% if insights.top_net_label %}
+                        <h4 class="mb-0">{{ insights.top_net_label }}</h4>
+                        <div class="text-secondary small">Saldo l&iacute;quido: R$ {{ insights.top_net_value|floatformat:2 }}</div>
+                    {% else %}
+                        <div class="text-secondary small">Sem dados no per&iacute;odo.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
         <div class="dashboard-toolbar">
             <button class="btn btn-outline-light page-action-btn" id="clearFilters" type="button" data-default-start="{{ start_date|date:'Y-m-d' }}" data-default-end="{{ end_date|date:'Y-m-d' }}" data-bs-toggle="tooltip" title="Limpar filtros e voltar ao per&iacute;odo inicial">
                 <i class="fa-solid fa-eraser me-1"></i>Limpar filtros
@@ -326,6 +364,9 @@
                         <tr class="text-secondary">
                             <th>Descri&#231;&#227;o</th>
                             <th>Categoria</th>
+                            {% if show_responsible_column %}
+                            <th>Respons&aacute;vel</th>
+                            {% endif %}
                             <th>Data</th>
                             <th class="text-end">Valor</th>
                             <th></th>
@@ -336,6 +377,15 @@
                             <tr>
                                 <td class="fw-semibold">{{ tx.description }}</td>
                                 <td><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
+                                {% if show_responsible_column %}
+                                <td class="text-secondary">
+                                    {% if tx.responsible %}
+                                        {{ tx.responsible.get_full_name|default:tx.responsible.username }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                {% endif %}
                                 <td class="text-secondary">{{ tx.date|date:"d/m/Y" }}</td>
                                 <td class="text-end {% if tx.type == 'income' %}text-success{% else %}text-danger{% endif %}">R$ {{ tx.value|floatformat:2 }}</td>
                                 <td>
@@ -344,7 +394,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="5">
+                                <td colspan="{% if show_responsible_column %}6{% else %}5{% endif %}">
                                     <div class="text-secondary mb-2">Sem transa&ccedil;&otilde;es por enquanto.</div>
                                     <a class="btn btn-sm btn-primary" href="{% url 'tracker:transaction_create' %}">
                                         <i class="fa-solid fa-plus me-2"></i>Criar primeira transa&ccedil;&atilde;o
@@ -936,7 +986,20 @@
         if (!res.ok) return;
         const data = await res.json();
 
-        const activeColor = activeCategoryId ? (data.active_category_color || (data.colors && data.colors[0]) || '') : '';
+        let activeColor = '';
+        if (activeCategoryId) {
+            if (data.active_category_color) {
+                activeColor = data.active_category_color;
+            } else if (Array.isArray(data.category_ids) && Array.isArray(data.colors)) {
+                const idx = data.category_ids.findIndex(id => String(id) === String(activeCategoryId));
+                if (idx >= 0 && data.colors[idx]) {
+                    activeColor = data.colors[idx];
+                }
+            }
+            if (!activeColor && data.colors && data.colors[0]) {
+                activeColor = data.colors[0];
+            }
+        }
         renderChart(data.labels || [], data.values || [], data.colors || [], data.category_ids || [], activeColor);
         renderTypeChart(data.income_total || 0, data.expense_total || 0);
         renderMonthly(data.monthly_labels || [], data.monthly_values || [], activeColor);

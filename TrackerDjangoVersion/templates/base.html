@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="pt-br" data-bs-theme="light">
+<html lang="pt-br" data-bs-theme="light" data-itracker-theme="light-teal">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,9 +9,12 @@
         (function() {
             try {
                 var saved = localStorage.getItem('theme');
-                if (saved) {
-                    document.documentElement.setAttribute('data-bs-theme', saved);
-                }
+                if (saved === 'light') saved = 'light-teal';
+                if (saved === 'dark') saved = 'dark-teal';
+                var theme = saved || 'light-teal';
+                var mode = theme.indexOf('light') === 0 ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-itracker-theme', theme);
+                document.documentElement.setAttribute('data-bs-theme', mode);
             } catch (e) {
                 // ignore storage failures
             }
@@ -108,7 +111,7 @@
                     {% endif %}
 
                     <div class="sidebar-theme">
-                        <span class="text-secondary small sidebar-label">Tema</span>
+                        <span class="text-secondary small sidebar-label">Tema atual: <span id="currentThemeLabel">—</span></span>
                         <button class="theme-toggle js-theme-toggle" type="button" aria-label="Alternar tema" data-tour="theme-toggle" data-bs-toggle="tooltip" data-bs-title="Alternar tema">
                             <i class="fa-solid fa-sun"></i>
                         </button>
@@ -176,15 +179,15 @@
                         <i class="fa-solid fa-chevron-down sidebar-label"></i>
                     </button>
                     <div class="sidebar-panel" id="quickActionsPanel">
-                        <a class="nav-link js-tooltip {% if '/workspaces' in request.path %}active{% endif %}" href="{% url 'tracker:workspace_overview' %}" data-bs-toggle="tooltip" data-bs-title="Workspaces" aria-label="Workspaces">
+                        <a class="nav-link js-tooltip {% if '/workspaces' in request.path %}active{% endif %}" href="{% url 'tracker:workspace_overview' %}" data-bs-toggle="tooltip" data-bs-title="Workspaces" aria-label="Workspaces" data-tour="nav-workspaces">
                             <i class="fa-solid fa-briefcase"></i><span class="nav-label sidebar-label">Workspaces</span>
                         </a>
                         {% if not user_is_guest %}
-                        <a class="nav-link js-tooltip {% if '/categorias' in request.path %}active{% endif %}" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" data-bs-title="Categorias" aria-label="Categorias">
+                        <a class="nav-link js-tooltip {% if '/categorias' in request.path %}active{% endif %}" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" data-bs-title="Categorias" aria-label="Categorias" data-tour="nav-categories">
                             <i class="fa-solid fa-tags"></i><span class="nav-label sidebar-label">Categorias</span>
                         </a>
                         {% endif %}
-                        <a class="nav-link js-tooltip {% if '/notificacoes' in request.path %}active{% endif %}" href="{% url 'tracker:notifications' %}" data-bs-toggle="tooltip" data-bs-title="Notifica&ccedil;&otilde;es" aria-label="Notifica&ccedil;&otilde;es">
+                        <a class="nav-link js-tooltip {% if '/notificacoes' in request.path %}active{% endif %}" href="{% url 'tracker:notifications' %}" data-bs-toggle="tooltip" data-bs-title="Notifica&ccedil;&otilde;es" aria-label="Notifica&ccedil;&otilde;es" data-tour="nav-notifications">
                             <span class="position-relative">
                                 <i class="fa-solid fa-bell"></i>
                                 {% if notifications_unread %}
@@ -195,7 +198,7 @@
                             </span>
                             <span class="nav-label sidebar-label">Notifica&ccedil;&otilde;es</span>
                         </a>
-                        <a class="nav-link js-tooltip {% if '/help' in request.path %}active{% endif %}" href="{% url 'tracker:help' %}" data-bs-toggle="tooltip" data-bs-title="Ajuda" aria-label="Ajuda">
+                        <a class="nav-link js-tooltip {% if '/help' in request.path %}active{% endif %}" href="{% url 'tracker:help' %}" data-bs-toggle="tooltip" data-bs-title="Ajuda" aria-label="Ajuda" data-tour="nav-help">
                             <i class="fa-solid fa-circle-question"></i><span class="nav-label sidebar-label">Ajuda</span>
                         </a>
                         {% if user.is_superuser %}
@@ -220,11 +223,26 @@
                 <button class="btn btn-outline-light icon-pill" id="sidebarToggle" type="button" aria-label="Abrir menu">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                <span class="fw-bold">iTracker</span>
+                <a class="fw-bold text-decoration-none text-white js-tooltip" href="{% if user.is_authenticated %}{% url 'tracker:dashboard' %}{% else %}{% url 'tracker:home' %}{% endif %}" data-bs-toggle="tooltip" data-bs-title="Ir para o dashboard" aria-label="Ir para o dashboard">iTracker</a>
                 <button class="theme-toggle js-theme-toggle" type="button" aria-label="Alternar tema">
                     <i class="fa-solid fa-sun"></i>
                 </button>
             </div>
+
+            {% if subscription_grace_active %}
+            <div class="grace-banner">
+                <div class="container d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+                    <div>
+                        <strong>Assinatura em car&ecirc;ncia</strong>
+                        <div class="small">
+                            IA e financeiro est&atilde;o bloqueados. Restam {{ subscription_grace_remaining }} dia(s).
+                            Fim em {{ subscription_grace_until|date:"d/m/Y" }}.
+                        </div>
+                    </div>
+                    <a class="btn btn-sm btn-light" href="{% url 'payments:subscription_start' %}">Regularizar assinatura</a>
+                </div>
+            </div>
+            {% endif %}
 
             <main class="py-4 main-shell">
                 <div class="container">

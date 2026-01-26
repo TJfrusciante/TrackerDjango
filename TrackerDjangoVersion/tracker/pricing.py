@@ -60,8 +60,9 @@ def plan_base_price(pricing_state: PricingState, plan: str, cycle: str, promo: b
 def plan_price(pricing_state: PricingState, plan: str, cycle: str, guest_limit: int | None = None, promo: bool = True) -> Decimal:
     base = plan_base_price(pricing_state, plan, cycle, promo=promo)
     if plan == "master" and guest_limit and guest_limit > 6:
-        extra = Decimal("0.15") * Decimal(guest_limit - 6)
-        return base * (Decimal("1.0") + extra)
+        extra_count = guest_limit - 6
+        multiplier = Decimal("1.15") ** extra_count
+        return (base * multiplier).quantize(Decimal("0.01"))
     return base
 
 

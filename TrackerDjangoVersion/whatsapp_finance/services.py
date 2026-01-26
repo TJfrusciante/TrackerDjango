@@ -16,7 +16,7 @@ from django.utils import timezone
 from assistant.limits import get_ai_quota
 from assistant.models import AiUsage
 from assistant.services import llm_complete, estimate_costs
-from tracker.models import Category, Transaction, Task, TaskStep, WorkspaceMembership
+from tracker.models import Category, TaskCategory, Transaction, Task, TaskStep, WorkspaceMembership
 from .models import CategoryPreference, ParsedTransaction, WhatsAppMessage, WhatsAppProfile
 
 
@@ -37,6 +37,7 @@ class ParsedTaskResult:
     due_date: dt.date
     category: str
     steps: list[str]
+    task_category: TaskCategory | None = None
 
 
 DEFAULT_CATEGORY_COLORS = {
@@ -151,6 +152,16 @@ def normalize_text(text: str) -> str:
 def _match_existing_category(workspace, name: str) -> Category | None:
     normalized = normalize_text(name)
     for category in Category.objects.filter(workspace=workspace):
+        if normalize_text(category.name) == normalized:
+            return category
+    return None
+
+
+def _match_task_category(workspace, name: str) -> TaskCategory | None:
+    if not name:
+        return None
+    normalized = normalize_text(name)
+    for category in TaskCategory.objects.filter(workspace=workspace):
         if normalize_text(category.name) == normalized:
             return category
     return None
@@ -309,6 +320,7 @@ def parse_task_text(text: str) -> ParsedTaskResult | None:
         due_date=due_date,
         category=category,
         steps=steps,
+        task_category=None,
     )
 
 
@@ -438,10 +450,13 @@ def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None
     if not quota.get("allowed", True):
         return None, None, "Limite de IA atingido. Reescreva informando valor e data."
     categories = list(Category.objects.filter(workspace=workspace).values_list("name", flat=True))
+    task_categories = list(TaskCategory.objects.filter(workspace=workspace).values_list("name", flat=True))
     categories_label = ", ".join(categories[:30]) if categories else "nenhuma"
+    task_categories_label = ", ".join(task_categories[:30]) if task_categories else "nenhuma"
     system_prompt = (
         "Você extrai dados de uma mensagem do WhatsApp para o iTracker. "
         "Use SOMENTE categorias da lista fornecida; se nenhuma servir, deixe category vazio. "
+        "Para tarefas, use SOMENTE categorias da lista de tarefas. "
         "Responda APENAS em JSON com as chaves: "
         "intent (transaction|task|unknown), "
         "description, amount, date (YYYY-MM-DD), type (income|expense), category, "
@@ -449,7 +464,8 @@ def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None
         "task_title, task_due_date (YYYY-MM-DD), task_steps (array), task_category."
     )
     user_prompt = (
-        f"Categorias disponíveis: {categories_label}\n"
+        f"Categorias de transação: {categories_label}\n"
+        f"Categorias de tarefas: {task_categories_label}\n"
         f"Mensagem: {text}"
     )
     reply, usage, model_name = llm_complete(system_prompt, user_prompt)
@@ -470,7 +486,14 @@ def _llm_fallback_parse(user, workspace, text: str) -> tuple[ParsedResult | None
         if isinstance(steps, str):
             steps = [s.strip() for s in steps.split(";") if s.strip()]
         category = (payload.get("task_category") or "").strip().title()
-        return None, ParsedTaskResult(title=title, due_date=due_date, category=category, steps=steps), None
+        matched_task_category = _match_task_category(workspace, category)
+        return None, ParsedTaskResult(
+            title=title,
+            due_date=due_date,
+            category=matched_task_category.name if matched_task_category else category,
+            steps=steps,
+            task_category=matched_task_category,
+        ), None
 
     if intent in ("transaction", "unknown", ""):
         raw_amount = payload.get("amount")
@@ -544,9 +567,12 @@ def _can_create_task(user, workspace) -> bool:
 
 def _create_task_from_parsed(user, workspace, parsed: ParsedTaskResult) -> Task:
     responsible_name = user.get_full_name() or user.username
+    task_category = parsed.task_category or _match_task_category(workspace, parsed.category)
+    category_label = task_category.name if task_category else parsed.category or ""
     task = Task.objects.create(
         title=parsed.title,
-        category=parsed.category or "",
+        task_category=task_category,
+        category=category_label,
         due_date=parsed.due_date,
         workspace=workspace,
         responsible_user=user,
@@ -569,7 +595,7 @@ def _create_task_from_parsed(user, workspace, parsed: ParsedTaskResult) -> Task:
 
 def build_task_message(task: Task, steps_count: int) -> str:
     due_label = _format_date(task.due_date)
-    category = task.category or "Sem categoria"
+    category = task.task_category.name if task.task_category else (task.category or "Sem categoria")
     return (
         f"Tarefa criada: {task.title}. Prazo: {due_label}. "
         f"Categoria: {category}. Etapas: {steps_count}."

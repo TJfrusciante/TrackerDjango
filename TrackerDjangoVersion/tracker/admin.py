@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     Category,
+    TaskCategory,
     Task,
     Transaction,
     Workspace,
@@ -29,6 +30,13 @@ class WorkspaceScopedAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(WorkspaceScopedAdmin):
+    list_display = ('name', 'workspace', 'color', 'created_at')
+    list_filter = ('workspace', 'created_at')
+    search_fields = ('name',)
+
+
+@admin.register(TaskCategory)
+class TaskCategoryAdmin(WorkspaceScopedAdmin):
     list_display = ('name', 'workspace', 'color', 'created_at')
     list_filter = ('workspace', 'created_at')
     search_fields = ('name',)
