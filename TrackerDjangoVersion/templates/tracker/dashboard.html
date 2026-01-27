@@ -33,7 +33,7 @@
 
     {% if trial.expires_at %}
     <div class="col-12">
-        <div class="glass-card p-3">
+        <div class="glass-card p-3 alert-critical">
             {% if trial.active %}
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                     <div>
@@ -134,7 +134,7 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
+                <div class="glass-card p-3 h-100 kpi-main">
                     <p class="text-secondary small mb-1">Saldo</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if balance_total >= 0 %}text-success{% else %}text-danger{% endif %}" id="balanceValue">R$ {{ balance_total|floatformat:2 }}</h3>

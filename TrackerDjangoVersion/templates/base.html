@@ -230,7 +230,7 @@
             </div>
 
             {% if subscription_grace_active %}
-            <div class="grace-banner">
+            <div class="grace-banner alert-critical">
                 <div class="container d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
                     <div>
                         <strong>Assinatura em car&ecirc;ncia</strong>
@@ -249,10 +249,12 @@
                     {% if messages %}
                         <div class="mb-3">
                             {% for message in messages %}
-                                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                                {% with msg_tags=message.tags|default:'info' %}
+                                <div class="alert alert-{{ msg_tags }} alert-dismissible fade show {% if 'success' in msg_tags %}alert-save{% endif %}" role="alert" {% if 'success' in msg_tags %}data-auto-dismiss="1"{% endif %}>
                                     {{ message }}
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
                                 </div>
+                                {% endwith %}
                             {% endfor %}
                         </div>
                     {% endif %}
@@ -353,6 +355,17 @@
                 });
             });
             toast.show();
+        });
+
+        document.querySelectorAll('[data-auto-dismiss="1"]').forEach(el => {
+            if (!bootstrap || !bootstrap.Alert) return;
+            setTimeout(() => {
+                try {
+                    bootstrap.Alert.getOrCreateInstance(el).close();
+                } catch (e) {
+                    // ignore
+                }
+            }, 2600);
         });
     </script>
     {% block extra_js %}{% endblock %}

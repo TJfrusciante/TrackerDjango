@@ -95,13 +95,11 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">De</label>
-            <input aria-label="Data inicial" id="txStartDisplay" type="text" name="start_display" inputmode="numeric" class="form-control" value="{{ filters_display.start }}" placeholder="dd/mm/aaaa">
-            <input id="txStartHidden" type="hidden" name="start" value="{{ filters.start }}">
+            <input aria-label="Data inicial" id="txStartDate" type="date" name="start" class="form-control" value="{{ filters.start }}">
         </div>
         <div class="col-md-2">
             <label class="form-label">At&eacute;</label>
-            <input aria-label="Data final" id="txEndDisplay" type="text" name="end_display" inputmode="numeric" class="form-control" value="{{ filters_display.end }}" placeholder="dd/mm/aaaa">
-            <input id="txEndHidden" type="hidden" name="end" value="{{ filters.end }}">
+            <input aria-label="Data final" id="txEndDate" type="date" name="end" class="form-control" value="{{ filters.end }}">
         </div>
         <div class="col-md-1 d-flex gap-2">
             <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transa&ccedil;&atilde;o">Filtrar</button>
@@ -156,43 +154,10 @@
                 localStorage.setItem(collapseKey, 'collapsed');
             });
         }
-        const startDisplay = document.getElementById('txStartDisplay');
-        const endDisplay = document.getElementById('txEndDisplay');
-        const startHidden = document.getElementById('txStartHidden');
-        const endHidden = document.getElementById('txEndHidden');
-        const applyDateMask = (input) => {
-            if (!input) return;
-            const digits = (input.value || '').replace(/\D/g, '').slice(0, 8);
-            let out = '';
-            if (digits.length >= 2) out = digits.slice(0, 2);
-            if (digits.length >= 3) out += `/${digits.slice(2, 4)}`;
-            if (digits.length >= 5) out += `/${digits.slice(4, 8)}`;
-            input.value = out;
-        };
-        const toIso = (val) => {
-            const parts = (val || '').split('/');
-            if (parts.length !== 3) return '';
-            const [d, m, y] = parts;
-            if (!d || !m || !y) return '';
-            return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-        };
-        if (startDisplay) {
-            startDisplay.addEventListener('input', () => applyDateMask(startDisplay));
-        }
-        if (endDisplay) {
-            endDisplay.addEventListener('input', () => applyDateMask(endDisplay));
-        }
-        form.addEventListener('submit', (e) => {
-            const isoStart = toIso(startDisplay.value.trim());
-            const isoEnd = toIso(endDisplay.value.trim());
-            if ((startDisplay.value && !isoStart) || (endDisplay.value && !isoEnd)) {
-                e.preventDefault();
-                alert('Use o formato dd/mm/aaaa nos filtros de data.');
-                return;
-            }
-            startHidden.value = isoStart;
-            endHidden.value = isoEnd;
-        });
+        const startDate = document.getElementById('txStartDate');
+        const endDate = document.getElementById('txEndDate');
+        if (startDate) startDate.dataset.bsToggle = 'tooltip';
+        if (endDate) endDate.dataset.bsToggle = 'tooltip';
     })();
 </script>
 
@@ -448,6 +413,14 @@
         update();
         const skeleton = document.getElementById('txTableSkeleton');
         if (skeleton) skeleton.classList.add('d-none');
+        const filtersForm = document.getElementById('txFilters');
+        const tableWrap = document.querySelector('#txTableSkeleton + .table-responsive');
+        if (filtersForm && skeleton && tableWrap) {
+            filtersForm.addEventListener('submit', () => {
+                skeleton.classList.remove('d-none');
+                tableWrap.classList.add('d-none');
+            });
+        }
     })();
 </script>
 {% endblock %}

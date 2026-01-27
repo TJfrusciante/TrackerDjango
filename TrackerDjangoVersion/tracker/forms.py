@@ -120,8 +120,7 @@ class TaskForm(BaseStyledForm):
             self.fields['task_category'].queryset = TaskCategory.objects.all()
         self.fields['task_category'].required = False
         self.fields['task_category'].empty_label = 'Selecione a categoria'
-        if self.instance and getattr(self.instance, 'task_category_id', None):
-            self.fields['category'].initial = ''
+        # campo category foi removido do form; task_category domina a seleção
 
     class Meta:
         model = Task

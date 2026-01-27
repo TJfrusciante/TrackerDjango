@@ -1061,8 +1061,10 @@ def transactions_list(request):
     search = request.GET.get('q', '').strip()
     tx_type = request.GET.get('type', '')
     category_id = request.GET.get('category', '')
-    start = request.GET.get('start', '')
-    end = request.GET.get('end', '')
+    start_raw = request.GET.get('start', '')
+    end_raw = request.GET.get('end', '')
+    start = _parse_date_input(start_raw)
+    end = _parse_date_input(end_raw)
 
     if search:
         transactions_qs = transactions_qs.filter(Q(description__icontains=search) | Q(category__name__icontains=search))
@@ -1105,8 +1107,8 @@ def transactions_list(request):
             ('q', 'Busca', search),
             ('type', 'Tipo', type_label),
             ('category', 'Categoria', category_label),
-            ('start', 'De', fmt(start)),
-            ('end', 'At\u00e9', fmt(end)),
+            ('start', 'De', fmt(start_raw)),
+            ('end', 'At\u00e9', fmt(end_raw)),
         ],
     )
 
@@ -1124,12 +1126,12 @@ def transactions_list(request):
             'q': search,
             'type': tx_type,
             'category': category_id,
-            'start': start,
-            'end': end,
+            'start': start.isoformat() if start else '',
+            'end': end.isoformat() if end else '',
         },
         'filters_display': {
-            'start': fmt(start),
-            'end': fmt(end),
+            'start': fmt(start_raw),
+            'end': fmt(end_raw),
         },
         'filter_chips': filter_chips,
     }
@@ -1873,8 +1875,10 @@ def tasks_list(request):
     status = request.GET.get('status', '')
     search = request.GET.get('q', '').strip()
     category = request.GET.get('category', '').strip()
-    start = request.GET.get('start', '')
-    end = request.GET.get('end', '')
+    start_raw = request.GET.get('start', '')
+    end_raw = request.GET.get('end', '')
+    start = _parse_date_input(start_raw)
+    end = _parse_date_input(end_raw)
 
     task_category_qs = TaskCategory.objects.all()
     if workspace:
@@ -1936,8 +1940,8 @@ def tasks_list(request):
             ('q', 'Busca', search),
             ('status', 'Status', status_label),
             ('category', 'Categoria', category),
-            ('start', 'De', fmt(start)),
-            ('end', 'Até', fmt(end)),
+            ('start', 'De', fmt(start_raw)),
+            ('end', 'Até', fmt(end_raw)),
         ],
     )
 
@@ -1955,12 +1959,12 @@ def tasks_list(request):
             'status': status,
             'q': search,
             'category': category,
-            'start': start,
-            'end': end,
+            'start': start.isoformat() if start else '',
+            'end': end.isoformat() if end else '',
         },
         'filters_display': {
-            'start': fmt(start),
-            'end': fmt(end),
+            'start': fmt(start_raw),
+            'end': fmt(end_raw),
         },
         'filter_chips': filter_chips,
     }
@@ -4318,6 +4322,16 @@ def superuser_overview(request):
         ).order_by('-created_at')[:8]
     )
 
+    activity_since = timezone.now() - datetime.timedelta(days=30)
+    engagement_rows = (
+        ws_qs.annotate(
+            active_tx_users=Count('transactions__responsible', filter=Q(transactions__created_at__gte=activity_since), distinct=True),
+            active_task_users=Count('tasks__responsible_user', filter=Q(tasks__updated_at__gte=activity_since), distinct=True),
+        ).annotate(
+            active_total=F('active_tx_users') + F('active_task_users')
+        ).order_by('-active_total', 'name')[:8]
+    )
+
     ai_qs = AiUsage.objects.all()
     if selected_user:
         ai_qs = ai_qs.filter(user=selected_user)
@@ -4550,6 +4564,7 @@ def superuser_overview(request):
         'tasks_open': tasks_open,
         'tasks_done': tasks_done,
         'recent_workspaces': recent_workspaces,
+        'engagement_rows': engagement_rows,
         'income_total': income_total,
         'expense_total': expense_total,
         'balance_total': balance_total,

@@ -446,6 +446,10 @@ body.sidebar-collapsed .sidebar-panel {
     z-index: 1035;
 }
 
+body.sidebar-open {
+    overflow: hidden;
+}
+
 .mobile-topbar {
     position: sticky;
     top: 0;
@@ -469,6 +473,16 @@ body.sidebar-collapsed .sidebar-panel {
     color: var(--text-color);
     padding: 0.6rem 0;
     backdrop-filter: blur(12px);
+}
+
+.alert-critical {
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    box-shadow: 0 12px 40px rgba(248, 113, 113, 0.12);
+}
+
+[data-bs-theme="light"] .alert-critical {
+    border-color: rgba(234, 88, 12, 0.45);
+    box-shadow: 0 12px 34px rgba(234, 88, 12, 0.12);
 }
 
 [data-bs-theme="light"] .grace-banner {
@@ -615,6 +629,29 @@ body.sidebar-collapsed .sidebar-panel {
     transform: translateY(-6px);
 }
 
+.alert-save {
+    border-left: 4px solid var(--primary-color);
+    position: relative;
+    padding-left: 2.2rem;
+    animation: save-pop 0.25s ease;
+}
+
+.alert-save::before {
+    content: "\f00c";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary-soft);
+}
+
+@keyframes save-pop {
+    0% { transform: translateY(-4px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
 .chart-skeleton {
     min-height: 220px;
 }
@@ -641,6 +678,16 @@ body.sidebar-collapsed .sidebar-panel {
     border-radius: 14px;
     padding: 12px;
     background: rgba(15, 23, 42, 0.25);
+}
+
+.kpi-main {
+    border: 1px solid rgba(94, 234, 212, 0.4);
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(15, 23, 42, 0.4));
+}
+
+[data-bs-theme="light"] .kpi-main {
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(255, 255, 255, 0.9));
+    border-color: rgba(15, 118, 110, 0.35);
 }
 
 .dashboard-toolbar {
@@ -926,6 +973,35 @@ footer {
 
     .agent-panel {
         bottom: 260px;
+    }
+}
+
+@media (max-width: 768px) {
+    .page-action-btn {
+        height: 52px;
+        padding: 0 18px;
+        font-size: 0.95rem;
+    }
+
+    .btn {
+        padding: 0.65rem 0.95rem;
+    }
+
+    .nav-link {
+        padding: 0.85rem 1rem;
+        font-size: 1rem;
+    }
+
+    .sidebar {
+        width: min(82vw, 320px);
+    }
+
+    .glass-card {
+        border-radius: 14px;
+    }
+
+    .table-responsive {
+        margin-inline: -0.25rem;
     }
 }
 
