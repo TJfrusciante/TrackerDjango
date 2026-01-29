@@ -1003,32 +1003,46 @@ def dashboard(request):
             member_ids.add(workspace.owner_id)
         responsible_users = list(User.objects.filter(id__in=member_ids).order_by('first_name', 'username'))
 
+    period_days = max(1, (end_date - start_date).days + 1)
+    period_income = income_total
+    period_expense = expense_total
+    net_period = period_income - period_expense
+    avg_daily_expense_period = (period_expense / period_days) if period_expense else 0
+
+    tasks_period_qs = tasks_qs.filter(
+        Q(due_date__gte=start_date, due_date__lte=end_date) |
+        Q(created_at__date__gte=start_date, created_at__date__lte=end_date)
+    )
+    tasks_period_total = tasks_period_qs.count()
+    tasks_period_done = tasks_period_qs.filter(status='done').count()
+    tasks_period_overdue = tasks_period_qs.filter(status='ongoing', due_date__lt=today).count()
+
     finance_eval = {
         'class': 'text-secondary',
         'title': 'Sem dados recentes',
-        'message': 'Sem movimentações nos últimos 30 dias. Registre entradas e saídas para desbloquear insights.',
+        'message': 'Sem movimentações no período selecionado. Registre entradas e saídas para desbloquear insights.',
     }
-    if net_30 > 0:
+    if net_period > 0:
         finance_eval = {
             'class': 'value-positive',
             'title': 'Saldo positivo',
-            'message': 'Boa! Seu saldo dos últimos 30 dias está positivo. Considere reservar parte para metas ou emergências.',
+            'message': 'Boa! Seu saldo no período selecionado está positivo. Considere reservar parte para metas ou emergências.',
         }
-    elif net_30 < 0:
+    elif net_period < 0:
         finance_eval = {
             'class': 'value-negative',
             'title': 'Saldo negativo',
-            'message': 'Atenção: seu saldo dos últimos 30 dias ficou negativo. Revise categorias críticas e ajuste limites.',
+            'message': 'Atenção: seu saldo no período selecionado ficou negativo. Revise categorias críticas e ajuste limites.',
         }
 
     task_eval = {
         'class': 'text-secondary',
         'title': 'Sem tarefas',
-        'message': 'Crie tarefas para acompanhar prazos e evolução. Experimente dividir em etapas.',
+        'message': 'Sem tarefas no período selecionado. Crie tarefas para acompanhar prazos e evolução.',
     }
-    if tasks_total:
-        overdue_ratio = (tasks_overdue / tasks_total) if tasks_total else 0
-        done_ratio = (tasks_done / tasks_total) if tasks_total else 0
+    if tasks_period_total:
+        overdue_ratio = (tasks_period_overdue / tasks_period_total) if tasks_period_total else 0
+        done_ratio = (tasks_period_done / tasks_period_total) if tasks_period_total else 0
         if overdue_ratio >= 0.5:
             task_eval = {
                 'class': 'value-negative',
@@ -1056,27 +1070,27 @@ def dashboard(request):
 
     finance_items = [
         {
-            'label': 'Saldo 30d',
-            'value': net_30,
-            'class': 'value-positive' if net_30 >= 0 else 'value-negative',
+            'label': 'Saldo do período',
+            'value': net_period,
+            'class': 'value-positive' if net_period >= 0 else 'value-negative',
             'icon': 'fa-solid fa-scale-balanced',
         },
         {
-            'label': 'Entradas 30d',
-            'value': last30_income,
-            'class': 'value-positive' if last30_income > 0 else 'text-secondary',
+            'label': 'Entradas do período',
+            'value': period_income,
+            'class': 'value-positive' if period_income > 0 else 'text-secondary',
             'icon': 'fa-solid fa-arrow-trend-up',
         },
         {
-            'label': 'Saídas 30d',
-            'value': last30_expense,
-            'class': 'value-negative' if last30_expense > 0 else 'text-secondary',
+            'label': 'Saídas do período',
+            'value': period_expense,
+            'class': 'value-negative' if period_expense > 0 else 'text-secondary',
             'icon': 'fa-solid fa-arrow-trend-down',
         },
         {
             'label': 'Despesa média/dia',
-            'value': avg_daily_expense,
-            'class': 'text-danger' if avg_daily_expense > 0 else 'text-secondary',
+            'value': avg_daily_expense_period,
+            'class': 'text-danger' if avg_daily_expense_period > 0 else 'text-secondary',
             'icon': 'fa-solid fa-calendar-day',
         },
     ]
@@ -1090,28 +1104,28 @@ def dashboard(request):
 
     task_items = [
         {
-            'label': 'Abertas',
-            'value': tasks_qs.filter(status='ongoing').count(),
-            'class': 'text-warning' if tasks_overdue else 'text-info',
+            'label': 'Abertas no período',
+            'value': tasks_period_qs.filter(status='ongoing').count(),
+            'class': 'text-warning' if tasks_period_overdue else 'text-info',
             'icon': 'fa-regular fa-circle-dot',
         },
         {
-            'label': 'Concluídas',
-            'value': tasks_done,
-            'class': 'value-positive' if tasks_done else 'text-secondary',
+            'label': 'Concluídas no período',
+            'value': tasks_period_done,
+            'class': 'value-positive' if tasks_period_done else 'text-secondary',
             'icon': 'fa-solid fa-circle-check',
         },
         {
-            'label': 'Atrasadas',
-            'value': tasks_overdue,
-            'class': 'value-negative' if tasks_overdue else 'text-secondary',
+            'label': 'Atrasadas no período',
+            'value': tasks_period_overdue,
+            'class': 'value-negative' if tasks_period_overdue else 'text-secondary',
             'icon': 'fa-solid fa-triangle-exclamation',
         },
         {
             'label': 'Progresso',
-            'value': tasks_progress_pct,
+            'value': round((tasks_period_done / tasks_period_total) * 100, 1) if tasks_period_total else 0,
             'suffix': '%',
-            'class': 'value-positive' if tasks_progress_pct >= 70 else ('text-warning' if tasks_progress_pct >= 40 else 'value-negative'),
+            'class': 'value-positive' if (tasks_period_total and (tasks_period_done / tasks_period_total) >= 0.7) else ('text-warning' if (tasks_period_total and (tasks_period_done / tasks_period_total) >= 0.4) else 'value-negative'),
             'icon': 'fa-solid fa-gauge-high',
         },
     ]
