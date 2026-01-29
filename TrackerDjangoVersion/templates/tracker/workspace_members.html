@@ -48,7 +48,7 @@
                     <span class="badge text-bg-secondary">Visualiza&ccedil;&atilde;o somente</span>
                 {% endif %}
             </div>
-            <form method="get" class="row g-2 align-items-end mb-3">
+            <form id="memberFilters" method="get" class="row g-2 align-items-end mb-3">
                 <div class="col-md-7">
                     <label class="form-label small">Buscar</label>
                     <input type="text" name="q" class="form-control" placeholder="Nome, usu\u00e1rio ou e-mail" value="{{ filters.q }}">
@@ -67,6 +67,10 @@
             </form>
             {% if filter_chips %}
                 <div class="d-flex flex-wrap gap-2 mb-3">
+                    <a class="filter-chip filter-chip-clear" href="{% url 'tracker:workspace_members' workspace.slug %}" data-bs-toggle="tooltip" title="Limpar todos os filtros">
+                        Limpar tudo
+                        <span class="ms-2">&times;</span>
+                    </a>
                     {% for chip in filter_chips %}
                         <a class="filter-chip" href="{{ chip.url }}" data-bs-toggle="tooltip" title="Remover filtro">
                             {{ chip.label }}
@@ -75,6 +79,7 @@
                     {% endfor %}
                 </div>
             {% endif %}
+            <div id="membersSkeleton" class="skeleton table-skeleton mb-3 d-none"></div>
             {% if memberships %}
             <div class="list-group">
                 {% for member in memberships %}
@@ -172,6 +177,7 @@
                 <h3 class="h6 fw-bold mb-0">Convites enviados</h3>
                 <span class="badge text-bg-info">{{ pending_invites|length }} pendentes</span>
             </div>
+            <div id="invitesSkeleton" class="skeleton table-skeleton mb-3"></div>
             {% if pending_invites %}
                 <div class="list-group">
                     {% for invite in pending_invites %}
@@ -196,6 +202,7 @@
                 <h3 class="h6 fw-bold mb-0">Pedidos de acesso pendentes</h3>
                 <span class="badge text-bg-warning">{{ pending_requests|length }} aguardando</span>
             </div>
+            <div id="requestsSkeleton" class="skeleton table-skeleton mb-3"></div>
             {% if pending_requests %}
                 <div class="list-group">
                     {% for req in pending_requests %}
@@ -231,6 +238,19 @@
     </div>
     {% endif %}
 </div>
+<script>
+    (function () {
+        const form = document.getElementById('memberFilters');
+        const skeleton = document.getElementById('membersSkeleton');
+        const invitesSkeleton = document.getElementById('invitesSkeleton');
+        const requestsSkeleton = document.getElementById('requestsSkeleton');
+        if (skeleton) skeleton.classList.add('d-none');
+        if (invitesSkeleton) invitesSkeleton.classList.add('d-none');
+        if (requestsSkeleton) requestsSkeleton.classList.add('d-none');
+        if (!form || !skeleton) return;
+        form.addEventListener('submit', () => skeleton.classList.remove('d-none'));
+    })();
+</script>
 {% endblock %}
 
 

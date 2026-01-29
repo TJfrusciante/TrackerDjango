@@ -546,22 +546,22 @@ def home(request):
         {
             "icon": "fa-solid fa-wallet",
             "title": "Financeiro inteligente",
-            "description": "Entradas, sa\u00eddas, or\u00e7amentos por categoria e metas de saldo.",
+            "description": "Dashboards em tempo real, entradas/sa\u00eddas, or\u00e7amentos e metas de saldo.",
         },
         {
             "icon": "fa-solid fa-list-check",
             "title": "Tarefas em etapas",
-            "description": "Subtarefas com respons\u00e1veis, progresso autom\u00e1tico e prazos.",
+            "description": "Etapas com respons\u00e1veis, progresso autom\u00e1tico e prazos claros.",
         },
         {
             "icon": "fa-solid fa-bell",
             "title": "Notifica\u00e7\u00f5es",
-            "description": "Centro in-app, e-mails, lembretes e resumos semanais/mensais.",
+            "description": "Central in-app, e-mails, lembretes e resumos semanais/mensais.",
         },
         {
             "icon": "fa-solid fa-robot",
             "title": "Agente de IA",
-            "description": "Responde sobre seu workspace; superuser enxerga tudo.",
+            "description": "Resumos, d\u00favidas e sugest\u00f5es dentro do seu workspace.",
         },
         {
             "icon": "fa-brands fa-whatsapp",
@@ -583,10 +583,10 @@ def home(request):
     carousel_slides = [feature_cards[i:i + 3] for i in range(0, len(feature_cards), 3)]
 
     steps = [
-        {"title": "Crie sua conta", "text": "Escolha plano e ciclo (Mensal ou Anual) para o seu workspace."},
-        {"title": "Importe ou dite", "text": "CSV/PDF, Falar por voz e lan\u00e7amento r\u00e1pido."},
+        {"title": "Crie sua conta", "text": "Escolha plano e ciclo (Mensal ou Anual) para seu workspace."},
+        {"title": "Lance com agilidade", "text": "CSV/PDF, Falar por voz e lan\u00e7amento r\u00e1pido."},
         {"title": "Conecte o WhatsApp", "text": "No Pro/Master, lance transa\u00e7\u00f5es e tarefas pelo ChatAgent."},
-        {"title": "Acompanhe no painel", "text": "Troque workspaces, aprove convites e configure alertas."},
+        {"title": "Acompanhe no painel", "text": "Dashboards, alertas e convites em poucos cliques."},
     ]
 
     faq_items = [
@@ -594,8 +594,8 @@ def home(request):
         {"question": "Posso escolher mensal ou anual?", "answer": "Sim. A escolha do ciclo \u00e9 feita no cadastro e pode ser revisada pelo admin."},
         {"question": "Tenho per\u00edodo de teste?", "answer": "Sim, novas contas iniciam com trial de 7 dias. Depois \u00e9 preciso ativar a assinatura."},
         {"question": "O que acontece se o pagamento vencer?", "answer": "Voc\u00ea entra em car\u00eancia: tarefas continuam dispon\u00edveis, mas finan\u00e7as e IA ficam bloqueadas at\u00e9 regularizar."},
-        {"question": "Meu financeiro \u00e9 privado?", "answer": "Sim. Cada workspace isola finan\u00e7as; o owner controla permiss\u00f5es de tarefas."},
-        {"question": "O agente de IA usa meus dados?", "answer": "Sim, ele responde sempre dentro do contexto do seu workspace e respeita permiss\u00f5es."},
+        {"question": "Meu financeiro \u00e9 privado?", "answer": "Sim. Cada workspace isola finan\u00e7as; o owner controla permiss\u00f5es."},
+        {"question": "O agente de IA usa meus dados?", "answer": "Sim, ele responde dentro do contexto do seu workspace e respeita permiss\u00f5es."},
         {"question": "Como funciona o WhatsApp?", "answer": "No Pro/Master, o ChatAgent recebe texto, \u00e1udio ou foto e lan\u00e7a no seu workspace."},
         {"question": "Posso falar por voz?", "answer": "Sim, use o bot\u00e3o Falar em transa\u00e7\u00f5es, tarefas e no agente de IA."},
         {"question": "Existe limite de IA?", "answer": "Cada plano tem um limite mensal de tokens; o painel mostra consumo e data de renova\u00e7\u00e3o."},
@@ -632,7 +632,7 @@ def help_page(request):
     faq_items = [
         {
             "question": "Como pedir acesso a um workspace?",
-            "answer": "Use o bot\u00e3o Pedir acesso no menu do usu\u00e1rio e informe o slug do workspace. O owner aprova na tela de membros.",
+            "answer": "Abra Perfil \u2192 Pedir acesso, informe o slug do workspace e aguarde a aprova\u00e7\u00e3o do owner.",
         },
         {
             "question": "Quem pode ver finan\u00e7as?",
@@ -640,7 +640,7 @@ def help_page(request):
         },
         {
             "question": "Como funcionam alertas?",
-            "answer": "O owner configura or\u00e7amentos e metas na tela de Notifica\u00e7\u00f5es. Alertas chegam por e-mail e in-app.",
+            "answer": "O owner configura or\u00e7amentos e metas em Notifica\u00e7\u00f5es. Alertas chegam por e-mail e in-app.",
         },
         {
             "question": "Onde configuro or\u00e7amentos e metas?",
@@ -652,15 +652,15 @@ def help_page(request):
         },
         {
             "question": "Como funciona o ditado por voz?",
-            "answer": "Use o bot\u00e3o Ditado em tarefas ou transa\u00e7\u00f5es. O sistema tenta extrair descri\u00e7\u00e3o, data, valor e etapas.",
+            "answer": "Use o bot\u00e3o Falar em tarefas ou transa\u00e7\u00f5es. O sistema tenta extrair descri\u00e7\u00e3o, data, valor e etapas.",
         },
         {
             "question": "Como funciona o agente de IA?",
-            "answer": "Ele responde com base nos dados do seu workspace. Se a chave da OpenAI estiver configurada, a resposta vem do modelo; sen\u00e3o, um resumo local \u00e9 exibido.",
+            "answer": "Ele responde com base nos dados do seu workspace e respeita permiss\u00f5es.",
         },
         {
             "question": "Como ativar o WhatsApp?",
-            "answer": "Cadastre seu n\u00famero na p\u00e1gina de Perfil \u2192 Agente do WhatsApp e escolha o workspace. Depois envie mensagens ao n\u00famero do iTracker.",
+            "answer": "Cadastre seu n\u00famero em Perfil \u2192 Agente do WhatsApp e escolha o workspace. Depois envie mensagens ao n\u00famero do iTracker.",
         },
         {
             "question": "Posso exportar dados?",
@@ -677,6 +677,10 @@ def help_page(request):
         {
             "question": "Como ativar push no navegador?",
             "answer": "Na tela de Notifica\u00e7\u00f5es, clique em Ativar push. Dispon\u00edvel quando VAPID estiver configurado.",
+        },
+        {
+            "question": "Como ver resumos r\u00e1pidos?",
+            "answer": "Use o agente de IA com perguntas como: \"Resumo do m\u00eas\" ou \"Maior gasto do per\u00edodo\".",
         },
     ]
 
@@ -902,6 +906,7 @@ def dashboard(request):
         tasks_qs = tasks_qs.filter(responsible_user_id=int(responsible_param))
     tasks_total = tasks_qs.count()
     tasks_done = tasks_qs.filter(status='done').count()
+    tasks_overdue = tasks_qs.filter(status='ongoing', due_date__lt=today).count()
     tasks_progress_pct = round((tasks_done / tasks_total) * 100, 1) if tasks_total else 100
     categories_qs = _apply_workspace_filter(Category.objects.all(), workspace, request.user)
     category_count = categories_qs.count()
@@ -998,12 +1003,126 @@ def dashboard(request):
             member_ids.add(workspace.owner_id)
         responsible_users = list(User.objects.filter(id__in=member_ids).order_by('first_name', 'username'))
 
+    finance_eval = {
+        'class': 'text-secondary',
+        'title': 'Sem dados recentes',
+        'message': 'Sem movimentações nos últimos 30 dias. Registre entradas e saídas para desbloquear insights.',
+    }
+    if net_30 > 0:
+        finance_eval = {
+            'class': 'value-positive',
+            'title': 'Saldo positivo',
+            'message': 'Boa! Seu saldo dos últimos 30 dias está positivo. Considere reservar parte para metas ou emergências.',
+        }
+    elif net_30 < 0:
+        finance_eval = {
+            'class': 'value-negative',
+            'title': 'Saldo negativo',
+            'message': 'Atenção: seu saldo dos últimos 30 dias ficou negativo. Revise categorias críticas e ajuste limites.',
+        }
+
+    task_eval = {
+        'class': 'text-secondary',
+        'title': 'Sem tarefas',
+        'message': 'Crie tarefas para acompanhar prazos e evolução. Experimente dividir em etapas.',
+    }
+    if tasks_total:
+        overdue_ratio = (tasks_overdue / tasks_total) if tasks_total else 0
+        done_ratio = (tasks_done / tasks_total) if tasks_total else 0
+        if overdue_ratio >= 0.5:
+            task_eval = {
+                'class': 'value-negative',
+                'title': 'Muitas tarefas atrasadas',
+                'message': 'Priorize as tarefas vencidas e reavalie prazos. O foco agora é reduzir atrasos.',
+            }
+        elif overdue_ratio > 0:
+            task_eval = {
+                'class': 'text-warning',
+                'title': 'Algumas tarefas atrasadas',
+                'message': 'Organize prazos e finalize as pendentes para evitar acúmulo.',
+            }
+        elif done_ratio >= 0.7:
+            task_eval = {
+                'class': 'value-positive',
+                'title': 'Tarefas em dia',
+                'message': 'Boa! A maioria das tarefas está concluída. Continue mantendo o ritmo.',
+            }
+        else:
+            task_eval = {
+                'class': 'text-info',
+                'title': 'Progresso em andamento',
+                'message': 'Continue avançando e revise prioridades quando precisar.',
+            }
+
+    finance_items = [
+        {
+            'label': 'Saldo 30d',
+            'value': net_30,
+            'class': 'value-positive' if net_30 >= 0 else 'value-negative',
+            'icon': 'fa-solid fa-scale-balanced',
+        },
+        {
+            'label': 'Entradas 30d',
+            'value': last30_income,
+            'class': 'value-positive' if last30_income > 0 else 'text-secondary',
+            'icon': 'fa-solid fa-arrow-trend-up',
+        },
+        {
+            'label': 'Saídas 30d',
+            'value': last30_expense,
+            'class': 'value-negative' if last30_expense > 0 else 'text-secondary',
+            'icon': 'fa-solid fa-arrow-trend-down',
+        },
+        {
+            'label': 'Despesa média/dia',
+            'value': avg_daily_expense,
+            'class': 'text-danger' if avg_daily_expense > 0 else 'text-secondary',
+            'icon': 'fa-solid fa-calendar-day',
+        },
+    ]
+    if top_expense_item:
+        finance_items.append({
+            'label': f"Maior gasto: {top_expense_item['category__name']}",
+            'value': top_expense_item['total'],
+            'class': 'value-negative' if top_expense_item['total'] else 'text-secondary',
+            'icon': 'fa-solid fa-money-bill-trend-down',
+        })
+
+    task_items = [
+        {
+            'label': 'Abertas',
+            'value': tasks_qs.filter(status='ongoing').count(),
+            'class': 'text-warning' if tasks_overdue else 'text-info',
+            'icon': 'fa-regular fa-circle-dot',
+        },
+        {
+            'label': 'Concluídas',
+            'value': tasks_done,
+            'class': 'value-positive' if tasks_done else 'text-secondary',
+            'icon': 'fa-solid fa-circle-check',
+        },
+        {
+            'label': 'Atrasadas',
+            'value': tasks_overdue,
+            'class': 'value-negative' if tasks_overdue else 'text-secondary',
+            'icon': 'fa-solid fa-triangle-exclamation',
+        },
+        {
+            'label': 'Progresso',
+            'value': tasks_progress_pct,
+            'suffix': '%',
+            'class': 'value-positive' if tasks_progress_pct >= 70 else ('text-warning' if tasks_progress_pct >= 40 else 'value-negative'),
+            'icon': 'fa-solid fa-gauge-high',
+        },
+    ]
+
     context = {
         'income_total': income_total,
         'expense_total': expense_total,
         'balance_total': income_total - expense_total,
         'tasks_open': tasks_qs.filter(status='ongoing').count(),
         'tasks_done': tasks_done,
+        'tasks_overdue': tasks_overdue,
         'tasks_progress_pct': tasks_progress_pct,
         'latest_transactions': base_qs.order_by('-date')[:5],
         'latest_tasks': latest_tasks,
@@ -1033,6 +1152,10 @@ def dashboard(request):
         'tx_count_period': tx_count_period,
         'net_30': net_30,
         'avg_daily_expense': avg_daily_expense,
+        'agent_eval': {
+            'finance': {**finance_eval, 'items': finance_items},
+            'tasks': {**task_eval, 'items': task_items},
+        },
         'category_count': category_count,
         'trial': {
             'active': trial_active,
@@ -1186,12 +1309,41 @@ def transactions_bulk_update(request):
     responsible = form.cleaned_data.get('responsible')
     new_date = form.cleaned_data.get('date')
     tx_type = form.cleaned_data.get('type')
+    icon = form.cleaned_data.get('icon')
     selected_action = form.cleaned_data.get('selected_action')
     if request.POST.get('bulk_delete') == '1':
         deleted_count = qs.count()
+        snapshot_limit = 200
+        payload = []
+        if deleted_count:
+            for item in list(qs.values(
+                'description',
+                'date',
+                'value',
+                'type',
+                'category_id',
+                'responsible_id',
+                'workspace_id',
+                'selected',
+                'icon',
+            )[:snapshot_limit]):
+                payload.append({
+                    'description': item.get('description', ''),
+                    'date': item.get('date').isoformat() if item.get('date') else '',
+                    'value': str(item.get('value')) if item.get('value') is not None else '0',
+                    'type': item.get('type', 'expense'),
+                    'category_id': item.get('category_id'),
+                    'responsible_id': item.get('responsible_id'),
+                    'workspace_id': item.get('workspace_id'),
+                    'selected': bool(item.get('selected')),
+                    'icon': item.get('icon') or '',
+                })
+        if payload:
+            request.session['undo_tx_bulk'] = payload
+            request.session['undo_tx_bulk_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         qs.delete()
         _invalidate_workspace_caches(workspace)
-        messages.success(request, f'{deleted_count} transa\u00e7\u00f5es exclu\u00eddas.')
+        messages.success(request, f'{deleted_count} transa\u00e7\u00f5es exclu\u00eddas. Voc\u00ea pode desfazer a a\u00e7\u00e3o.')
         return redirect('tracker:transactions_list')
     if request.POST.get('bulk_mark') == '1':
         qs.update(selected=True)
@@ -1218,6 +1370,8 @@ def transactions_bulk_update(request):
         updates['date'] = new_date
     if tx_type:
         updates['type'] = tx_type
+    if icon:
+        updates['icon'] = icon
     if selected_action == 'mark':
         updates['selected'] = True
     elif selected_action == 'unmark':
@@ -1379,6 +1533,69 @@ def transaction_undo_clear(request):
     return JsonResponse({'ok': True})
 
 
+@login_required
+def transaction_bulk_undo_delete(request):
+    if request.method != 'POST':
+        return redirect('tracker:transactions_list')
+    payload = request.session.get('undo_tx_bulk')
+    expires = request.session.get('undo_tx_bulk_expires')
+    if not payload:
+        messages.error(request, 'Nada para desfazer.')
+        return redirect('tracker:transactions_list')
+    if expires:
+        try:
+            expires_at = datetime.datetime.fromisoformat(expires)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                request.session.pop('undo_tx_bulk', None)
+                request.session.pop('undo_tx_bulk_expires', None)
+                messages.error(request, 'O tempo para desfazer expirou.')
+                return redirect('tracker:transactions_list')
+        except Exception:
+            pass
+    restored = 0
+    for item in payload:
+        category = Category.objects.filter(id=item.get('category_id')).first()
+        if not category:
+            continue
+        date_val = item.get('date')
+        value_val = item.get('value')
+        if date_val:
+            try:
+                date_val = datetime.date.fromisoformat(date_val)
+            except Exception:
+                date_val = None
+        try:
+            value_val = Decimal(str(value_val))
+        except Exception:
+            value_val = Decimal('0')
+        Transaction.objects.create(
+            description=item.get('description', ''),
+            date=date_val or timezone.localdate(),
+            value=value_val,
+            type=item.get('type', 'expense'),
+            category=category,
+            responsible_id=item.get('responsible_id'),
+            workspace_id=item.get('workspace_id'),
+            selected=bool(item.get('selected')),
+            icon=item.get('icon') or '',
+        )
+        restored += 1
+    request.session.pop('undo_tx_bulk', None)
+    request.session.pop('undo_tx_bulk_expires', None)
+    messages.success(request, f'{restored} transa\u00e7\u00f5es restauradas.')
+    return redirect('tracker:transactions_list')
+
+
+@login_required
+def transaction_bulk_undo_clear(request):
+    if request.method == 'POST':
+        request.session.pop('undo_tx_bulk', None)
+        request.session.pop('undo_tx_bulk_expires', None)
+    return JsonResponse({'ok': True})
+
+
 def transaction_toggle_selected(request, pk):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
@@ -1395,6 +1612,10 @@ def transaction_toggle_selected(request, pk):
         tx.selected = not tx.selected
         tx.save(update_fields=['selected', 'updated_at'])
         _invalidate_workspace_caches(workspace)
+        if tx.selected:
+            messages.success(request, 'Transação destacada.')
+        else:
+            messages.success(request, 'Transação removida dos destaques.')
     return redirect('tracker:transactions_list')
 
 
@@ -1415,6 +1636,7 @@ def transaction_toggle_type(request, pk):
         tx.type = 'expense' if tx.type == 'income' else 'income'
         tx.save(update_fields=['type', 'updated_at'])
         _invalidate_workspace_caches(workspace)
+        messages.success(request, 'Transação convertida com sucesso.')
     return redirect('tracker:transactions_list')
 
 
@@ -2022,12 +2244,47 @@ def tasks_bulk_update(request):
     category = (form.cleaned_data.get('category') or '').strip()
     due_date = form.cleaned_data.get('due_date')
     status = form.cleaned_data.get('status')
+    icon = form.cleaned_data.get('icon')
     selected_action = form.cleaned_data.get('selected_action')
     if request.POST.get('bulk_delete') == '1':
         deleted_count = qs.count()
+        snapshot_limit = 200
+        payload = []
+        if deleted_count:
+            for item in list(qs.values(
+                'title',
+                'due_date',
+                'status',
+                'progress',
+                'selected',
+                'responsible_user_id',
+                'responsible',
+                'responsible_email',
+                'workspace_id',
+                'task_category_id',
+                'category',
+                'icon',
+            )[:snapshot_limit]):
+                payload.append({
+                    'title': item.get('title', ''),
+                    'due_date': item.get('due_date').isoformat() if item.get('due_date') else '',
+                    'status': item.get('status', 'ongoing'),
+                    'progress': str(item.get('progress')) if item.get('progress') is not None else '0',
+                    'selected': bool(item.get('selected')),
+                    'responsible_user_id': item.get('responsible_user_id'),
+                    'responsible': item.get('responsible', ''),
+                    'responsible_email': item.get('responsible_email', ''),
+                    'workspace_id': item.get('workspace_id'),
+                    'task_category_id': item.get('task_category_id'),
+                    'category': item.get('category', ''),
+                    'icon': item.get('icon') or '',
+                })
+        if payload:
+            request.session['undo_task_bulk'] = payload
+            request.session['undo_task_bulk_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         qs.delete()
         _invalidate_workspace_caches(workspace)
-        messages.success(request, f'{deleted_count} tarefas exclu\u00eddas.')
+        messages.success(request, f'{deleted_count} tarefas exclu\u00eddas. Voc\u00ea pode desfazer a a\u00e7\u00e3o.')
         return redirect('tracker:tasks_list')
     if request.POST.get('bulk_mark') == '1':
         qs.update(selected=True)
@@ -2061,6 +2318,8 @@ def tasks_bulk_update(request):
     elif task_category:
         updates['task_category'] = task_category
         updates['category'] = task_category.name
+    if icon:
+        updates['icon'] = icon
     if due_date:
         updates['due_date'] = due_date
     if status:
@@ -2485,6 +2744,70 @@ def task_undo_clear(request):
     return JsonResponse({'ok': True})
 
 
+@login_required
+def task_bulk_undo_delete(request):
+    if request.method != 'POST':
+        return redirect('tracker:tasks_list')
+    payload = request.session.get('undo_task_bulk')
+    expires = request.session.get('undo_task_bulk_expires')
+    if not payload:
+        messages.error(request, 'Nada para desfazer.')
+        return redirect('tracker:tasks_list')
+    if expires:
+        try:
+            expires_at = datetime.datetime.fromisoformat(expires)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                request.session.pop('undo_task_bulk', None)
+                request.session.pop('undo_task_bulk_expires', None)
+                messages.error(request, 'O tempo para desfazer expirou.')
+                return redirect('tracker:tasks_list')
+        except Exception:
+            pass
+    restored = 0
+    for item in payload:
+        due_val = item.get('due_date')
+        if due_val:
+            try:
+                due_val = datetime.date.fromisoformat(due_val)
+            except Exception:
+                due_val = None
+        try:
+            progress_val = Decimal(str(item.get('progress', '0')))
+        except Exception:
+            progress_val = Decimal('0')
+        task_category_id = item.get('task_category_id')
+        task_category = TaskCategory.objects.filter(id=task_category_id).first() if task_category_id else None
+        Task.objects.create(
+            title=item.get('title', ''),
+            due_date=due_val or timezone.localdate(),
+            status=item.get('status', 'ongoing'),
+            progress=progress_val,
+            selected=bool(item.get('selected')),
+            responsible_user_id=item.get('responsible_user_id'),
+            responsible=item.get('responsible', ''),
+            responsible_email=item.get('responsible_email', ''),
+            workspace_id=item.get('workspace_id'),
+            task_category=task_category,
+            category=item.get('category', ''),
+            icon=item.get('icon') or '',
+        )
+        restored += 1
+    request.session.pop('undo_task_bulk', None)
+    request.session.pop('undo_task_bulk_expires', None)
+    messages.success(request, f'{restored} tarefas restauradas.')
+    return redirect('tracker:tasks_list')
+
+
+@login_required
+def task_bulk_undo_clear(request):
+    if request.method == 'POST':
+        request.session.pop('undo_task_bulk', None)
+        request.session.pop('undo_task_bulk_expires', None)
+    return JsonResponse({'ok': True})
+
+
 def task_toggle_status(request, pk):
     workspace = getattr(request, "workspace", None)
     qs = Task.objects.prefetch_related('steps')
@@ -2524,6 +2847,10 @@ def task_toggle_status(request, pk):
                 task.completed_at = None
                 task.save(update_fields=['status', 'progress', 'completed_at', 'updated_at'])
         _invalidate_workspace_caches(workspace)
+        if mark_done:
+            messages.success(request, 'Tarefa concluída.')
+        else:
+            messages.success(request, 'Tarefa reaberta.')
     return redirect('tracker:tasks_list')
 
 
@@ -2547,6 +2874,10 @@ def task_toggle_selected(request, pk):
         task.selected = not task.selected
         task.save(update_fields=['selected', 'updated_at'])
         _invalidate_workspace_caches(workspace)
+        if task.selected:
+            messages.success(request, 'Tarefa destacada.')
+        else:
+            messages.success(request, 'Tarefa removida dos destaques.')
     return redirect('tracker:tasks_list')
 
 

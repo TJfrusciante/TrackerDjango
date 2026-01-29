@@ -43,6 +43,7 @@ class Task(models.Model):
     ]
 
     title = models.CharField(max_length=180)
+    icon = models.CharField(max_length=60, blank=True, default='')
     category = models.CharField(max_length=80, blank=True, default='')
     task_category = models.ForeignKey(TaskCategory, null=True, blank=True, on_delete=models.SET_NULL, related_name='tasks')
     due_date = models.DateField()
@@ -76,6 +77,7 @@ class Transaction(models.Model):
     ]
 
     description = models.CharField(max_length=180)
+    icon = models.CharField(max_length=60, blank=True, default='')
     date = models.DateField()
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='transactions')
     value = models.DecimalField(max_digits=12, decimal_places=2)

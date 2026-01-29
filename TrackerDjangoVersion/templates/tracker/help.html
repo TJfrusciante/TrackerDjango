@@ -135,8 +135,8 @@
             <div class="help-pill mb-3">Central de ajuda</div>
             <h1 class="fw-bold mb-2">Como usar o iTracker no dia a dia</h1>
             <p class="text-secondary mb-4">
-                Guia r&aacute;pido para lan&ccedil;ar transa&ccedil;&otilde;es, organizar tarefas por etapas,
-                configurar alertas e usar o agente de IA.
+                Um guia direto para lan&ccedil;ar transa&ccedil;&otilde;es, organizar tarefas com etapas,
+                configurar alertas e tirar o m&aacute;ximo do agente de IA.
             </p>
             <div class="d-flex flex-wrap gap-2">
                 {% if user.is_authenticated %}
@@ -159,6 +159,24 @@
         </div>
     </div>
 </section>
+
+{% if user.is_authenticated %}
+<section class="py-2">
+    <div class="help-card">
+        <div class="row g-3 align-items-center">
+            <div class="col-lg-8">
+                <h5 class="fw-bold mb-2"><i class="fa-solid fa-lightbulb me-2 text-warning"></i>Envie uma sugest&atilde;o para o admin</h5>
+                <p class="text-secondary mb-0">Tem uma melhoria em mente? Fale direto com o time e ajude a evoluir o iTracker.</p>
+            </div>
+            <div class="col-lg-4 d-flex justify-content-lg-end">
+                <a class="btn btn-primary" href="{% url 'tracker:contact_admin' %}">
+                    <i class="fa-solid fa-paper-plane me-2"></i>Enviar sugest&atilde;o
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
 
 <section class="py-3 d-lg-none">
     <div class="help-scroll">
@@ -538,6 +556,23 @@
                         <div class="help-callout small text-secondary">
                             Dica: se o parser local falhar, o agente usa IA para entender valor, data, tipo e categoria.
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-card mb-4" id="contato">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-7">
+                        <h4 class="fw-bold mb-3"><i class="fa-solid fa-envelope-open-text me-2 text-primary"></i>Fale direto com o admin</h4>
+                        <p class="text-secondary">Precisa de ajuda, quer sugerir melhorias ou falar sobre seu plano? Use o canal de contato interno.</p>
+                        <div class="help-callout small text-secondary">
+                            Responderemos pelo seu e-mail cadastrado e também dentro do iTracker.
+                        </div>
+                    </div>
+                    <div class="col-lg-5 d-flex align-items-center justify-content-lg-end">
+                        <a class="btn btn-primary" href="{% url 'tracker:contact_admin' %}">
+                            <i class="fa-solid fa-paper-plane me-2"></i>Ir para contato
+                        </a>
                     </div>
                 </div>
             </div>

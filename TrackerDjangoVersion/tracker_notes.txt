@@ -174,3 +174,16 @@ Mapa rapido (onde mexer)
 - Categorias: barra de navegação fixa (sticky) abaixo do título com 4 botões em grid (âncoras #categorias-transacoes/#categorias-tarefas + ir para transações/tarefas).
 - Perfil: dono do plano Master pode solicitar mais convidados; fica pendente até cobrança confirmar e só então aumenta limite (atualiza preapproval no MP para o próximo ciclo).
 - Assinaturas: período de carência (SUBSCRIPTION_GRACE_DAYS) envia e-mail/alerta, mostra banner fixo e bloqueia IA+financeiro; tarefas continuam acessíveis. Após carência, acesso total bloqueado até renovar.
+
+- Dashboard: cards com feedback visual ampliado (kpi-positive/kpi-negative) para entradas/saídas/saldo/30d/despesa média/progresso; “Avaliação do agente” com dicas e métricas (finanças + tarefas) no dashboard.
+- Ícones: seleção visual por grade com busca e filtros (Finanças/Tarefas/Todos) em criação/edição de transações e tarefas; preview de ícone; grades aparecem apenas ao clicar no dropdown de ícone.
+- Ícones: favoritos por formulário (localStorage) no topo da grade + busca/filtragem aplicada; seleção adiciona aos favoritos automaticamente.
+- Tabelas: coluna Ícone movida para o fim (depois de Ações) em transações e tarefas.
+- Ajuda: novo bloco “Fale direto com o admin” com CTA para /contato.
+- Dashboard: “Avaliação do agente” mostra ícones por métrica (saldo, entradas, saídas, despesa média, maior gasto, abertas/concluídas/atrasadas/progresso).
+
+Atualizacoes recentes (2026-01-29)
+- Ícones: select nativo escondido via CSS; seleção agora aparece somente na grade (busca + filtros + favoritos) ao clicar no botão de ícone.
+- Ícones: tooltip no botão de ícone em tarefas (explica o uso).
+- Workspace overview: skeleton “Todos os workspaces ativos” agora é removido no DOMContentLoaded (evita loading infinito).
+- Revisao rápida: sem ocorrências de mojibake (Ã, Ã§ etc.) e sem TODO/FIXME pendentes no código.

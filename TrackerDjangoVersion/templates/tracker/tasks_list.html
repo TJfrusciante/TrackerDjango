@@ -109,6 +109,10 @@
 </div>
 {% if filter_chips %}
 <div class="d-flex flex-wrap gap-2 mb-4">
+    <a class="filter-chip filter-chip-clear" href="{% url 'tracker:tasks_list' %}" data-bs-toggle="tooltip" title="Limpar todos os filtros">
+        Limpar tudo
+        <span class="ms-2">&times;</span>
+    </a>
     {% for chip in filter_chips %}
         <a class="filter-chip" href="{{ chip.url }}" data-bs-toggle="tooltip" title="Remover filtro">
             {{ chip.label }}
@@ -183,6 +187,10 @@
                     {{ bulk_form.category }}
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label">Ícone</label>
+                    {{ bulk_form.icon }}
+                </div>
+                <div class="col-md-2">
                     <label class="form-label">Status</label>
                     {{ bulk_form.status }}
                 </div>
@@ -191,21 +199,23 @@
                     {{ bulk_form.selected_action }}
                 </div>
                 <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-light" type="submit">Aplicar</button>
-                </div>
-                <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-danger" type="submit" name="bulk_delete" value="1">
+                    <button class="btn btn-outline-danger" type="submit" name="bulk_delete" value="1" title="Remove todas as tarefas selecionadas">
                         Excluir selecionadas
                     </button>
                 </div>
                 <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-success" type="submit" name="bulk_mark" value="1">
+                    <button class="btn btn-outline-success" type="submit" name="bulk_mark" value="1" title="Marca todas as selecionadas como destaque">
                         Destacar selecionadas
                     </button>
                 </div>
                 <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-warning" type="submit" name="bulk_convert" value="1">
+                    <button class="btn btn-outline-warning" type="submit" name="bulk_convert" value="1" title="Converte em andamento ↔ concluída em todas as selecionadas">
                         Converter selecionadas
+                    </button>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-primary" type="submit" title="Aplica as alterações selecionadas">
+                        Aplicar
                     </button>
                 </div>
             </div>
@@ -250,6 +260,7 @@
                     <th>Status</th>
                     <th>Progresso</th>
                     <th class="text-end">A&ccedil;&otilde;es</th>
+                    <th>Ícone</th>
                 </tr>
             </thead>
             <tbody>
@@ -344,10 +355,17 @@
                                 </form>
                             </div>
                         </td>
+                        <td class="text-center">
+                            {% if task.icon %}
+                                <i class="{{ task.icon }}"></i>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7">
+                        <td colspan="9">
                             <div class="text-secondary mb-2">Nenhuma tarefa registrada.</div>
                             <a class="btn btn-sm btn-primary" href="{% url 'tracker:task_create' %}">
                                 <i class="fa-solid fa-plus me-2"></i>Criar primeira tarefa

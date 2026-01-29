@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Perfil | iTracker{% endblock %}
 
@@ -18,9 +19,14 @@
                 {% csrf_token %}
                 <div class="col-12">
                     <label class="form-label">Avatar</label>
+                    {% if user_avatar_missing %}
+                        <div class="alert alert-warning small mb-2">
+                            Sua foto n&atilde;o est&aacute; dispon&iacute;vel. Envie uma nova imagem para atualizar o avatar.
+                        </div>
+                    {% endif %}
                     {% if user_avatar_url %}
                         <div class="mb-2">
-                            <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb" style="width:64px;height:64px;">
+                            <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb" style="width:64px;height:64px;" onerror="this.onerror=null;this.src='{% static 'img/avatar-fallback.svg' %}';">
                         </div>
                     {% endif %}
                     {{ avatar_form.avatar }}

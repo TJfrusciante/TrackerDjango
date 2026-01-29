@@ -116,39 +116,42 @@
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
+                <div class="glass-card p-3 h-100 {% if income_total > 0 %}kpi-positive{% endif %}" id="incomeCard">
                     <p class="text-secondary small mb-1">Entradas</p>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h3 class="mb-0 text-success" id="incomeValue">R$ {{ income_total|floatformat:2 }}</h3>
+                        <h3 class="mb-0 {% if income_total > 0 %}value-positive{% else %}text-secondary{% endif %}" id="incomeValue">R$ {{ income_total|floatformat:2 }}</h3>
                         <i class="fa-solid fa-arrow-trend-up text-success"></i>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
-                    <p class="text-secondary small mb-1">Sa&iacute;das</p>
+                <div class="glass-card p-3 h-100 {% if expense_total > 0 %}kpi-negative{% endif %}" id="expenseCard">
+                <p class="text-secondary small mb-1">Sa&iacute;das</p>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h3 class="mb-0 text-danger" id="expenseValue">R$ {{ expense_total|floatformat:2 }}</h3>
+                        <h3 class="mb-0 {% if expense_total > 0 %}value-negative{% else %}text-secondary{% endif %}" id="expenseValue">R$ {{ expense_total|floatformat:2 }}</h3>
                         <i class="fa-solid fa-arrow-trend-down text-danger"></i>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-main">
-                    <p class="text-secondary small mb-1">Saldo</p>
+                <div class="glass-card p-3 h-100 kpi-main {% if balance_total >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="balanceCard">
+                <p class="text-secondary small mb-1">Saldo</p>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h3 class="mb-0 {% if balance_total >= 0 %}text-success{% else %}text-danger{% endif %}" id="balanceValue">R$ {{ balance_total|floatformat:2 }}</h3>
+                        <h3 class="mb-0 {% if balance_total >= 0 %}value-positive{% else %}value-negative{% endif %}" id="balanceValue">R$ {{ balance_total|floatformat:2 }}</h3>
                         <i class="fa-solid fa-wallet text-warning"></i>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
-                    <p class="text-secondary small mb-1">Tarefas</p>
+                <div class="glass-card p-3 h-100 {% if tasks_overdue > 0 %}kpi-negative{% elif tasks_done > 0 %}kpi-positive{% endif %}" id="tasksCard">
+                <p class="text-secondary small mb-1">Tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h3 class="mb-0">{{ tasks_open }} abertas</h3>
-                        <span class="badge bg-success px-3 py-2">{{ tasks_done }} feitas</span>
+                        <h3 class="mb-0 {% if tasks_overdue > 0 %}text-warning{% else %}text-info{% endif %}">{{ tasks_open }} abertas</h3>
+                        <span class="badge {% if tasks_done > 0 %}bg-success{% else %}bg-secondary{% endif %} px-3 py-2">{{ tasks_done }} feitas</span>
                     </div>
+                    {% if tasks_overdue > 0 %}
+                        <div class="small text-warning mt-2">{{ tasks_overdue }} atrasada(s)</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -157,28 +160,28 @@
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
-                    <p class="text-secondary small mb-1">Movimenta&#231;&#245;es no per&#237;odo</p>
-                    <h4 class="mb-0">{{ tx_count_period }}</h4>
+                <div class="glass-card p-3 h-100 {% if tx_count_period > 0 %}kpi-positive{% endif %}" id="txCountCard">
+                <p class="text-secondary small mb-1">Movimenta&#231;&#245;es no per&#237;odo</p>
+                    <h4 class="mb-0 {% if tx_count_period > 0 %}text-success{% else %}text-secondary{% endif %}">{{ tx_count_period }}</h4>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
-                    <p class="text-secondary small mb-1">Saldo &#250;ltimos 30 dias</p>
-                    <h4 class="mb-0 {% if net_30 >= 0 %}text-success{% else %}text-danger{% endif %}">R$ {{ net_30|floatformat:2 }}</h4>
+                <div class="glass-card p-3 h-100 {% if net_30 >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="net30Card">
+                <p class="text-secondary small mb-1">Saldo &#250;ltimos 30 dias</p>
+                    <h4 class="mb-0 {% if net_30 >= 0 %}value-positive{% else %}value-negative{% endif %}">R$ {{ net_30|floatformat:2 }}</h4>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
-                    <p class="text-secondary small mb-1">Despesa m&#233;dia (30d)</p>
-                    <h4 class="mb-0 text-danger">R$ {{ avg_daily_expense|floatformat:2 }}/dia</h4>
+                <div class="glass-card p-3 h-100 {% if avg_daily_expense > 0 %}kpi-negative{% endif %}" id="avgExpenseCard">
+                <p class="text-secondary small mb-1">Despesa m&#233;dia (30d)</p>
+                    <h4 class="mb-0 {% if avg_daily_expense > 0 %}value-negative{% else %}text-secondary{% endif %}">R$ {{ avg_daily_expense|floatformat:2 }}/dia</h4>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100">
-                    <p class="text-secondary small mb-1">Progresso tarefas</p>
+                <div class="glass-card p-3 h-100 {% if tasks_progress_pct >= 70 %}kpi-positive{% elif tasks_progress_pct < 40 %}kpi-negative{% endif %}" id="tasksProgressCard">
+                <p class="text-secondary small mb-1">Progresso tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h4 class="mb-0">{{ tasks_progress_pct }}%</h4>
+                        <h4 class="mb-0 {% if tasks_progress_pct >= 70 %}value-positive{% elif tasks_progress_pct >= 40 %}text-warning{% else %}value-negative{% endif %}">{{ tasks_progress_pct }}%</h4>
                         <span class="badge bg-primary px-3 py-2">{{ category_count }} categorias</span>
                     </div>
                 </div>
@@ -189,7 +192,7 @@
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-4">
-                <div class="glass-card p-3 h-100">
+                <div class="glass-card p-3 h-100 {% if insights.top_income_value %}kpi-positive{% endif %}">
                     <p class="text-secondary small mb-1">Maior receita</p>
                     {% if insights.top_income_label %}
                         <h4 class="mb-0 text-success">{{ insights.top_income_label }}</h4>
@@ -200,7 +203,7 @@
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="glass-card p-3 h-100">
+                <div class="glass-card p-3 h-100 {% if insights.top_expense_value %}kpi-negative{% endif %}">
                     <p class="text-secondary small mb-1">Maior gasto</p>
                     {% if insights.top_expense_label %}
                         <h4 class="mb-0 text-danger">{{ insights.top_expense_label }}</h4>
@@ -211,11 +214,13 @@
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="glass-card p-3 h-100">
+                <div class="glass-card p-3 h-100 {% if insights.top_net_value >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}">
                     <p class="text-secondary small mb-1">Categoria com maior impacto</p>
                     {% if insights.top_net_label %}
                         <h4 class="mb-0">{{ insights.top_net_label }}</h4>
-                        <div class="text-secondary small">Saldo l&iacute;quido: R$ {{ insights.top_net_value|floatformat:2 }}</div>
+                        <div class="small {% if insights.top_net_value >= 0 %}value-positive{% else %}value-negative{% endif %}">
+                            Saldo l&iacute;quido: R$ {{ insights.top_net_value|floatformat:2 }}
+                        </div>
                     {% else %}
                         <div class="text-secondary small">Sem dados no per&iacute;odo.</div>
                     {% endif %}
@@ -352,6 +357,61 @@
     </div>
 
     <div class="col-12">
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="glass-card p-4 h-100">
+                    <div class="d-flex align-items-start justify-content-between mb-2">
+                        <h5 class="mb-0">Avalia&ccedil;&atilde;o do agente</h5>
+                        <span class="badge bg-primary-subtle text-primary px-3">Finan&ccedil;as</span>
+                    </div>
+                    <h4 class="mb-2 {{ agent_eval.finance.class }}">{{ agent_eval.finance.title }}</h4>
+                    <p class="text-secondary mb-3">{{ agent_eval.finance.message }}</p>
+                    <div class="row g-2">
+                        {% for item in agent_eval.finance.items %}
+                        <div class="col-6">
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary">
+                                    {% if item.icon %}
+                                        <i class="{{ item.icon }} me-1 text-secondary"></i>
+                                    {% endif %}
+                                    {{ item.label }}
+                                </span>
+                                <span class="{{ item.class }}">R$ {{ item.value|floatformat:2 }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="glass-card p-4 h-100">
+                    <div class="d-flex align-items-start justify-content-between mb-2">
+                        <h5 class="mb-0">Avalia&ccedil;&atilde;o do agente</h5>
+                        <span class="badge bg-warning-subtle text-warning px-3">Tarefas</span>
+                    </div>
+                    <h4 class="mb-2 {{ agent_eval.tasks.class }}">{{ agent_eval.tasks.title }}</h4>
+                    <p class="text-secondary mb-3">{{ agent_eval.tasks.message }}</p>
+                    <div class="row g-2">
+                        {% for item in agent_eval.tasks.items %}
+                        <div class="col-6">
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary">
+                                    {% if item.icon %}
+                                        <i class="{{ item.icon }} me-1 text-secondary"></i>
+                                    {% endif %}
+                                    {{ item.label }}
+                                </span>
+                                <span class="{{ item.class }}">{{ item.value }}{% if item.suffix %}{{ item.suffix }}{% endif %}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
         <div class="glass-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">&Uacute;ltimas transa&ccedil;&otilde;es</h5>
@@ -362,6 +422,7 @@
                 <table class="table table-borderless align-middle mb-0">
                     <thead>
                         <tr class="text-secondary">
+                            <th>Ícone</th>
                             <th>Descri&#231;&#227;o</th>
                             <th>Categoria</th>
                             {% if show_responsible_column %}
@@ -375,6 +436,13 @@
                     <tbody>
                         {% for tx in latest_transactions %}
                             <tr>
+                                <td class="text-center">
+                                    {% if tx.icon %}
+                                        <i class="{{ tx.icon }}"></i>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                                 <td class="fw-semibold">{{ tx.description }}</td>
                                 <td><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
                                 {% if show_responsible_column %}
@@ -394,7 +462,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="{% if show_responsible_column %}6{% else %}5{% endif %}">
+                                <td colspan="{% if show_responsible_column %}7{% else %}6{% endif %}">
                                     <div class="text-secondary mb-2">Sem transa&ccedil;&otilde;es por enquanto.</div>
                                     <a class="btn btn-sm btn-primary" href="{% url 'tracker:transaction_create' %}">
                                         <i class="fa-solid fa-plus me-2"></i>Criar primeira transa&ccedil;&atilde;o
@@ -556,6 +624,9 @@
     const incomeEl = document.getElementById('incomeValue');
     const expenseEl = document.getElementById('expenseValue');
     const balanceEl = document.getElementById('balanceValue');
+    const incomeCard = document.getElementById('incomeCard');
+    const expenseCard = document.getElementById('expenseCard');
+    const balanceCard = document.getElementById('balanceCard');
     const applyBtn = document.getElementById('applyRange');
     const clearFiltersBtn = document.getElementById('clearFilters');
     const categoryFilterInfo = document.getElementById('categoryFilterInfo');
@@ -1021,9 +1092,23 @@
         );
         incomeEl.textContent = formatMoney(data.income_total);
         expenseEl.textContent = formatMoney(data.expense_total);
+        incomeEl.classList.toggle('value-positive', (data.income_total || 0) > 0);
+        incomeEl.classList.toggle('text-secondary', !(data.income_total > 0));
+        expenseEl.classList.toggle('value-negative', (data.expense_total || 0) > 0);
+        expenseEl.classList.toggle('text-secondary', !(data.expense_total > 0));
+        if (incomeCard) {
+            incomeCard.classList.toggle('kpi-positive', (data.income_total || 0) > 0);
+        }
+        if (expenseCard) {
+            expenseCard.classList.toggle('kpi-negative', (data.expense_total || 0) > 0);
+        }
         balanceEl.textContent = formatMoney(data.balance_total);
-        balanceEl.classList.toggle('text-success', (data.balance_total || 0) >= 0);
-        balanceEl.classList.toggle('text-danger', (data.balance_total || 0) < 0);
+        balanceEl.classList.toggle('value-positive', (data.balance_total || 0) >= 0);
+        balanceEl.classList.toggle('value-negative', (data.balance_total || 0) < 0);
+        if (balanceCard) {
+            balanceCard.classList.toggle('kpi-positive', (data.balance_total || 0) >= 0);
+            balanceCard.classList.toggle('kpi-negative', (data.balance_total || 0) < 0);
+        }
 
         if (emptyMsg) {
             const isEmpty = !data.labels || data.labels.length === 0;

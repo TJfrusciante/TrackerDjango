@@ -48,7 +48,7 @@
                     <div class="dropdown w-100 sidebar-profile">
                         <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2 w-100 text-start js-tooltip" data-bs-toggle="dropdown" data-bs-title="Perfil e conta">
                             {% if user_avatar_url %}
-                                <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb">
+                                <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb" onerror="this.onerror=null;this.src='{% static 'img/avatar-fallback.svg' %}';">
                             {% else %}
                                 <span class="avatar-thumb d-inline-flex align-items-center justify-content-center bg-secondary text-white">{{ user.username|first|upper }}</span>
                             {% endif %}
@@ -262,7 +262,7 @@
                 </div>
             </main>
 
-            {% if undo_tx or undo_task %}
+            {% if undo_tx or undo_task or undo_tx_bulk or undo_task_bulk %}
             <div class="toast-container position-fixed bottom-0 end-0 p-3">
                 {% if undo_tx %}
                 <div class="toast undo-toast text-bg-dark border-0 mb-2" role="alert" aria-live="polite" aria-atomic="true" data-clear-url="{% url 'tracker:transaction_undo_clear' %}">
@@ -281,6 +281,30 @@
                     <div class="d-flex align-items-center gap-2">
                         <div class="toast-body">Tarefa exclu&iacute;da.</div>
                         <form method="post" action="{% url 'tracker:task_undo_delete' %}" class="d-inline-flex">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-light" type="submit">Desfazer</button>
+                        </form>
+                        <button type="button" class="btn-close btn-close-white ms-auto me-2" data-bs-dismiss="toast" aria-label="Fechar"></button>
+                    </div>
+                </div>
+                {% endif %}
+                {% if undo_tx_bulk %}
+                <div class="toast undo-toast text-bg-dark border-0 mb-2" role="alert" aria-live="polite" aria-atomic="true" data-clear-url="{% url 'tracker:transaction_bulk_undo_clear' %}">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="toast-body">Transações excluídas.</div>
+                        <form method="post" action="{% url 'tracker:transaction_bulk_undo_delete' %}" class="d-inline-flex">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-light" type="submit">Desfazer</button>
+                        </form>
+                        <button type="button" class="btn-close btn-close-white ms-auto me-2" data-bs-dismiss="toast" aria-label="Fechar"></button>
+                    </div>
+                </div>
+                {% endif %}
+                {% if undo_task_bulk %}
+                <div class="toast undo-toast text-bg-dark border-0" role="alert" aria-live="polite" aria-atomic="true" data-clear-url="{% url 'tracker:task_bulk_undo_clear' %}">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="toast-body">Tarefas excluídas.</div>
+                        <form method="post" action="{% url 'tracker:task_bulk_undo_delete' %}" class="d-inline-flex">
                             {% csrf_token %}
                             <button class="btn btn-sm btn-outline-light" type="submit">Desfazer</button>
                         </form>
@@ -311,7 +335,7 @@
                     <div class="row gy-3">
                         <div class="col-md-6">
                             <h5 class="fw-bold footer-brand mb-2"><i class="fa-solid fa-bolt me-2 text-warning"></i>iTracker</h5>
-                            <p class="mb-0">Controle de tarefas e finan&ccedil;as com visual moderno e pronto para dispositivos m&oacute;veis.</p>
+                            <p class="mb-0">Controle de tarefas e financeiro com visual moderno integração com Inteligência Artificial e responsividade.</p>
                         </div>
                         <div class="col-md-6 text-md-end">
                             <div class="d-flex flex-wrap justify-content-md-end gap-2">

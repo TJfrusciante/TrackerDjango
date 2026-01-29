@@ -29,19 +29,25 @@ def workspace_context(request):
 
     undo_tx = _get_undo_payload(request, 'undo_tx')
     undo_task = _get_undo_payload(request, 'undo_task')
+    undo_tx_bulk = _get_undo_payload(request, 'undo_tx_bulk')
+    undo_task_bulk = _get_undo_payload(request, 'undo_task_bulk')
     grace_active = bool(getattr(request, "subscription_grace", False))
     grace_until = getattr(request, "subscription_grace_until", None)
     grace_remaining = getattr(request, "subscription_grace_remaining", None)
+    avatar_missing = _avatar_missing(user)
     return {
         "current_workspace": current,
         "available_workspaces": available,
         "current_workspace_role": getattr(request, "workspace_role", None),
         "user_avatar_url": _avatar_url(user),
+        "user_avatar_missing": avatar_missing,
         "user_is_guest": _is_guest(user),
         "notifications_unread": _notification_unread_count(user),
         "app_version": getattr(settings, "APP_VERSION", ""),
         "undo_tx": undo_tx,
         "undo_task": undo_task,
+        "undo_tx_bulk": undo_tx_bulk,
+        "undo_task_bulk": undo_task_bulk,
         "subscription_grace_active": grace_active,
         "subscription_grace_until": grace_until,
         "subscription_grace_remaining": grace_remaining,
@@ -54,10 +60,23 @@ def _avatar_url(user):
     profile = getattr(user, "profile", None)
     if profile and profile.avatar:
         try:
-            return profile.avatar.url
+            if default_storage.exists(profile.avatar.name):
+                return profile.avatar.url
         except Exception:
             return ""
     return ""
+
+
+def _avatar_missing(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    profile = getattr(user, "profile", None)
+    if profile and profile.avatar:
+        try:
+            return not default_storage.exists(profile.avatar.name)
+        except Exception:
+            return True
+    return False
 
 
 def _is_guest(user):

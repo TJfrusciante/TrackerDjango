@@ -100,9 +100,6 @@
                         {% endif %}
                     {% endif %}
                 </div>
-                {% if not is_detail %}
-                <div class="col-md-4 d-none"></div>
-                {% endif %}
                 <div class="col-md-4">
                     <label class="form-label">Respons&aacute;vel</label>
                     {% if is_detail %}
@@ -138,6 +135,44 @@
                     {% endif %}
                     {% if form.instance.status == 'done' and form.instance.completed_at %}
                         <div class="small text-secondary mt-1">Conclu&iacute;da em {{ form.instance.completed_at|date:"d/m/Y" }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Ícone</label>
+                    {% if is_detail %}
+                        {% if form.instance.icon %}
+                            <p class="form-control-plaintext fw-semibold"><i class="{{ form.instance.icon }}"></i></p>
+                        {% else %}
+                            <p class="form-control-plaintext fw-semibold">-</p>
+                        {% endif %}
+                    {% else %}
+                        <div class="icon-picker-wrap">
+                            <div class="d-none">
+                                {{ form.icon }}{{ form.icon.errors }}
+                            </div>
+                            <button type="button" class="form-select icon-toggle-btn w-100" id="taskIconToggle" data-bs-toggle="tooltip" title="Escolha um ícone para destacar esta tarefa.">
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="icon-pill bg-dark bg-opacity-10" id="taskIconTogglePill"><i class="fa-solid fa-circle"></i></span>
+                                    <span id="taskIconToggleLabel">Selecionar ícone</span>
+                                </span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                            <div class="icon-picker mt-2" id="taskIconPicker">
+                                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Filtrar ícones">
+                                        <button type="button" class="btn btn-outline-light active" data-group="tasks">Tarefas</button>
+                                        <button type="button" class="btn btn-outline-light" data-group="finance">Finanças</button>
+                                        <button type="button" class="btn btn-outline-light" data-group="all">Todos</button>
+                                    </div>
+                                    <input type="text" class="form-control form-control-sm icon-search" id="taskIconSearch" placeholder="Buscar ícone...">
+                                </div>
+                                <div class="icon-grid mt-2" id="taskIconGrid"></div>
+                                <div class="icon-favorites hidden" id="taskIconFavoritesWrap">
+                                    <div class="small text-secondary mb-1">Favoritos</div>
+                                    <div class="icon-grid" id="taskIconFavorites"></div>
+                                </div>
+                            </div>
+                        </div>
                     {% endif %}
                 </div>
                 {% if not is_detail and not is_edit %}
@@ -410,6 +445,20 @@
         const dateInput = document.getElementById('id_due_date');
         const dateDisplay = document.getElementById('taskDateDisplay');
         const categorySelect = document.getElementById('id_task_category');
+        const categoryInput = document.getElementById('id_category');
+        const iconSelect = document.getElementById('id_icon');
+        const iconToggle = document.getElementById('taskIconToggle');
+        const iconToggleLabel = document.getElementById('taskIconToggleLabel');
+        const iconTogglePill = document.getElementById('taskIconTogglePill');
+        const iconPreview = document.getElementById('taskIconPreview');
+        const iconPreviewPill = document.getElementById('taskIconPreviewPill');
+        const iconPreviewLabel = document.getElementById('taskIconPreviewLabel');
+        const iconPicker = document.getElementById('taskIconPicker');
+        const iconGrid = document.getElementById('taskIconGrid');
+        const iconSearch = document.getElementById('taskIconSearch');
+        const iconFavoritesWrap = document.getElementById('taskIconFavoritesWrap');
+        const iconFavorites = document.getElementById('taskIconFavorites');
+        const iconFavoritesKey = 'itracker:icon-favorites:tasks';
         const stepContainer = document.getElementById('stepContainer');
         const addBtn = document.getElementById('addStepRow');
         const preview = document.getElementById('taskVoicePreview');
@@ -441,6 +490,57 @@
         let manualCategory = false;
 
         const normalize = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const findOptionByValue = (value) => {
+            if (!iconSelect) return null;
+            try {
+                if (window.CSS && CSS.escape) {
+                    return iconSelect.querySelector(`option[value="${CSS.escape(value)}"]`);
+                }
+            } catch (err) { /* ignore */ }
+            return Array.from(iconSelect.options).find((opt) => opt.value === value) || null;
+        };
+        const loadIconFavorites = () => {
+            try {
+                const raw = localStorage.getItem(iconFavoritesKey);
+                return raw ? JSON.parse(raw) : [];
+            } catch (err) {
+                return [];
+            }
+        };
+        const saveIconFavorites = (values) => {
+            try {
+                localStorage.setItem(iconFavoritesKey, JSON.stringify(values));
+            } catch (err) { /* ignore */ }
+        };
+        const addIconFavorite = (value) => {
+            if (!value) return;
+            const favs = loadIconFavorites();
+            const next = [value, ...favs.filter((item) => item !== value)].slice(0, 8);
+            saveIconFavorites(next);
+            renderIconFavorites();
+        };
+
+        const financeIconSet = new Set([
+            'fa-solid fa-wallet', 'fa-solid fa-cart-shopping', 'fa-solid fa-bolt', 'fa-solid fa-house',
+            'fa-solid fa-building', 'fa-solid fa-briefcase-medical', 'fa-solid fa-credit-card',
+            'fa-solid fa-piggy-bank', 'fa-solid fa-hand-holding-dollar', 'fa-solid fa-coins',
+            'fa-solid fa-shield-halved', 'fa-solid fa-bus', 'fa-solid fa-truck', 'fa-solid fa-gas-pump',
+            'fa-solid fa-mobile-screen', 'fa-solid fa-wifi', 'fa-solid fa-tv', 'fa-solid fa-bag-shopping',
+            'fa-solid fa-ticket', 'fa-solid fa-mug-hot', 'fa-solid fa-utensils'
+        ]);
+        const taskIconSet = new Set([
+            'fa-solid fa-calendar-check', 'fa-solid fa-flag', 'fa-solid fa-briefcase', 'fa-solid fa-book',
+            'fa-solid fa-graduation-cap', 'fa-solid fa-people-group', 'fa-solid fa-child',
+            'fa-solid fa-heart', 'fa-solid fa-person-running', 'fa-solid fa-plane', 'fa-solid fa-gamepad',
+            'fa-solid fa-shirt', 'fa-solid fa-scissors', 'fa-solid fa-hammer', 'fa-solid fa-paw'
+        ]);
+        let iconGroup = 'tasks';
+
+        const getIconGroup = (value) => {
+            if (financeIconSet.has(value)) return 'finance';
+            if (taskIconSet.has(value)) return 'tasks';
+            return 'all';
+        };
 
         const hasCategorySelection = () => {
             if (categorySelect && categorySelect.value) return true;
@@ -670,6 +770,97 @@
             }
         };
 
+        const updateIconPreview = () => {
+            if (!iconSelect) return;
+            const option = iconSelect.selectedOptions ? iconSelect.selectedOptions[0] : null;
+            const value = option ? option.value : '';
+            const label = option ? option.textContent.trim() : '';
+            const resolvedLabel = label || 'Selecionar ícone';
+            if (iconPreviewLabel) iconPreviewLabel.textContent = label || 'Sem ícone';
+            if (iconToggleLabel) iconToggleLabel.textContent = resolvedLabel;
+            if (value) {
+                if (iconPreviewPill) iconPreviewPill.innerHTML = `<i class="${value}"></i>`;
+                if (iconTogglePill) iconTogglePill.innerHTML = `<i class="${value}"></i>`;
+            } else {
+                if (iconPreviewPill) iconPreviewPill.innerHTML = '<i class="fa-solid fa-circle"></i>';
+                if (iconTogglePill) iconTogglePill.innerHTML = '<i class="fa-solid fa-circle"></i>';
+            }
+            if (iconGrid) {
+                iconGrid.querySelectorAll('.icon-chip').forEach((chip) => {
+                    chip.classList.toggle('active', chip.dataset.value === value);
+                });
+            }
+            renderIconFavorites();
+        };
+
+        const renderIconFavorites = () => {
+            if (!iconFavorites || !iconFavoritesWrap || !iconSelect) return;
+            const favs = loadIconFavorites();
+            const query = normalize(iconSearch ? iconSearch.value : '');
+            iconFavorites.innerHTML = '';
+            let count = 0;
+            favs.forEach((value) => {
+                const opt = findOptionByValue(value);
+                if (!opt) return;
+                const optionGroup = getIconGroup(value);
+                if (iconGroup !== 'all' && optionGroup !== iconGroup) return;
+                const labelText = opt.textContent.trim();
+                if (query && !normalize(labelText).includes(query)) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'icon-chip';
+                btn.dataset.value = value;
+                btn.title = labelText;
+                btn.innerHTML = `<i class="${value}"></i>`;
+                btn.addEventListener('click', () => {
+                    iconSelect.value = value;
+                    updateIconPreview();
+                });
+                iconFavorites.appendChild(btn);
+                count += 1;
+            });
+            iconFavoritesWrap.classList.toggle('hidden', count === 0);
+        };
+
+        const buildIconGrid = () => {
+            if (!iconSelect || !iconGrid) return;
+            iconGrid.innerHTML = '';
+            const query = normalize(iconSearch ? iconSearch.value : '');
+            Array.from(iconSelect.options).forEach((opt) => {
+                if (!opt) return;
+                const optionGroup = getIconGroup(opt.value);
+                if (iconGroup !== 'all' && optionGroup !== iconGroup) return;
+                const labelText = opt.textContent.trim();
+                if (query && !normalize(labelText).includes(query)) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'icon-chip';
+                btn.dataset.value = opt.value;
+                btn.title = opt.textContent.trim();
+                if (opt.value) {
+                    btn.innerHTML = `<i class="${opt.value}"></i>`;
+                } else {
+                    btn.textContent = '—';
+                }
+                btn.addEventListener('click', () => {
+                    iconSelect.value = opt.value;
+                    updateIconPreview();
+                    addIconFavorite(opt.value);
+                    toggleIconPicker(false);
+                });
+                iconGrid.appendChild(btn);
+            });
+            renderIconFavorites();
+        };
+
+        const toggleIconPicker = (open) => {
+            if (!iconPicker) return;
+            iconPicker.classList.toggle('is-open', open);
+            if (open) {
+                buildIconGrid();
+            }
+        };
+
         const syncSteps = (steps) => {
             if (!stepContainer || !steps.length) return;
             const entries = Array.from(stepContainer.querySelectorAll('.step-entry'));
@@ -855,6 +1046,38 @@
                 manualCategory = hasCategorySelection();
             });
         }
+        if (iconSelect) {
+            updateIconPreview();
+            toggleIconPicker(false);
+            iconSelect.classList.add('visually-hidden');
+            iconSelect.setAttribute('tabindex', '-1');
+            iconSelect.addEventListener('change', () => {
+                updateIconPreview();
+                addIconFavorite(iconSelect.value);
+            });
+            if (iconToggle) {
+                iconToggle.addEventListener('click', () => toggleIconPicker(true));
+            }
+        }
+        if (iconPicker) {
+            iconPicker.addEventListener('click', (ev) => {
+                const btn = ev.target.closest('button[data-group]');
+                if (!btn) return;
+                iconGroup = btn.dataset.group || 'all';
+                iconPicker.querySelectorAll('button[data-group]').forEach((el) => {
+                    el.classList.toggle('active', el === btn);
+                });
+                buildIconGrid();
+            });
+        }
+        if (iconSearch) {
+            iconSearch.addEventListener('input', buildIconGrid);
+        }
+        document.addEventListener('click', (ev) => {
+            if (!iconSelect || !iconPicker) return;
+            const within = iconPicker.contains(ev.target) || (iconToggle && iconToggle.contains(ev.target));
+            if (!within) toggleIconPicker(false);
+        });
 
         if (dateDisplay && dateInput && dateInput.value) {
             dateDisplay.value = formatIsoToBr(dateInput.value);

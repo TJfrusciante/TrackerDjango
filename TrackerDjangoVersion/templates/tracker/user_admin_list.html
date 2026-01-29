@@ -121,7 +121,7 @@
 </div>
 
 <div class="admin-filter-card mb-3">
-    <form method="get" class="row g-2 align-items-end">
+    <form id="userAdminFilters" method="get" class="row g-2 align-items-end">
         <div class="col-md-4">
             <label class="form-label small">Buscar</label>
             <input type="text" name="q" class="form-control" placeholder="Username, nome ou e-mail" value="{{ filters.q }}">
@@ -174,6 +174,10 @@
 
 {% if filter_chips %}
 <div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="filter-chip filter-chip-clear" href="{% url 'tracker:user_admin_list' %}" data-bs-toggle="tooltip" title="Limpar todos os filtros">
+        Limpar tudo
+        <span class="ms-2">&times;</span>
+    </a>
     {% for chip in filter_chips %}
         <a class="filter-chip" href="{{ chip.url }}" data-bs-toggle="tooltip" title="Remover filtro">
             {{ chip.label }}
@@ -343,6 +347,12 @@
     (function () {
         const skeleton = document.getElementById('userTableSkeleton');
         if (skeleton) skeleton.classList.add('d-none');
+        const form = document.getElementById('userAdminFilters');
+        if (form && skeleton) {
+            form.addEventListener('submit', () => {
+                skeleton.classList.remove('d-none');
+            });
+        }
         const wrap = document.querySelector('.admin-user-table-wrap');
         if (!wrap) return;
         document.querySelectorAll('.admin-actions .dropdown').forEach((dropdown) => {

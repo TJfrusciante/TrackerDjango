@@ -46,6 +46,7 @@
                 <h2 class="h6 fw-bold mb-0">Workspaces em que voc&ecirc; participa</h2>
                 <span class="badge text-bg-secondary">{{ memberships|length }} ativos</span>
             </div>
+            <div id="workspaceMembershipsSkeleton" class="skeleton table-skeleton mb-3"></div>
             {% if memberships %}
                 <div class="list-group">
                     {% for membership in memberships %}
@@ -82,6 +83,7 @@
                 <h2 class="h6 fw-bold mb-0">Convites pendentes</h2>
                 <span class="badge text-bg-warning">{{ pending_invites|length }}</span>
             </div>
+            <div id="workspaceOverviewInvitesSkeleton" class="skeleton table-skeleton mb-3"></div>
             {% if pending_invites %}
                 <div class="list-group list-group-flush">
                     {% for invite in pending_invites %}
@@ -106,14 +108,13 @@
             {% endif %}
         </div>
     </div>
-</div>
-
 {% if user.is_superuser and all_workspaces %}
 <div class="glass-card p-4 mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h6 fw-bold mb-0">Todos os workspaces ativos</h2>
         <span class="badge text-bg-info">{{ all_workspaces|length }}</span>
     </div>
+    <div id="allWorkspacesSkeleton" class="skeleton table-skeleton mb-3"></div>
     <div class="list-group">
         {% for ws in all_workspaces %}
             <div class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
@@ -130,4 +131,15 @@
     </div>
 </div>
 {% endif %}
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const invitesSkeleton = document.getElementById('workspaceOverviewInvitesSkeleton');
+        if (invitesSkeleton) invitesSkeleton.classList.add('d-none');
+        const membershipsSkeleton = document.getElementById('workspaceMembershipsSkeleton');
+        if (membershipsSkeleton) membershipsSkeleton.classList.add('d-none');
+        const allSkeleton = document.getElementById('allWorkspacesSkeleton');
+        if (allSkeleton) allSkeleton.classList.add('d-none');
+    });
+</script>
 {% endblock %}

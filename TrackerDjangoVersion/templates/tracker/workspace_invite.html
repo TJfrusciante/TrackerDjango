@@ -39,6 +39,7 @@
     <div class="col-lg-7">
         <div class="glass-card p-4">
             <h2 class="h6 fw-bold mb-3">Convites pendentes</h2>
+            <div id="workspaceInviteSkeleton" class="skeleton table-skeleton mb-3"></div>
             {% if pending_invites %}
                 <div class="list-group list-group-flush">
                     {% for invite in pending_invites %}
@@ -59,4 +60,10 @@
         </div>
     </div>
 </div>
+<script>
+    (function () {
+        const skeleton = document.getElementById('workspaceInviteSkeleton');
+        if (skeleton) skeleton.classList.add('d-none');
+    })();
+</script>
 {% endblock %}

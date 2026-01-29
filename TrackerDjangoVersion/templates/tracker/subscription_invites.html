@@ -39,6 +39,7 @@
                 <h2 class="h6 fw-bold mb-0">Convites ativos</h2>
                 <span class="badge text-bg-secondary">{{ invites|length }}</span>
             </div>
+            <div id="subscriptionInvitesSkeleton" class="skeleton table-skeleton mb-3"></div>
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <thead>
@@ -98,6 +99,8 @@
 
 {% block extra_js %}
 <script>
+    const subscriptionInvitesSkeleton = document.getElementById('subscriptionInvitesSkeleton');
+    if (subscriptionInvitesSkeleton) subscriptionInvitesSkeleton.classList.add('d-none');
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const code = btn.dataset.code || '';

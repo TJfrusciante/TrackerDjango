@@ -367,40 +367,78 @@ def _help_response(message: str) -> str | None:
     return "Você pode consultar a página Ajuda no menu para um passo a passo completo."
 
 
-def _task_detail_summary(workspace, request, limit_tasks: int = 5, limit_steps: int = 6) -> str:
+def _task_detail_summary(workspace, request, message: str, limit_tasks: int = 5, limit_steps: int = 6) -> str:
     tasks_qs = _tasks_queryset(request, workspace)
-    done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at')
-    total_done = done_tasks.count()
-    if total_done == 0:
-        return "Nenhuma tarefa concluída no momento."
+    msg_norm = _normalize_text(message or '')
+    wants_done = any(key in msg_norm for key in ['conclu', 'finaliz', 'encerrad'])
+    wants_open = any(key in msg_norm for key in ['penden', 'andamento', 'aberta', 'aberto', 'ongoing'])
 
-    lines = [f"Tarefas concluídas ({total_done}):"]
-    for idx, task in enumerate(done_tasks[:limit_tasks], start=1):
-        completed_date = task.completed_at.date() if task.completed_at else None
-        completed_label = completed_date.strftime('%d/%m/%Y') if completed_date else '-'
-        due_label = task.due_date.strftime('%d/%m/%Y') if task.due_date else '-'
-        status_label = 'no prazo'
-        if completed_date and task.due_date and completed_date > task.due_date:
-            status_label = 'com atraso'
-        lines.append(f"{idx}. {task.title}")
-        lines.append(f"   - Concluída em: {completed_label}")
-        lines.append(f"   - Prazo: {due_label}")
-        lines.append(f"   - Status: {status_label}")
-        steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
-        if steps.exists():
-            lines.append("   - Etapas:")
-            for step in steps[:limit_steps]:
-                responsible = step.responsible or '-'
-                email = step.responsible_email or '-'
-                order_label = step.order if step.order else '?'
-                lines.append(
-                    f"     - Etapa {order_label}: {step.title} ({step.get_status_display()})"
-                )
-                lines.append(f"       Respons\u00e1vel: {responsible} | {email}")
-        else:
-            lines.append("   - Etapas: nenhuma cadastrada")
-    if total_done > limit_tasks:
-        lines.append(f"Mostrando {limit_tasks} de {total_done} tarefas conclu\u00eddas.")
+    done_tasks = tasks_qs.filter(status='done').order_by('-completed_at', '-updated_at')
+    open_tasks = tasks_qs.exclude(status='done').order_by('due_date', '-updated_at')
+    total_done = done_tasks.count()
+    total_open = open_tasks.count()
+
+    if wants_done and not total_done:
+        return "Nenhuma tarefa concluída no momento."
+    if wants_open and not total_open:
+        return "Nenhuma tarefa em andamento no momento."
+    if not wants_done and not wants_open and total_done == 0 and total_open == 0:
+        return "Nenhuma tarefa cadastrada no momento."
+
+    lines = []
+    if not wants_done or wants_open:
+        lines.append(f"Tarefas em andamento ({total_open}):")
+        for idx, task in enumerate(open_tasks[:limit_tasks], start=1):
+            due_label = task.due_date.strftime('%d/%m/%Y') if task.due_date else '-'
+            lines.append(f"{idx}. {task.title}")
+            lines.append(f"   - Prazo: {due_label}")
+            lines.append(f"   - Status: {task.get_status_display()}")
+            steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
+            if steps.exists():
+                lines.append("   - Etapas:")
+                for step in steps[:limit_steps]:
+                    responsible = step.responsible or '-'
+                    email = step.responsible_email or '-'
+                    order_label = step.order if step.order else '?'
+                    lines.append(
+                        f"     - Etapa {order_label}: {step.title} ({step.get_status_display()})"
+                    )
+                    lines.append(f"       Respons\u00e1vel: {responsible} | {email}")
+            else:
+                lines.append("   - Etapas: nenhuma cadastrada")
+        if total_open > limit_tasks:
+            lines.append(f"Mostrando {limit_tasks} de {total_open} tarefas em andamento.")
+
+    if not wants_open or wants_done:
+        if lines:
+            lines.append("")
+        lines.append(f"Tarefas concluídas ({total_done}):")
+        for idx, task in enumerate(done_tasks[:limit_tasks], start=1):
+            completed_date = task.completed_at.date() if task.completed_at else None
+            completed_label = completed_date.strftime('%d/%m/%Y') if completed_date else '-'
+            due_label = task.due_date.strftime('%d/%m/%Y') if task.due_date else '-'
+            status_label = 'no prazo'
+            if completed_date and task.due_date and completed_date > task.due_date:
+                status_label = 'com atraso'
+            lines.append(f"{idx}. {task.title}")
+            lines.append(f"   - Concluída em: {completed_label}")
+            lines.append(f"   - Prazo: {due_label}")
+            lines.append(f"   - Status: {status_label}")
+            steps = TaskStep.objects.filter(task=task).order_by('order', 'created_at')
+            if steps.exists():
+                lines.append("   - Etapas:")
+                for step in steps[:limit_steps]:
+                    responsible = step.responsible or '-'
+                    email = step.responsible_email or '-'
+                    order_label = step.order if step.order else '?'
+                    lines.append(
+                        f"     - Etapa {order_label}: {step.title} ({step.get_status_display()})"
+                    )
+                    lines.append(f"       Respons\u00e1vel: {responsible} | {email}")
+            else:
+                lines.append("   - Etapas: nenhuma cadastrada")
+        if total_done > limit_tasks:
+            lines.append(f"Mostrando {limit_tasks} de {total_done} tarefas conclu\u00eddas.")
     return "\n".join(lines)
 
 
@@ -480,7 +518,7 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
         return help_text, None, None
 
     if _wants_task_details(message):
-        reply = _task_detail_summary(workspace, request)
+        reply = _task_detail_summary(workspace, request, message)
         if cache_key:
             cache.set(cache_key, reply, 300)
         return reply, None, None

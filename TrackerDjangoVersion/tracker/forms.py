@@ -26,6 +26,50 @@ from .models import (
 
 User = get_user_model()
 
+ICON_CHOICES = [
+    ('', 'Sem ícone'),
+    ('fa-solid fa-tag', 'Tag'),
+    ('fa-solid fa-wallet', 'Carteira'),
+    ('fa-solid fa-cart-shopping', 'Compras'),
+    ('fa-solid fa-bolt', 'Conta/serviço'),
+    ('fa-solid fa-car', 'Transporte'),
+    ('fa-solid fa-house', 'Casa'),
+    ('fa-solid fa-building', 'Imóvel'),
+    ('fa-solid fa-heart', 'Saúde'),
+    ('fa-solid fa-briefcase-medical', 'Medicamentos'),
+    ('fa-solid fa-graduation-cap', 'Educação'),
+    ('fa-solid fa-book', 'Estudos'),
+    ('fa-solid fa-utensils', 'Alimentação'),
+    ('fa-solid fa-mug-hot', 'Café'),
+    ('fa-solid fa-briefcase', 'Trabalho'),
+    ('fa-solid fa-calendar-check', 'Tarefa'),
+    ('fa-solid fa-flag', 'Meta'),
+    ('fa-solid fa-gift', 'Presente'),
+    ('fa-solid fa-person-running', 'Esporte'),
+    ('fa-solid fa-plane', 'Viagem'),
+    ('fa-solid fa-gamepad', 'Lazer'),
+    ('fa-solid fa-ticket', 'Eventos'),
+    ('fa-solid fa-credit-card', 'Cartão'),
+    ('fa-solid fa-piggy-bank', 'Poupança'),
+    ('fa-solid fa-hand-holding-dollar', 'Receita'),
+    ('fa-solid fa-coins', 'Investimento'),
+    ('fa-solid fa-shield-halved', 'Seguro'),
+    ('fa-solid fa-paw', 'Pets'),
+    ('fa-solid fa-people-group', 'Família'),
+    ('fa-solid fa-bus', 'Ônibus'),
+    ('fa-solid fa-truck', 'Frete'),
+    ('fa-solid fa-gas-pump', 'Combustível'),
+    ('fa-solid fa-mobile-screen', 'Celular'),
+    ('fa-solid fa-wifi', 'Internet'),
+    ('fa-solid fa-tv', 'Streaming'),
+    ('fa-solid fa-film', 'Cinema'),
+    ('fa-solid fa-shirt', 'Roupas'),
+    ('fa-solid fa-scissors', 'Beleza'),
+    ('fa-solid fa-hammer', 'Reparos'),
+    ('fa-solid fa-bag-shopping', 'Compras diversas'),
+    ('fa-solid fa-child', 'Filhos'),
+]
+
 
 class BaseStyledForm(forms.ModelForm):
     """
@@ -70,10 +114,17 @@ class TransactionForm(BaseStyledForm):
                 member_ids.add(self.instance.responsible_id)
             self.fields['category'].queryset = Category.objects.filter(workspace=workspace)
             self.fields['responsible'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
+        icon_initial = getattr(self.instance, 'icon', '') or ''
+        self.fields['icon'] = forms.ChoiceField(
+            required=False,
+            choices=ICON_CHOICES,
+            widget=forms.Select(attrs={'class': 'form-select'}),
+        )
+        self.fields['icon'].initial = icon_initial
 
     class Meta:
         model = Transaction
-        fields = ['description', 'date', 'category', 'responsible', 'value', 'type']
+        fields = ['description', 'date', 'category', 'icon', 'responsible', 'value', 'type']
         widgets = {
             'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control', 'lang': 'pt-BR'}),
             'responsible': forms.Select(attrs={'class': 'form-select'}),
@@ -120,11 +171,18 @@ class TaskForm(BaseStyledForm):
             self.fields['task_category'].queryset = TaskCategory.objects.all()
         self.fields['task_category'].required = False
         self.fields['task_category'].empty_label = 'Selecione a categoria'
+        icon_initial = getattr(self.instance, 'icon', '') or ''
+        self.fields['icon'] = forms.ChoiceField(
+            required=False,
+            choices=ICON_CHOICES,
+            widget=forms.Select(attrs={'class': 'form-select'}),
+        )
+        self.fields['icon'].initial = icon_initial
         # campo category foi removido do form; task_category domina a seleção
 
     class Meta:
         model = Task
-        fields = ['title', 'task_category', 'responsible_user', 'due_date', 'status']
+        fields = ['title', 'task_category', 'icon', 'responsible_user', 'due_date', 'status']
         widgets = {
             'due_date': forms.DateInput(
                 format='%Y-%m-%d',
@@ -156,6 +214,7 @@ class TaskStepForm(BaseStyledForm):
 
 class TransactionBulkUpdateForm(forms.Form):
     category = forms.ModelChoiceField(queryset=Category.objects.none(), required=False, empty_label='Manter categoria')
+    icon = forms.ChoiceField(required=False, choices=ICON_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
     responsible = forms.ModelChoiceField(queryset=User.objects.none(), required=False, empty_label='Manter responsável')
     date = forms.DateField(
         required=False,
@@ -208,6 +267,7 @@ class TaskBulkUpdateForm(forms.Form):
         empty_label='Manter categoria',
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+    icon = forms.ChoiceField(required=False, choices=ICON_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
     category = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Outra categoria (opcional)'})
