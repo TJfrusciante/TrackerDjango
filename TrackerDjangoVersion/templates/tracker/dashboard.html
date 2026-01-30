@@ -116,7 +116,7 @@
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 {% if income_total > 0 %}kpi-positive{% endif %}" id="incomeCard">
+                <div class="glass-card p-3 h-100 kpi-secondary {% if income_total > 0 %}kpi-positive{% endif %}" id="incomeCard">
                     <p class="text-secondary small mb-1">Entradas</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if income_total > 0 %}value-positive{% else %}text-secondary{% endif %}" id="incomeValue">R$ {{ income_total|floatformat:2 }}</h3>
@@ -125,7 +125,7 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 {% if expense_total > 0 %}kpi-negative{% endif %}" id="expenseCard">
+                <div class="glass-card p-3 h-100 kpi-secondary {% if expense_total > 0 %}kpi-negative{% endif %}" id="expenseCard">
                 <p class="text-secondary small mb-1">Sa&iacute;das</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if expense_total > 0 %}value-negative{% else %}text-secondary{% endif %}" id="expenseValue">R$ {{ expense_total|floatformat:2 }}</h3>
@@ -143,7 +143,7 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 {% if tasks_overdue > 0 %}kpi-negative{% elif tasks_done > 0 %}kpi-positive{% endif %}" id="tasksCard">
+                <div class="glass-card p-3 h-100 kpi-secondary {% if tasks_overdue > 0 %}kpi-negative{% elif tasks_done > 0 %}kpi-positive{% endif %}" id="tasksCard">
                 <p class="text-secondary small mb-1">Tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if tasks_overdue > 0 %}text-warning{% else %}text-info{% endif %}">{{ tasks_open }} abertas</h3>
@@ -160,25 +160,25 @@
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 {% if tx_count_period > 0 %}kpi-positive{% endif %}" id="txCountCard">
+                <div class="glass-card p-3 h-100 kpi-secondary {% if tx_count_period > 0 %}kpi-positive{% endif %}" id="txCountCard">
                 <p class="text-secondary small mb-1">Movimenta&#231;&#245;es no per&#237;odo</p>
                     <h4 class="mb-0 {% if tx_count_period > 0 %}text-success{% else %}text-secondary{% endif %}">{{ tx_count_period }}</h4>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 {% if net_30 >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="net30Card">
+                <div class="glass-card p-3 h-100 kpi-secondary {% if net_30 >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="net30Card">
                 <p class="text-secondary small mb-1">Saldo &#250;ltimos 30 dias</p>
                     <h4 class="mb-0 {% if net_30 >= 0 %}value-positive{% else %}value-negative{% endif %}">R$ {{ net_30|floatformat:2 }}</h4>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 {% if avg_daily_expense > 0 %}kpi-negative{% endif %}" id="avgExpenseCard">
+                <div class="glass-card p-3 h-100 kpi-secondary {% if avg_daily_expense > 0 %}kpi-negative{% endif %}" id="avgExpenseCard">
                 <p class="text-secondary small mb-1">Despesa m&#233;dia (30d)</p>
                     <h4 class="mb-0 {% if avg_daily_expense > 0 %}value-negative{% else %}text-secondary{% endif %}">R$ {{ avg_daily_expense|floatformat:2 }}/dia</h4>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 {% if tasks_progress_pct >= 70 %}kpi-positive{% elif tasks_progress_pct < 40 %}kpi-negative{% endif %}" id="tasksProgressCard">
+                <div class="glass-card p-3 h-100 kpi-secondary {% if tasks_progress_pct >= 70 %}kpi-positive{% elif tasks_progress_pct < 40 %}kpi-negative{% endif %}" id="tasksProgressCard">
                 <p class="text-secondary small mb-1">Progresso tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h4 class="mb-0 {% if tasks_progress_pct >= 70 %}value-positive{% elif tasks_progress_pct >= 40 %}text-warning{% else %}value-negative{% endif %}">{{ tasks_progress_pct }}%</h4>
@@ -587,6 +587,13 @@
         </div>
     </div>
 </div>
+<div id="dashboardMeta"
+     class="d-none"
+     data-period="{{ period }}"
+     data-tasks-open="{{ tasks_open }}"
+     data-tasks-done="{{ tasks_done }}"
+     data-user-id="{{ user.id }}"
+     data-onboarding-enabled="{{ onboarding.show|yesno:"true,false" }}"></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -631,8 +638,12 @@
     const clearFiltersBtn = document.getElementById('clearFilters');
     const categoryFilterInfo = document.getElementById('categoryFilterInfo');
     const chartUrl = "{% url 'tracker:chart_data' %}";
-    const period = "{{ period }}";
-    const tasksData = { open: {{ tasks_open }}, done: {{ tasks_done }} };
+    const dashboardMeta = document.getElementById('dashboardMeta');
+    const period = dashboardMeta ? (dashboardMeta.dataset.period || '') : '';
+    const tasksData = {
+        open: dashboardMeta ? Number(dashboardMeta.dataset.tasksOpen || 0) : 0,
+        done: dashboardMeta ? Number(dashboardMeta.dataset.tasksDone || 0) : 0
+    };
     let chartInstance;
     let typeChartInstance;
     let monthlyChartInstance;
@@ -1221,11 +1232,12 @@
         const startTourBtn = document.getElementById('startTourBtn');
         const modalStartBtn = document.getElementById('startTourModal');
         const modalEl = document.getElementById('onboardingModal');
-        const userKey = `itracker:onboarding:{{ user.id }}`;
+        const userId = dashboardMeta ? (dashboardMeta.dataset.userId || '') : '';
+        const userKey = `itracker:onboarding:${userId}`;
         const checklistKey = `${userKey}:checklist`;
         const promptedKey = `${userKey}:prompted`;
         const doneKey = `${userKey}:done`;
-        const onboardingEnabled = {{ onboarding.show|yesno:"true,false" }};
+        const onboardingEnabled = dashboardMeta ? (dashboardMeta.dataset.onboardingEnabled === 'true') : false;
         const checklistEl = document.getElementById('onboardingChecklist');
         const checklistToggle = document.querySelector('[data-bs-target="#onboardingChecklist"]');
         const checklistIcon = checklistToggle ? checklistToggle.querySelector('.collapse-icon') : null;

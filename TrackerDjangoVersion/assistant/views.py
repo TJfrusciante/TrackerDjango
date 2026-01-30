@@ -9,6 +9,7 @@ import unicodedata
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.conf import settings
 from django.db.models import Sum, Case, When, DecimalField, F
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -161,6 +162,12 @@ def _parse_month_range(message: str):
 
 
 def _summarize_period(workspace, request, start_date, end_date, label: str, include_tasks: bool, include_finance: bool) -> str:
+    ws_key = workspace.id if workspace else 'global'
+    cache_key = f"ai:summary:{request.user.id}:{ws_key}:{start_date}:{end_date}:{int(include_tasks)}:{int(include_finance)}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
     lines = [f'Resumo de {label} ({start_date:%d/%m/%Y} a {end_date:%d/%m/%Y})']
 
     if include_finance:
@@ -204,7 +211,10 @@ def _summarize_period(workspace, request, start_date, end_date, label: str, incl
         lines.append(f'- Com prazo no período: {tasks_due.count()}')
         lines.append(f'- Concluídas no período: {tasks_done.count()}')
 
-    return '\n'.join(lines)
+    result = '\n'.join(lines)
+    ttl = int(getattr(settings, "AI_SUMMARY_CACHE_TTL", 600))
+    cache.set(cache_key, result, ttl)
+    return result
 
 
 def _finance_queryset(request, workspace):

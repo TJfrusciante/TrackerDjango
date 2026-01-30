@@ -205,7 +205,7 @@ CACHES = {
 
 # Cache TTLs (segundos)
 DASHBOARD_CACHE_TTL = int(env("DASHBOARD_CACHE_TTL", "600"))
-CHART_CACHE_TTL = int(env("CHART_CACHE_TTL", "300"))
+CHART_CACHE_TTL = int(env("CHART_CACHE_TTL", "600"))
 
 # ------------------------------------------------------------------------------
 # Auth redirects
@@ -273,6 +273,7 @@ AI_PLAN_TOKEN_LIMITS = {
     "master": int(env("AI_MASTER_TOKEN_LIMIT", env("AI_TEAM_TOKEN_LIMIT", "200000"))),
 }
 AI_USAGE_WINDOW_DAYS = int(env("AI_USAGE_WINDOW_DAYS", "30"))
+AI_SUMMARY_CACHE_TTL = int(env("AI_SUMMARY_CACHE_TTL", "600"))
 
 VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", "")

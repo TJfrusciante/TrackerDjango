@@ -116,25 +116,103 @@ document.addEventListener('DOMContentLoaded', () => {
         icon.className = collapsed ? 'fa-solid fa-angles-right' : 'fa-solid fa-angles-left';
     }
 
+    function updateSidebarCollapseIconFromState() {
+        const effectiveCollapsed = document.body.classList.contains('sidebar-collapsed')
+            && !document.body.classList.contains('sidebar-hovering');
+        updateCollapseIcon(effectiveCollapsed);
+    }
+
     if (sidebarCollapse) {
         const collapsedSaved = localStorage.getItem(collapsedKey) === '1';
         setCollapsed(collapsedSaved);
         sidebarCollapse.addEventListener('click', () => {
-            const collapsed = !document.body.classList.contains('sidebar-collapsed');
-            setCollapsed(collapsed);
+            const wasHovering = document.body.classList.contains('sidebar-hovering');
+            document.body.classList.remove('sidebar-hovering');
+            window.iTrackerSidebarHoverSuppress = true;
+            window.iTrackerSidebarHoverLockUntil = Date.now() + 350;
+            const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+            const nextCollapsed = isCollapsed && wasHovering ? true : !isCollapsed;
+            setCollapsed(nextCollapsed);
         });
     }
 
+    const setQuickActionsOpen = (isOpen, options = {}) => {
+        if (!quickActionsToggle || !quickActionsPanel) return;
+        const persist = options.persist !== false;
+        quickActionsPanel.classList.toggle('open', isOpen);
+        quickActionsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        quickActionsToggle.classList.toggle('is-rotating', isOpen);
+        if (persist) {
+            localStorage.setItem(quickKey, isOpen ? '1' : '0');
+        }
+    };
+
     if (quickActionsToggle && quickActionsPanel) {
         const savedQuick = localStorage.getItem(quickKey) === '1';
-        quickActionsPanel.classList.toggle('open', savedQuick);
-        quickActionsToggle.setAttribute('aria-expanded', savedQuick ? 'true' : 'false');
+        setQuickActionsOpen(savedQuick, { persist: false });
         quickActionsToggle.addEventListener('click', () => {
-            const isOpen = quickActionsPanel.classList.toggle('open');
-            quickActionsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-            localStorage.setItem(quickKey, isOpen ? '1' : '0');
+            const isOpen = !quickActionsPanel.classList.contains('open');
+            quickActionsPanel.dataset.hoverAuto = '';
+            setQuickActionsOpen(isOpen, { persist: true });
         });
     }
+
+    const setupQuickActionsHover = () => {
+        if (!quickActionsToggle || !quickActionsPanel) return;
+        let hoverTimer = null;
+        let leaveTimer = null;
+
+        const isDesktop = () => window.matchMedia('(min-width: 992px)').matches;
+        const isHoverEligible = () => isDesktop() && document.body.classList.contains('sidebar-hovering');
+
+        const onEnter = () => {
+            if (!isHoverEligible()) return;
+            const savedQuick = localStorage.getItem(quickKey) === '1';
+            if (savedQuick) return;
+            if (leaveTimer) {
+                window.clearTimeout(leaveTimer);
+                leaveTimer = null;
+            }
+            hoverTimer = window.setTimeout(() => {
+                quickActionsPanel.dataset.hoverAuto = '1';
+                setQuickActionsOpen(true, { persist: false });
+            }, 80);
+        };
+
+        const onLeave = (event) => {
+            if (hoverTimer) {
+                window.clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+            if (leaveTimer) {
+                window.clearTimeout(leaveTimer);
+            }
+            leaveTimer = window.setTimeout(() => {
+                const savedQuick = localStorage.getItem(quickKey) === '1';
+                if (savedQuick) {
+                    leaveTimer = null;
+                    return;
+                }
+                const related = event.relatedTarget;
+                if (related && (quickActionsToggle.contains(related) || quickActionsPanel.contains(related))) {
+                    leaveTimer = null;
+                    return;
+                }
+                if (quickActionsPanel.dataset.hoverAuto === '1') {
+                    setQuickActionsOpen(false, { persist: false });
+                    quickActionsPanel.dataset.hoverAuto = '';
+                }
+                leaveTimer = null;
+            }, 120);
+        };
+
+        quickActionsToggle.addEventListener('mouseenter', onEnter);
+        quickActionsPanel.addEventListener('mouseenter', onEnter);
+        quickActionsToggle.addEventListener('mouseleave', onLeave);
+        quickActionsPanel.addEventListener('mouseleave', onLeave);
+    };
+
+    setupQuickActionsHover();
 
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => openSidebar());
@@ -161,6 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
             setCollapsed(collapsedSaved);
         }
     });
+
+    window.iTrackerUpdateSidebarIcon = updateSidebarCollapseIconFromState;
+    updateSidebarCollapseIconFromState();
 
     // auto-close alerts (respeita data-autoclose em ms; default 2000)
     const alerts = document.querySelectorAll('.alert');

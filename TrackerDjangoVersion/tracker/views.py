@@ -1682,10 +1682,13 @@ def _parse_statement_rows(text: str, categories_qs):
     if not header:
         return []
 
+    return _parse_statement_rows_from_reader(header, reader)
+
+
+def _parse_statement_rows_from_reader(header, reader):
     header = [c.strip().lower() for c in header]
     has_keywords = any(k in header for k in ('description', 'descrição', 'descrição', 'valor', 'value', 'data', 'date'))
 
-    # Se tiver header, usa DictReader normalmente
     if has_keywords:
         key_map = {
             'descrição': 'description', 'descrição': 'description', 'description': 'description',
@@ -1694,22 +1697,20 @@ def _parse_statement_rows(text: str, categories_qs):
             'tipo': 'type', 'type': 'type',
             'categoria': 'category', 'category': 'category',
         }
-        dict_reader = csv.DictReader(io.StringIO(text, newline=''), delimiter=delimiter)
         mapped_rows = []
-        for row in dict_reader:
+        for row in reader:
+            if not row:
+                continue
             mapped = {}
-            for key, val in row.items():
-                if key is None:
+            for idx, key in enumerate(header):
+                if idx >= len(row):
                     continue
                 norm = key.strip().lower()
                 target = key_map.get(norm, norm)
-                mapped[target] = val
+                mapped[target] = row[idx]
             mapped_rows.append(mapped)
         return mapped_rows
 
-    # Sem header: assume colunas [datahora, descrição, valor, tipo?, categoria?]
-    data_rows = []
-    # Sem header: assume colunas [datahora, descrição, valor, tipo?, categoria?]
     data_rows = []
     for row in ([header] + list(reader)):
         if len(row) < 2:
@@ -1719,7 +1720,6 @@ def _parse_statement_rows(text: str, categories_qs):
         val = row[2] if len(row) > 2 else ''
         t_type = row[3] if len(row) > 3 else ''
         cat = row[4] if len(row) > 4 else ''
-        # tenta separar data de hora
         date_part = raw_date
         for fmt in ('%d/%m/%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S', '%d/%m/%Y'):
             try:
@@ -1736,6 +1736,32 @@ def _parse_statement_rows(text: str, categories_qs):
             'category': cat,
         })
     return data_rows
+
+
+def _parse_statement_rows_file(file_obj):
+    try:
+        file_obj.seek(0)
+        sample_bytes = file_obj.read(4096)
+        file_obj.seek(0)
+    except Exception:
+        sample_bytes = b''
+    sample_text = ''
+    if isinstance(sample_bytes, bytes):
+        sample_text = sample_bytes.decode('utf-8', errors='ignore')
+    else:
+        sample_text = str(sample_bytes)
+    try:
+        sniffed = csv.Sniffer().sniff(sample_text, delimiters=',;')
+        delimiter = sniffed.delimiter
+    except Exception:
+        delimiter = ','
+    file_obj.seek(0)
+    text_stream = io.TextIOWrapper(file_obj, encoding='utf-8', errors='ignore', newline='')
+    reader = csv.reader(text_stream, delimiter=delimiter)
+    header = next(reader, None)
+    if not header:
+        return []
+    return _parse_statement_rows_from_reader(header, reader)
 
 
 def _parse_pdf_statement(file_bytes: bytes):
@@ -2000,7 +2026,6 @@ def _suggest_category_for_desc(desc: str, cat_hint: str, categories, user=None, 
 
 
 @login_required
-@login_required
 def transaction_import(request):
     workspace = getattr(request, "workspace", None)
     if not _user_can_view_finance(request, workspace):
@@ -2076,13 +2101,17 @@ def transaction_import(request):
         if upload_form.is_valid():
             up_file = upload_form.cleaned_data['file']
             name = (up_file.name or '').lower()
-            file_bytes = up_file.read()
             rows = []
             if name.endswith('.pdf'):
+                file_bytes = up_file.read()
                 rows, parse_error = _parse_pdf_statement(file_bytes)
             else:
-                raw = _decode_upload(file_bytes)
-                rows = _parse_statement_rows(raw, categories)
+                try:
+                    rows = _parse_statement_rows_file(up_file.file)
+                except Exception:
+                    file_bytes = up_file.read()
+                    raw = _decode_upload(file_bytes)
+                    rows = _parse_statement_rows(raw, categories)
             categories = _ensure_categories_for_rows(rows, categories, workspace)
             preview_rows, ai_used = _build_preview(rows, categories)
             if not preview_rows:

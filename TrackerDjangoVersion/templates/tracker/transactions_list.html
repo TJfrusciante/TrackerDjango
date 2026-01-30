@@ -69,7 +69,7 @@
         <i class="fa-solid fa-filter me-2"></i>Filtros
     </button>
 </div>
-<div class="collapse d-lg-block" id="txFiltersCollapse">
+<div class="collapse d-lg-block filters-drawer" id="txFiltersCollapse">
 <form id="txFilters" method="get" class="glass-card p-3 mb-4">
     <div class="row g-3 align-items-end">
         <div class="col-md-3">
@@ -137,13 +137,16 @@
     </div>
 </div>
 {% endif %}
+<div id="transactionsMeta" class="d-none" data-user-id="{{ user.id }}"></div>
 <script>
     (function() {
         const form = document.getElementById('txFilters');
         if (!form) return;
         const collapseEl = document.getElementById('txFiltersCollapse');
         const collapseToggle = document.querySelector('[data-bs-target="#txFiltersCollapse"]');
-        const collapseKey = `itracker:filters:tx:{{ user.id }}`;
+        const transactionsMeta = document.getElementById('transactionsMeta');
+        const userId = transactionsMeta ? (transactionsMeta.dataset.userId || '') : '';
+        const collapseKey = `itracker:filters:tx:${userId}`;
         if (collapseEl && window.bootstrap && bootstrap.Collapse) {
             const collapse = new bootstrap.Collapse(collapseEl, { toggle: false });
             const savedState = localStorage.getItem(collapseKey);

@@ -193,6 +193,7 @@
         </div>
     </div>
 </div>
+<div id="pushMeta" class="d-none" data-vapid-key="{{ vapid_public_key|default:'' }}"></div>
 <script>
     (function () {
         const skeleton = document.getElementById('notificationsSkeleton');
@@ -211,7 +212,8 @@
     (function() {
         const btn = document.getElementById('pushToggleBtn');
         const status = document.getElementById('pushStatus');
-        const vapidKey = "{{ vapid_public_key|default:'' }}";
+        const pushMeta = document.getElementById('pushMeta');
+        const vapidKey = pushMeta ? (pushMeta.dataset.vapidKey || '') : '';
         if (!btn || !status) return;
         if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidKey) {
             btn.disabled = true;

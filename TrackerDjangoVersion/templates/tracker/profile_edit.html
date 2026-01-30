@@ -26,7 +26,7 @@
                     {% endif %}
                     {% if user_avatar_url %}
                         <div class="mb-2">
-                            <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb" style="width:64px;height:64px;" onerror="this.onerror=null;this.src='{% static 'img/avatar-fallback.svg' %}';">
+                            <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb avatar-img" style="width:64px;height:64px;" data-avatar-fallback="{% static 'img/avatar-fallback.svg' %}">
                         </div>
                     {% endif %}
                     {{ avatar_form.avatar }}
@@ -114,6 +114,18 @@
                                 {{ pref_form.digest_monthly.label }}
                             </label>
                         </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="glass-card p-3 bg-dark bg-opacity-10">
+                        <h6 class="fw-bold mb-2">Interface</h6>
+                        <div class="form-check">
+                            {{ pref_form.sidebar_hover_expand }}
+                            <label class="form-check-label" for="{{ pref_form.sidebar_hover_expand.id_for_label }}">
+                                {{ pref_form.sidebar_hover_expand.label }}
+                            </label>
+                        </div>
+                        <div class="form-text">No desktop, a sidebar expande automaticamente quando voc&ecirc; passa o mouse.</div>
                     </div>
                 </div>
                 <div class="col-12">

@@ -619,6 +619,7 @@ class NotificationPreferencesForm(forms.ModelForm):
             'notify_admin_new_account',
             'notify_admin_payment_request',
             'notify_admin_contact',
+            'sidebar_hover_expand',
         ]
         labels = {
             'notify_balance_threshold': 'Alertar quando o saldo atingir um valor',
@@ -634,6 +635,7 @@ class NotificationPreferencesForm(forms.ModelForm):
             'notify_admin_new_account': 'Receber aviso de novos cadastros pendentes',
             'notify_admin_payment_request': 'Receber aviso de solicita\u00e7\u00f5es de pagamento',
             'notify_admin_contact': 'Receber mensagens enviadas pelo contato',
+            'sidebar_hover_expand': 'Expandir sidebar ao passar o mouse (desktop)',
         }
         widgets = {
             'balance_threshold': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0', 'placeholder': 'Ex.: 5000'}),
@@ -649,6 +651,7 @@ class NotificationPreferencesForm(forms.ModelForm):
             'notify_admin_new_account': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notify_admin_payment_request': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notify_admin_contact': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'sidebar_hover_expand': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         help_texts = {
             'balance_threshold': 'Considera o saldo acumulado do workspace.',

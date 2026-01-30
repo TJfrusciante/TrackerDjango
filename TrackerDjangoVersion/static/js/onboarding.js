@@ -111,17 +111,23 @@
         const rect = target.getBoundingClientRect();
         const padding = 16;
         const isMobile = window.innerWidth <= 768;
+        tooltip.classList.toggle('tour-tooltip-mobile', isMobile);
         if (isMobile) {
             tooltip.style.maxWidth = `${window.innerWidth - padding * 2}px`;
+            target.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }
         const tipRect = tooltip.getBoundingClientRect();
         let top = rect.bottom + 12;
         let left = rect.left;
         if (isMobile) {
-            top = window.innerHeight - tipRect.height - padding;
-            if (top < padding) top = padding;
-            left = (window.innerWidth - tipRect.width) / 2;
-            if (left < padding) left = padding;
+            top = rect.bottom + 12;
+            if (top + tipRect.height > window.innerHeight - padding) {
+                top = rect.top - tipRect.height - 12;
+            }
+            if (top < padding) {
+                top = window.innerHeight - tipRect.height - padding;
+            }
+            left = Math.max(padding, (window.innerWidth - tipRect.width) / 2);
             tooltip.style.top = `${top}px`;
             tooltip.style.left = `${left}px`;
             return;

@@ -32,7 +32,7 @@
                     <div class="form-text">Clique no seletor ou em uma cor abaixo. Usada nos cards, gr&aacute;ficos e tabelas.</div>
                     <div class="color-palette mt-3" id="colorPalette">
                         {% for color in color_palette %}
-                            <button class="color-swatch" type="button" data-color="{{ color }}" style="background: {{ color }};" aria-label="Selecionar {{ color }}"></button>
+                            <button class="color-swatch" type="button" data-color="{{ color }}" aria-label="Selecionar {{ color }}"></button>
                         {% endfor %}
                     </div>
                 </div>
@@ -56,6 +56,9 @@
                 btn.classList.toggle('active', btn.dataset.color.toLowerCase() === normalized);
             });
         };
+        buttons.forEach((btn) => {
+            btn.style.background = btn.dataset.color;
+        });
         buttons.forEach((btn) => {
             btn.addEventListener('click', () => {
                 input.value = btn.dataset.color;

@@ -44,6 +44,7 @@ def workspace_context(request):
         "user_is_guest": _is_guest(user),
         "notifications_unread": _notification_unread_count(user),
         "app_version": getattr(settings, "APP_VERSION", ""),
+        "sidebar_hover_expand": _sidebar_hover_expand(user),
         "undo_tx": undo_tx,
         "undo_task": undo_task,
         "undo_tx_bulk": undo_tx_bulk,
@@ -112,4 +113,13 @@ def _get_undo_payload(request, key):
         except Exception:
             pass
     return payload
+
+
+def _sidebar_hover_expand(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return True
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        return True
+    return bool(getattr(profile, "sidebar_hover_expand", True))
 

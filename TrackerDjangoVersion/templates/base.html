@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
+{% static "img/avatar-fallback.svg" as avatar_fallback_url %}
 <html lang="pt-br" data-bs-theme="light" data-itracker-theme="light-teal">
 <head>
     <meta charset="UTF-8">
@@ -28,7 +29,7 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body data-sidebar-hover="{{ sidebar_hover_expand|yesno:'1,0' }}">
     <div class="layout-shell">
         {% with request.resolver_match.url_name as url_name %}
         <aside class="sidebar" id="sidebar">
@@ -48,7 +49,7 @@
                     <div class="dropdown w-100 sidebar-profile">
                         <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2 w-100 text-start js-tooltip" data-bs-toggle="dropdown" data-bs-title="Perfil e conta">
                             {% if user_avatar_url %}
-                                <img src="{{ user_avatar_url }}" alt="Avatar" class="avatar-thumb" onerror="this.onerror=null;this.src='{% static 'img/avatar-fallback.svg' %}';">
+                                <img src="/static/img/avatar-fallback.svg" alt="Avatar" class="avatar-thumb avatar-img">
                             {% else %}
                                 <span class="avatar-thumb d-inline-flex align-items-center justify-content-center bg-secondary text-white">{{ user.username|first|upper }}</span>
                             {% endif %}
@@ -314,6 +315,9 @@
                 {% endif %}
             </div>
             {% endif %}
+            <div id="globalToastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+            {{ user_avatar_url|default:''|json_script:"avatarUrlData" }}
+            {{ avatar_fallback_url|json_script:"avatarFallbackData" }}
 
             <button id="scrollTopBtn" class="nav-fab nav-top" type="button" aria-label="Ir para o topo">
                 <i class="fa-solid fa-arrow-up"></i>
@@ -391,6 +395,194 @@
                 }
             }, 2600);
         });
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (!form) return;
+            const submitter = event.submitter || form.querySelector('button[type=\"submit\"]');
+            if (submitter) {
+                submitter.classList.add('btn-saving');
+                setTimeout(() => submitter.classList.remove('btn-saving'), 1200);
+            }
+            const bulkWrap = form.closest('.bulk-actions');
+            if (bulkWrap) {
+                bulkWrap.classList.add('bulk-actions--busy');
+                setTimeout(() => bulkWrap.classList.remove('bulk-actions--busy'), 1400);
+            }
+        });
+
+        const getJsonValue = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return '';
+            try {
+                return JSON.parse(el.textContent || '""');
+            } catch (e) {
+                return '';
+            }
+        };
+        const avatarUrlValue = getJsonValue('avatarUrlData');
+        const avatarFallbackValue = getJsonValue('avatarFallbackData');
+        document.querySelectorAll('.avatar-img').forEach(img => {
+            if (avatarUrlValue) {
+                img.src = avatarUrlValue;
+            } else if (avatarFallbackValue) {
+                img.src = avatarFallbackValue;
+            }
+            img.addEventListener('error', () => {
+                if (avatarFallbackValue && img.src !== avatarFallbackValue) {
+                    img.src = avatarFallbackValue;
+                }
+            }, { once: true });
+        });
+
+        const showServerErrorToast = (message) => {
+            if (!bootstrap || !bootstrap.Toast) return;
+            const container = document.getElementById('globalToastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast text-bg-danger border-0 mb-2';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'polite');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.innerHTML = `
+                <div class="d-flex align-items-center gap-2">
+                    <div class="toast-body">${message || 'Ocorreu um erro no servidor. Tente novamente.'}</div>
+                    <button type="button" class="btn-close btn-close-white ms-auto me-2" data-bs-dismiss="toast" aria-label="Fechar"></button>
+                </div>
+            `;
+            container.appendChild(toast);
+            const instance = new bootstrap.Toast(toast, { delay: 5000 });
+            toast.addEventListener('hidden.bs.toast', () => toast.remove());
+            instance.show();
+        };
+
+        const originalFetch = window.fetch;
+        if (originalFetch) {
+            window.fetch = async (...args) => {
+                const response = await originalFetch(...args);
+                if (response && response.status >= 500) {
+                    const url = (() => {
+                        const input = args && args.length ? args[0] : null;
+                        if (!input) return '';
+                        if (typeof input === 'string') return input;
+                        if (input && typeof input.url === 'string') return input.url;
+                        return '';
+                    })();
+                    const message = (() => {
+                        if (url.includes('/api/chart-data/')) return 'Gráficos indisponíveis no momento.';
+                        if (url.includes('/ia/')) return 'Assistente indisponível no momento.';
+                        if (url.includes('/tarefas/')) return 'Tarefas indisponíveis no momento.';
+                        if (url.includes('/transacoes/')) return 'Transações indisponíveis no momento.';
+                        return 'Ocorreu um erro no servidor. Tente novamente.';
+                    })();
+                    showServerErrorToast(message);
+                }
+                return response;
+            };
+        }
+
+        const setupFiltersBackdrop = () => {
+            if (!window.bootstrap || !bootstrap.Collapse) return;
+            const drawers = Array.from(document.querySelectorAll('.filters-drawer'));
+            if (!drawers.length) return;
+            let backdrop = document.querySelector('.filters-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.className = 'filters-backdrop';
+                document.body.appendChild(backdrop);
+            }
+            const updateBackdrop = (forceShow) => {
+                if (window.innerWidth >= 992) {
+                    backdrop.classList.remove('show');
+                    return;
+                }
+                const anyOpen = drawers.some(drawer => drawer.classList.contains('show'));
+                if (forceShow || anyOpen) {
+                    backdrop.classList.add('show');
+                } else {
+                    backdrop.classList.remove('show');
+                }
+            };
+            drawers.forEach(drawer => {
+                drawer.addEventListener('shown.bs.collapse', () => updateBackdrop(true));
+                drawer.addEventListener('hidden.bs.collapse', () => updateBackdrop(false));
+            });
+            backdrop.addEventListener('click', () => {
+                drawers.forEach(drawer => {
+                    const instance = bootstrap.Collapse.getOrCreateInstance(drawer, { toggle: false });
+                    instance.hide();
+                });
+            });
+            window.addEventListener('resize', () => updateBackdrop(false));
+            updateBackdrop(false);
+        };
+
+        setupFiltersBackdrop();
+
+        const setupSidebarHover = () => {
+            const sidebar = document.getElementById('sidebar');
+            if (!sidebar) return;
+            const hoverTarget = sidebar.querySelector('.sidebar-inner') || sidebar;
+            const body = document.body;
+            const isDesktop = () => window.matchMedia('(min-width: 992px)').matches;
+            let hoverTimer = null;
+            let leaveTimer = null;
+            const allowHover = body.dataset.sidebarHover !== '0';
+
+            const onEnter = () => {
+                if (!isDesktop()) return;
+                if (!allowHover) return;
+                if (window.iTrackerSidebarHoverSuppress) return;
+                if (window.iTrackerSidebarHoverLockUntil && Date.now() < window.iTrackerSidebarHoverLockUntil) return;
+                if (!body.classList.contains('sidebar-collapsed')) return;
+                if (sidebar.querySelector('.dropdown-menu.show')) return;
+                if (leaveTimer) {
+                    window.clearTimeout(leaveTimer);
+                    leaveTimer = null;
+                }
+                hoverTimer = window.setTimeout(() => {
+                    if (!sidebar.querySelector('.dropdown-menu.show')) {
+                        body.classList.add('sidebar-hovering');
+                        if (window.iTrackerUpdateSidebarIcon) {
+                            window.iTrackerUpdateSidebarIcon();
+                        }
+                    }
+                }, 120);
+            };
+
+            const onLeave = () => {
+                if (hoverTimer) {
+                    window.clearTimeout(hoverTimer);
+                    hoverTimer = null;
+                }
+                if (leaveTimer) {
+                    window.clearTimeout(leaveTimer);
+                }
+                leaveTimer = window.setTimeout(() => {
+                    body.classList.remove('sidebar-hovering');
+                    window.iTrackerSidebarHoverSuppress = false;
+                    if (window.iTrackerUpdateSidebarIcon) {
+                        window.iTrackerUpdateSidebarIcon();
+                    }
+                    leaveTimer = null;
+                }, 80);
+            };
+
+            hoverTarget.addEventListener('mouseenter', onEnter);
+            hoverTarget.addEventListener('mouseleave', onLeave);
+            window.addEventListener('resize', () => {
+                if (!isDesktop()) {
+                    body.classList.remove('sidebar-hovering');
+                    window.iTrackerSidebarHoverSuppress = false;
+                    if (hoverTimer) {
+                        window.clearTimeout(hoverTimer);
+                        hoverTimer = null;
+                    }
+                }
+            });
+        };
+
+        setupSidebarHover();
     </script>
     {% block extra_js %}{% endblock %}
 </body>

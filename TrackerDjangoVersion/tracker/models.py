@@ -69,6 +69,12 @@ class Task(models.Model):
     def __str__(self):
         return self.title
 
+    def clean(self):
+        super().clean()
+        if self.workspace_id and self.task_category_id:
+            if self.task_category.workspace_id != self.workspace_id:
+                raise ValidationError({'task_category': 'Categoria não pertence ao workspace selecionado.'})
+
 
 class Transaction(models.Model):
     TYPE_CHOICES = [
@@ -240,6 +246,7 @@ class UserProfile(models.Model):
     deletion_requested_at = models.DateTimeField(null=True, blank=True)
     trial_started_at = models.DateTimeField(null=True, blank=True)
     trial_expires_at = models.DateTimeField(null=True, blank=True)
+    sidebar_hover_expand = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

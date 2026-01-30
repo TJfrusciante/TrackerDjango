@@ -655,19 +655,41 @@
     </div>
 </div>
 
+{{ ws_labels|json_script:"wsLabels" }}
+{{ ws_income|json_script:"wsIncome" }}
+{{ ws_expense|json_script:"wsExpense" }}
+{{ monthly_labels|json_script:"monthlyLabels" }}
+{{ monthly_values|json_script:"monthlyValues" }}
+{{ ai_daily_labels|json_script:"aiDailyLabels" }}
+{{ ai_daily_tokens|json_script:"aiDailyTokens" }}
+{{ ai_daily_costs|json_script:"aiDailyCosts" }}
+{{ ai_feature_labels|json_script:"aiFeatureLabels" }}
+{{ ai_feature_tokens|json_script:"aiFeatureTokens" }}
+
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    const wsLabels = JSON.parse(document.getElementById('wsLabels')?.textContent || '[]');
+    const wsIncome = JSON.parse(document.getElementById('wsIncome')?.textContent || '[]');
+    const wsExpense = JSON.parse(document.getElementById('wsExpense')?.textContent || '[]');
+    const monthlyLabels = JSON.parse(document.getElementById('monthlyLabels')?.textContent || '[]');
+    const monthlyValues = JSON.parse(document.getElementById('monthlyValues')?.textContent || '[]');
+    const aiDailyLabels = JSON.parse(document.getElementById('aiDailyLabels')?.textContent || '[]');
+    const aiDailyTokens = JSON.parse(document.getElementById('aiDailyTokens')?.textContent || '[]');
+    const aiDailyCosts = JSON.parse(document.getElementById('aiDailyCosts')?.textContent || '[]');
+    const aiFeatureLabels = JSON.parse(document.getElementById('aiFeatureLabels')?.textContent || '[]');
+    const aiFeatureTokens = JSON.parse(document.getElementById('aiFeatureTokens')?.textContent || '[]');
+
     const wsCtx = document.getElementById('wsChart');
     const wsSkeleton = document.getElementById('wsChartSkeleton');
     if (wsCtx) {
         new Chart(wsCtx, {
             type: 'bar',
             data: {
-                labels: {{ ws_labels|safe }},
+                labels: wsLabels,
                 datasets: [
-                    {label: 'Entradas', data: {{ ws_income|safe }}, backgroundColor: '#22c55e'},
-                    {label: 'Sa\u00eddas', data: {{ ws_expense|safe }}, backgroundColor: '#ef4444'},
+                    {label: 'Entradas', data: wsIncome, backgroundColor: '#22c55e'},
+                    {label: 'Saídas', data: wsExpense, backgroundColor: '#ef4444'},
                 ]
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
@@ -680,9 +702,9 @@
         new Chart(monthlyCtx, {
             type: 'line',
             data: {
-                labels: {{ monthly_labels|safe }},
+                labels: monthlyLabels,
                 datasets: [
-                    {label: 'Saldo l\u00edquido', data: {{ monthly_values|safe }}, borderColor: '#3b82f6', fill:false, tension:0.2}
+                    {label: 'Saldo líquido', data: monthlyValues, borderColor: '#3b82f6', fill:false, tension:0.2}
                 ]
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
@@ -696,10 +718,10 @@
         new Chart(aiTokensCtx, {
             type: 'line',
             data: {
-                labels: {{ ai_daily_labels|safe }},
+                labels: aiDailyLabels,
                 datasets: [
-                    {label: 'Tokens IA', data: {{ ai_daily_tokens|safe }}, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.2)', fill:true, tension:0.2},
-                    {label: 'Custo IA (R$)', data: {{ ai_daily_costs|safe }}, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.2)', fill:true, tension:0.2}
+                    {label: 'Tokens IA', data: aiDailyTokens, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.2)', fill:true, tension:0.2},
+                    {label: 'Custo IA (R$)', data: aiDailyCosts, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.2)', fill:true, tension:0.2}
                 ]
             },
             options: {responsive: true, plugins:{legend:{display:true}}}
@@ -713,9 +735,9 @@
         new Chart(aiFeatureCtx, {
             type: 'doughnut',
             data: {
-                labels: {{ ai_feature_labels|safe }},
+                labels: aiFeatureLabels,
                 datasets: [
-                    {data: {{ ai_feature_tokens|safe }}, backgroundColor: ['#22c55e', '#3b82f6']}
+                    {data: aiFeatureTokens, backgroundColor: ['#22c55e', '#3b82f6']}
                 ]
             },
             options: {responsive: true, plugins:{legend:{position:'bottom'}}}

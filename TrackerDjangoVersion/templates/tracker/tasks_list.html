@@ -63,7 +63,7 @@
         <i class="fa-solid fa-filter me-2"></i>Filtros
     </button>
 </div>
-<div class="collapse d-lg-block" id="taskFiltersCollapse">
+<div class="collapse d-lg-block filters-drawer" id="taskFiltersCollapse">
 <form id="taskFilters" method="get" class="glass-card p-3 mb-4">
     <div class="row g-3 align-items-end">
         <div class="col-md-3">
@@ -128,13 +128,16 @@
     <a class="btn btn-primary" href="{% url 'tracker:task_create' %}">Criar tarefa</a>
 </div>
 {% endif %}
+<div id="tasksMeta" class="d-none" data-user-id="{{ user.id }}"></div>
 <script>
     (function() {
         const form = document.getElementById('taskFilters');
         if (!form) return;
         const collapseEl = document.getElementById('taskFiltersCollapse');
         const collapseToggle = document.querySelector('[data-bs-target="#taskFiltersCollapse"]');
-        const collapseKey = `itracker:filters:tasks:{{ user.id }}`;
+        const tasksMeta = document.getElementById('tasksMeta');
+        const userId = tasksMeta ? (tasksMeta.dataset.userId || '') : '';
+        const collapseKey = `itracker:filters:tasks:${userId}`;
         if (collapseEl && window.bootstrap && bootstrap.Collapse) {
             const collapse = new bootstrap.Collapse(collapseEl, { toggle: false });
             const savedState = localStorage.getItem(collapseKey);
