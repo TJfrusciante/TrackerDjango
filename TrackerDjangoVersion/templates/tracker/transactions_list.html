@@ -78,7 +78,7 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">Tipo</label>
-            <select name="type" class="form-select" aria-label="Filtrar por tipo">
+            <select name="type" class="form-select js-auto-filter" aria-label="Filtrar por tipo">
                 <option value="">Todas</option>
                 <option value="income" {% if filters.type == 'income' %}selected{% endif %}>Entrada</option>
                 <option value="expense" {% if filters.type == 'expense' %}selected{% endif %}>Sa&iacute;da</option>
@@ -86,7 +86,7 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">Categoria</label>
-            <select name="category" class="form-select" aria-label="Filtrar por categoria">
+            <select name="category" class="form-select js-auto-filter" aria-label="Filtrar por categoria">
                 <option value="">Todas</option>
                 {% for cat in categories %}
                     <option value="{{ cat.id }}" {% if filters.category|stringformat:'s' == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
@@ -95,11 +95,11 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">De</label>
-            <input aria-label="Data inicial" id="txStartDate" type="date" name="start" class="form-control" value="{{ filters.start }}">
+            <input aria-label="Data inicial" id="txStartDate" type="date" name="start" class="form-control js-auto-filter" value="{{ filters.start }}">
         </div>
         <div class="col-md-2">
             <label class="form-label">At&eacute;</label>
-            <input aria-label="Data final" id="txEndDate" type="date" name="end" class="form-control" value="{{ filters.end }}">
+            <input aria-label="Data final" id="txEndDate" type="date" name="end" class="form-control js-auto-filter" value="{{ filters.end }}">
         </div>
         <div class="col-md-1 d-flex gap-2">
             <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transa&ccedil;&atilde;o">Filtrar</button>
@@ -440,6 +440,14 @@
             filtersForm.addEventListener('submit', () => {
                 skeleton.classList.remove('d-none');
                 tableWrap.classList.add('d-none');
+            });
+        }
+        if (filtersForm) {
+            const autoInputs = filtersForm.querySelectorAll('.js-auto-filter');
+            autoInputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    filtersForm.requestSubmit();
+                });
             });
         }
     })();

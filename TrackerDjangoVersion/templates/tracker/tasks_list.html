@@ -72,7 +72,7 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">Status</label>
-            <select name="status" class="form-select" aria-label="Filtrar por status">
+            <select name="status" class="form-select js-auto-filter" aria-label="Filtrar por status">
                 <option value="">Todos</option>
                 <option value="ongoing" {% if filters.status == 'ongoing' %}selected{% endif %}>Em andamento</option>
                 <option value="done" {% if filters.status == 'done' %}selected{% endif %}>Finalizada</option>
@@ -80,7 +80,7 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">Categoria</label>
-            <select name="category" class="form-select" aria-label="Filtrar por categoria">
+            <select name="category" class="form-select js-auto-filter" aria-label="Filtrar por categoria">
                 <option value="">Todas</option>
                 {% for cat in task_categories %}
                     <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
@@ -89,11 +89,11 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">De</label>
-            <input aria-label="Data inicial" id="taskStartDate" type="date" name="start" class="form-control" value="{{ filters.start }}">
+            <input aria-label="Data inicial" id="taskStartDate" type="date" name="start" class="form-control js-auto-filter" value="{{ filters.start }}">
         </div>
         <div class="col-md-2">
             <label class="form-label">At&eacute;</label>
-            <input aria-label="Data final" id="taskEndDate" type="date" name="end" class="form-control" value="{{ filters.end }}">
+            <input aria-label="Data final" id="taskEndDate" type="date" name="end" class="form-control js-auto-filter" value="{{ filters.end }}">
         </div>
         <div class="col-md-1 d-flex gap-2">
             <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de tarefa">Filtrar</button>
@@ -476,6 +476,14 @@
             filtersForm.addEventListener('submit', () => {
                 skeleton.classList.remove('d-none');
                 tableWrap.classList.add('d-none');
+            });
+        }
+        if (filtersForm) {
+            const autoInputs = filtersForm.querySelectorAll('.js-auto-filter');
+            autoInputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    filtersForm.requestSubmit();
+                });
             });
         }
     })();
