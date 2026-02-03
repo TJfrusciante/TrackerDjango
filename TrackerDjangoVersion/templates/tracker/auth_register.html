@@ -160,6 +160,20 @@
                     <button class="btn btn-primary" type="submit">Criar conta</button>
                 </div>
             </form>
+            {% if social_instagram_url or social_facebook_url %}
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                {% if social_instagram_url %}
+                <a class="btn btn-outline-light btn-sm" href="{{ social_instagram_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Instagram" aria-label="Instagram">
+                    <i class="fa-brands fa-instagram me-1"></i>Instagram
+                </a>
+                {% endif %}
+                {% if social_facebook_url %}
+                <a class="btn btn-outline-light btn-sm" href="{{ social_facebook_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Facebook" aria-label="Facebook">
+                    <i class="fa-brands fa-facebook me-1"></i>Facebook
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
             <p class="small mt-3 mb-0 text-secondary">Seu cadastro fica pendente at&eacute; a aprova&ccedil;&atilde;o do administrador.</p>
         </div>
     </div>

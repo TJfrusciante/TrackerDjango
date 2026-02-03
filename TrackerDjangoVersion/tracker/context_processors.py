@@ -44,6 +44,8 @@ def workspace_context(request):
         "user_is_guest": _is_guest(user),
         "notifications_unread": _notification_unread_count(user),
         "app_version": getattr(settings, "APP_VERSION", ""),
+        "social_facebook_url": getattr(settings, "SOCIAL_FACEBOOK_URL", ""),
+        "social_instagram_url": getattr(settings, "SOCIAL_INSTAGRAM_URL", ""),
         "sidebar_hover_expand": _sidebar_hover_expand(user),
         "undo_tx": undo_tx,
         "undo_task": undo_task,

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import secrets
+from types import SimpleNamespace
 from decimal import Decimal
 
 from django.conf import settings
@@ -26,6 +27,7 @@ from django.db.models import (
     DecimalField,
     ExpressionWrapper,
     F,
+    IntegerField,
     Max,
     OuterRef,
     Q,
@@ -73,6 +75,7 @@ from .forms import (
     SubscriptionInviteForm,
     PasswordResetRequestForm,
     PricingConfigForm,
+    SecurityConfigForm,
     TransactionBulkUpdateForm,
     TaskBulkUpdateForm,
     AdminBroadcastForm,
@@ -96,6 +99,7 @@ from .models import (
     SubscriptionInviteUse,
     MetricEvent,
     PricingConfig,
+    SecurityConfig,
 )
 from .notifications import (
     notify_balance_threshold,
@@ -244,6 +248,16 @@ def _cache_delete_pattern(pattern: str) -> bool:
     return False
 
 
+def _rate_limit(request, key, limit=60, window=60):
+    ident = request.user.id if request.user.is_authenticated else request.META.get('REMOTE_ADDR', 'anon')
+    cache_key = f"rl:{key}:{ident}"
+    count = cache.get(cache_key, 0)
+    if count >= limit:
+        return True
+    cache.set(cache_key, count + 1, window)
+    return False
+
+
 def _invalidate_workspace_caches(workspace):
     if not workspace:
         cache.clear()
@@ -262,6 +276,8 @@ def _invalidate_workspace_caches(workspace):
     for uid in user_ids:
         _cache_delete_pattern(f"dash:{uid}:{ws_key}:*")
         _cache_delete_pattern(f"chart:{uid}:{ws_key}:*")
+        _cache_delete_pattern(f"list:tx:{uid}:{ws_key}:*")
+        _cache_delete_pattern(f"list:tasks:{uid}:{ws_key}:*")
 
 
 def _build_filter_chips(request, items):
@@ -764,6 +780,8 @@ def dashboard(request):
     start_param = request.GET.get('start')
     end_param = request.GET.get('end')
     responsible_param = request.GET.get('responsible') or ''
+    type_param = request.GET.get('type') or ''
+    selected_only_param = request.GET.get('selected_only') == '1'
 
     start_date = None
     end_date = None
@@ -1181,6 +1199,8 @@ def dashboard(request):
             'items': onboarding_items,
         },
         'show_responsible_column': show_responsible_column,
+        'type_filter': type_param,
+        'selected_only': selected_only_param,
     }
     return render(request, 'tracker/dashboard.html', context)
 
@@ -1202,6 +1222,21 @@ def transactions_list(request):
     end_raw = request.GET.get('end', '')
     start = _parse_date_input(start_raw)
     end = _parse_date_input(end_raw)
+    cursor = request.GET.get('cursor', '').strip()
+
+    def _parse_tx_cursor(value):
+        parts = value.split('|')
+        if len(parts) != 3:
+            return None
+        try:
+            c_date = datetime.date.fromisoformat(parts[0])
+            c_created = datetime.datetime.fromisoformat(parts[1])
+            c_id = int(parts[2])
+        except Exception:
+            return None
+        return c_date, c_created, c_id
+
+    cursor_data = _parse_tx_cursor(cursor) if cursor else None
 
     if search:
         transactions_qs = transactions_qs.filter(Q(description__icontains=search) | Q(category__name__icontains=search))
@@ -1214,15 +1249,39 @@ def transactions_list(request):
     if end:
         transactions_qs = transactions_qs.filter(date__lte=end)
 
-    transactions = transactions_qs.order_by('-date', '-created_at')
+    transactions = transactions_qs.order_by('-date', '-created_at', '-id')
 
     if request.GET.get('export') == 'csv':
         return _export_transactions_csv(transactions)
 
-    income_total = transactions.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
-    expense_total = transactions.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
-    paginator = Paginator(transactions, 12)
+    list_ttl = int(getattr(settings, "LIST_CACHE_TTL", 120))
+    ws_key = workspace.id if workspace else 'global'
+    cache_key = f"list:tx:{request.user.id}:{ws_key}:{search}:{tx_type}:{category_id}:{start_raw}:{end_raw}"
+    cached = cache.get(cache_key) if list_ttl > 0 else None
+    if cached:
+        tx_ids = cached.get('ids', [])
+        income_total = cached.get('income_total', 0)
+        expense_total = cached.get('expense_total', 0)
+    else:
+        tx_ids = list(transactions.values_list('id', flat=True))
+        income_total = transactions.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
+        expense_total = transactions.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
+        if list_ttl > 0:
+            cache.set(cache_key, {
+                'ids': tx_ids,
+                'income_total': income_total,
+                'expense_total': expense_total,
+            }, list_ttl)
+
+    paginator = Paginator(tx_ids, 12)
     page_obj = paginator.get_page(request.GET.get('page'))
+    page_ids = list(page_obj.object_list or [])
+    if page_ids:
+        preserved = Case(*[When(id=pk, then=pos) for pos, pk in enumerate(page_ids)], output_field=IntegerField())
+        page_qs = Transaction.objects.select_related('category', 'responsible').filter(id__in=page_ids).order_by(preserved)
+        page_obj.object_list = list(page_qs)
+    else:
+        page_obj.object_list = []
     query_params = request.GET.copy()
     query_params.pop('page', None)
     query_string = query_params.urlencode()
@@ -1248,6 +1307,7 @@ def transactions_list(request):
             ('end', 'At\u00e9', fmt(end_raw)),
         ],
     )
+    filter_count = sum(1 for val in [search, tx_type, category_id, start_raw, end_raw] if val)
 
     context = {
         'transactions_page': page_obj,
@@ -1357,11 +1417,13 @@ def transactions_bulk_update(request):
             request.session['undo_tx_bulk_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         qs.delete()
         _invalidate_workspace_caches(workspace)
+        record_metric('tx_bulk_delete', user=request.user, workspace=workspace, metadata={'count': deleted_count})
         messages.success(request, f'{deleted_count} transa\u00e7\u00f5es exclu\u00eddas. Voc\u00ea pode desfazer a a\u00e7\u00e3o.')
         return redirect('tracker:transactions_list')
     if request.POST.get('bulk_mark') == '1':
         qs.update(selected=True)
         _invalidate_workspace_caches(workspace)
+        record_metric('tx_bulk_mark', user=request.user, workspace=workspace, metadata={'count': qs.count()})
         messages.success(request, 'Transa\u00e7\u00f5es destacadas.')
         return redirect('tracker:transactions_list')
     if request.POST.get('bulk_convert') == '1':
@@ -1374,6 +1436,7 @@ def transactions_bulk_update(request):
             )
         )
         _invalidate_workspace_caches(workspace)
+        record_metric('tx_bulk_convert', user=request.user, workspace=workspace, metadata={'count': qs.count()})
         messages.success(request, 'Transa\u00e7\u00f5es convertidas.')
         return redirect('tracker:transactions_list')
     if category:
@@ -1395,6 +1458,7 @@ def transactions_bulk_update(request):
         return redirect('tracker:transactions_list')
     qs.update(**updates)
     _invalidate_workspace_caches(workspace)
+    record_metric('tx_bulk_update', user=request.user, workspace=workspace, metadata={'count': qs.count(), 'fields': list(updates.keys())})
     messages.success(request, 'Transa\u00e7\u00f5es atualizadas.')
     return redirect('tracker:transactions_list')
 
@@ -1479,6 +1543,7 @@ def transaction_delete(request, pk):
         }
         request.session['undo_tx_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         transaction.delete()
+        record_metric(request, 'transaction_deleted')
         _invalidate_workspace_caches(workspace)
         messages.success(request, 'Transa\u00e7\u00e3o removida. Voc\u00ea pode desfazer a a\u00e7\u00e3o.')
     return redirect('tracker:transactions_list')
@@ -2042,6 +2107,9 @@ def transaction_import(request):
     ai_used = False
 
     if request.method == 'POST':
+        if _rate_limit(request, 'import:transactions', limit=30, window=60):
+            messages.error(request, 'Muitas importações em pouco tempo. Aguarde alguns segundos e tente novamente.')
+            return redirect('tracker:transaction_import')
         action = request.POST.get('action', '')
         if action == 'confirm':
             desc_list = request.POST.getlist('description')
@@ -2170,13 +2238,31 @@ def tasks_list(request):
     if end:
         tasks_qs = tasks_qs.filter(due_date__lte=end)
 
-    tasks = tasks_qs.order_by('due_date', '-created_at')
+    tasks = tasks_qs.order_by('due_date', '-created_at', '-id')
 
     if request.GET.get('export') == 'csv':
         return _export_tasks_csv(tasks)
 
-    paginator = Paginator(tasks, 12)
+    list_ttl = int(getattr(settings, "LIST_CACHE_TTL", 120))
+    ws_key = workspace.id if workspace else 'global'
+    cache_key = f"list:tasks:{request.user.id}:{ws_key}:{search}:{status}:{category}:{start_raw}:{end_raw}"
+    cached = cache.get(cache_key) if list_ttl > 0 else None
+    if cached:
+        task_ids = cached.get('ids', [])
+    else:
+        task_ids = list(tasks.values_list('id', flat=True))
+        if list_ttl > 0:
+            cache.set(cache_key, {'ids': task_ids}, list_ttl)
+
+    paginator = Paginator(task_ids, 12)
     page_obj = paginator.get_page(request.GET.get('page'))
+    page_ids = list(page_obj.object_list or [])
+    if page_ids:
+        preserved = Case(*[When(id=pk, then=pos) for pos, pk in enumerate(page_ids)], output_field=IntegerField())
+        page_qs = Task.objects.select_related('responsible_user', 'task_category').prefetch_related('steps').filter(id__in=page_ids).order_by(preserved)
+        page_obj.object_list = list(page_qs)
+    else:
+        page_obj.object_list = []
     for task in page_obj:
         completed_late = False
         if task.status == 'done' and task.due_date:
@@ -2209,6 +2295,7 @@ def tasks_list(request):
             ('end', 'Até', fmt(end_raw)),
         ],
     )
+    filter_count = sum(1 for val in [search, status, category, start_raw, end_raw] if val)
 
     context = {
         'tasks_page': page_obj,
@@ -2232,6 +2319,7 @@ def tasks_list(request):
             'end': fmt(end_raw),
         },
         'filter_chips': filter_chips,
+        'filter_count': filter_count,
     }
     return render(request, 'tracker/tasks_list.html', context)
 
@@ -2327,11 +2415,13 @@ def tasks_bulk_update(request):
             request.session['undo_task_bulk_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         qs.delete()
         _invalidate_workspace_caches(workspace)
+        record_metric('task_bulk_delete', user=request.user, workspace=workspace, metadata={'count': deleted_count})
         messages.success(request, f'{deleted_count} tarefas exclu\u00eddas. Voc\u00ea pode desfazer a a\u00e7\u00e3o.')
         return redirect('tracker:tasks_list')
     if request.POST.get('bulk_mark') == '1':
         qs.update(selected=True)
         _invalidate_workspace_caches(workspace)
+        record_metric('task_bulk_mark', user=request.user, workspace=workspace, metadata={'count': qs.count()})
         messages.success(request, 'Tarefas destacadas.')
         return redirect('tracker:tasks_list')
     if request.POST.get('bulk_convert') == '1':
@@ -2351,6 +2441,7 @@ def tasks_bulk_update(request):
             ),
         )
         _invalidate_workspace_caches(workspace)
+        record_metric('task_bulk_convert', user=request.user, workspace=workspace, metadata={'count': qs.count()})
         messages.success(request, 'Tarefas convertidas.')
         return redirect('tracker:tasks_list')
     if responsible_user:
@@ -2373,6 +2464,7 @@ def tasks_bulk_update(request):
         return redirect('tracker:tasks_list')
     qs.update(**updates)
     _invalidate_workspace_caches(workspace)
+    record_metric('task_bulk_update', user=request.user, workspace=workspace, metadata={'count': qs.count(), 'fields': list(updates.keys())})
     messages.success(request, 'Tarefas atualizadas.')
     return redirect('tracker:tasks_list')
 
@@ -2696,6 +2788,7 @@ def task_delete(request, pk):
         }
         request.session['undo_task_expires'] = (timezone.now() + datetime.timedelta(minutes=10)).isoformat()
         task.delete()
+        record_metric(request, 'task_deleted')
         _invalidate_workspace_caches(workspace)
         messages.success(request, 'Tarefa removida. Você pode desfazer a ação.')
     return redirect('tracker:tasks_list')
@@ -4518,6 +4611,7 @@ def workspace_member_remove(request, slug, member_id):
             messages.error(request, 'Não é possível remover o último owner.')
             return redirect('tracker:workspace_members', slug=slug)
         membership.delete()
+        record_metric('member_removed', user=request.user, workspace=workspace, metadata={'removed_id': member_id})
         messages.success(request, 'Membro removido.')
     else:
         messages.error(request, 'Requisição inválida.')
@@ -4639,11 +4733,20 @@ def superuser_overview(request):
             return redirect('tracker:superuser_overview')
         messages.error(request, 'Corrija os campos da promo\u00e7\u00e3o.')
 
-    tx_qs = Transaction.objects.all()
+    security_config = SecurityConfig.get_solo()
+    security_form = SecurityConfigForm(request.POST or None, instance=security_config)
+    if request.method == 'POST' and request.POST.get('security_form') == '1':
+        if security_form.is_valid():
+            security_form.save()
+            messages.success(request, 'Rotação de chaves atualizada.')
+            return redirect('tracker:superuser_overview')
+        messages.error(request, 'Corrija as datas de rotação.')
+
+    tx_qs = Transaction.objects.select_related('workspace', 'category', 'responsible').all()
     ws_qs = Workspace.objects.select_related('owner').all()
-    task_qs = Task.objects.all()
-    cat_qs = Category.objects.all()
-    membership_qs = WorkspaceMembership.objects.all()
+    task_qs = Task.objects.select_related('workspace', 'responsible_user').all()
+    cat_qs = Category.objects.select_related('workspace').all()
+    membership_qs = WorkspaceMembership.objects.select_related('workspace', 'user').all()
 
     if selected_user:
         ws_qs = ws_qs.filter(owner=selected_user)
@@ -4800,6 +4903,19 @@ def superuser_overview(request):
         if sub:
             revenue_30 += _subscription_amount(sub)
     churn_rate = (cancelled_30 / funnel_active * 100) if funnel_active else 0
+
+    def _rotation_status(date_value):
+        if not date_value:
+            return {'days': None, 'stale': True}
+        days = (timezone.localdate() - date_value).days
+        return {'days': days, 'stale': days >= 90}
+
+    rotation_status = {
+        'openai': _rotation_status(security_config.last_rotated_openai),
+        'twilio': _rotation_status(security_config.last_rotated_twilio),
+        'mp': _rotation_status(security_config.last_rotated_mp),
+        'whatsapp': _rotation_status(security_config.last_rotated_whatsapp),
+    }
 
     revenue_rows = []
     revenue_totals = {
@@ -4974,6 +5090,8 @@ def superuser_overview(request):
         'data_export_30': data_export_30,
         'pricing_form': pricing_form,
         'pricing_config': pricing_config,
+        'security_form': security_form,
+        'rotation_status': rotation_status,
         'recent_webhooks': recent_webhooks,
         'recent_subscriptions': recent_subscriptions,
         'funnel_signups': funnel_signups,
@@ -5167,6 +5285,7 @@ def user_admin_list(request):
         'paid_count': paid_count,
         'unpaid_count': unpaid_count,
         'filter_chips': filter_chips,
+        'filter_count': filter_count,
     }
     return render(request, 'tracker/user_admin_list.html', context)
 

@@ -120,6 +120,7 @@ Atualizacoes recentes
 - Convites de assinatura: tela admin /super/convites/ com planos mensal/anual, limite de uso e expiracao; campo "Tenho convite" no cadastro ativa plano sem cobranca.
 - Filtros mobile: filtros de tarefas/transacoes agora abrem como drawer (bottom sheet) com padding refinado e scroll interno.
 - Cache: CHART_CACHE_TTL padrao subiu para 10 min; resumos de IA por periodo agora sao cacheados (AI_SUMMARY_CACHE_TTL).
+- Cache: listas de transações/tarefas agora usam cache de IDs por filtro (LIST_CACHE_TTL) para reduzir consultas repetidas.
 - UX: feedback de "salvo" com animacao no botao e em acoes em massa; toast global para erros 500 em chamadas fetch.
 - Importacao CSV: parser em stream (chunks) para evitar carregar arquivo inteiro em memoria; fallback para parser antigo quando necessario.
 - Planos: acao "Renovar 1 ano" no admin (user_admin_status) atualiza billing_cycle=annual.
@@ -193,6 +194,14 @@ Atualizacoes recentes (2026-01-29)
 - Revisao rápida: sem ocorrências de mojibake (Ã, Ã§ etc.) e sem TODO/FIXME pendentes no código.
 - Filtros mobile: backdrop para fechar o drawer ao clicar fora; drawer fecha automaticamente no resize para desktop.
 - Toasts de erro: mensagens mais contextuais para falhas em gráficos/IA/tarefas/transações (fallback client-side).
+- Rate limit: importação CSV, webhook MP/WhatsApp e chat IA com limite por IP/usuário (retorna 429 ou mensagem de espera).
 - Sidebar: expansão por hover no desktop com delay (120ms) e bloqueio quando dropdown estiver aberto; preferência do usuário em Perfil (Interface) para ativar/desativar.
 - Sidebar: hover abre apenas o menu; "Demais funcionalidades" abre/fecha por hover próprio (auto retração ao sair), ícone com rotação para feedback.
 - Sidebar: clicar em minimizar fecha na primeira vez mesmo com mouse em cima; reabre só ao tirar e passar de novo.
+
+Atualizacoes recentes (2026-01-30)
+- Cache: LIST_CACHE_TTL (default 600s) configurável via .env; listas de transações/tarefas usam TTL maior.
+- Superuser: querysets com select_related para transações/tarefas/categorias/membros (menos N+1).
+- Auditoria: eventos “transaction_deleted” e “task_deleted” registrados ao excluir.
+- Categorias: empty state com CTA direto para criar a primeira categoria (transações e tarefas).
+- Skeletons: shimmer suavizado (menos “carregando” visual).

@@ -110,12 +110,22 @@
     transition: background-color .3s ease, color .3s ease, border-color .3s ease;
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 body {
     background: radial-gradient(circle at 20% 20%, var(--primary-glow), transparent 30%),
                 radial-gradient(circle at 80% 0%, var(--accent-glow), transparent 25%),
                 var(--bg);
     color: var(--text-color);
     min-height: 100vh;
+    overflow-x: hidden;
+}
+
+img, svg, canvas {
+    max-width: 100%;
 }
 
 .layout-shell {
@@ -296,6 +306,14 @@ body:not(.sidebar-collapsed) .sidebar-close-btn {
 .sidebar-collapse-btn,
 .sidebar-close-btn {
     align-self: center;
+}
+
+.sidebar-collapse-btn i {
+    transition: transform 0.22s ease;
+}
+
+.sidebar-collapse-btn.is-rotating i {
+    transform: rotate(-180deg);
 }
 
 .sidebar-stack {
@@ -701,6 +719,27 @@ body.sidebar-open {
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
     border-color: rgba(94, 234, 212, 0.35);
     z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .glass-card,
+    .glass-card:hover {
+        transition: none;
+        transform: none;
+    }
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+[data-itracker-theme^="light"] .badge {
+    color: #0f172a;
 }
 
 .page-action-btn {
@@ -1115,9 +1154,9 @@ body.sidebar-open {
 .skeleton {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(90deg, var(--border), var(--card-bg), var(--border));
-    background-size: 200% 100%;
-    animation: skeleton 1.4s ease infinite;
+    background: linear-gradient(90deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.28), rgba(148, 163, 184, 0.12));
+    background-size: 220% 100%;
+    animation: skeleton 1.2s ease-in-out infinite;
     border-radius: 12px;
     min-height: 120px;
 }
@@ -1377,6 +1416,12 @@ footer {
 
     .table-responsive {
         margin-inline: -0.25rem;
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px;
     }
 }
 

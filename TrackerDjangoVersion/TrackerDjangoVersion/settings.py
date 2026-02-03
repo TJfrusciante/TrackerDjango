@@ -52,6 +52,9 @@ if not APP_VERSION:
     except FileNotFoundError:
         APP_VERSION = "0.0.0"
 
+SOCIAL_FACEBOOK_URL = env("SOCIAL_FACEBOOK_URL", "")
+SOCIAL_INSTAGRAM_URL = env("SOCIAL_INSTAGRAM_URL", "")
+
 
 # ------------------------------------------------------------------------------
 # Quick-start development settings - unsuitable for production
@@ -206,6 +209,7 @@ CACHES = {
 # Cache TTLs (segundos)
 DASHBOARD_CACHE_TTL = int(env("DASHBOARD_CACHE_TTL", "600"))
 CHART_CACHE_TTL = int(env("CHART_CACHE_TTL", "600"))
+LIST_CACHE_TTL = int(env("LIST_CACHE_TTL", "600"))
 
 # ------------------------------------------------------------------------------
 # Auth redirects

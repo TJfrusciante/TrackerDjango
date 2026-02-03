@@ -142,7 +142,12 @@
                 </div>
             {% empty %}
                 <div class="col-12">
-                    <div class="glass-card p-4 text-secondary">Nenhuma categoria cadastrada.</div>
+                    <div class="glass-card p-4 text-secondary">
+                        <div class="mb-2">Nenhuma categoria cadastrada.</div>
+                        <a class="btn btn-sm btn-primary" href="#categorias-transacoes">
+                            <i class="fa-solid fa-plus me-2"></i>Criar primeira categoria
+                        </a>
+                    </div>
                 </div>
             {% endfor %}
         </div>
@@ -220,7 +225,12 @@
                 </div>
             {% empty %}
                 <div class="col-12">
-                    <div class="glass-card p-4 text-secondary">Nenhuma categoria de tarefa cadastrada.</div>
+                    <div class="glass-card p-4 text-secondary">
+                        <div class="mb-2">Nenhuma categoria de tarefa cadastrada.</div>
+                        <a class="btn btn-sm btn-primary" href="#categorias-tarefas">
+                            <i class="fa-solid fa-plus me-2"></i>Criar primeira categoria de tarefas
+                        </a>
+                    </div>
                 </div>
             {% endfor %}
         </div>

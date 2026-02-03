@@ -264,10 +264,10 @@
                             </option>
                         {% endfor %}
                     </select>
-                    <select id="typeFilter" class="form-select" aria-label="Filtrar por tipo">
-                        <option value="">Entradas e sa&#237;das</option>
-                        <option value="income">S&#243; entradas</option>
-                        <option value="expense">S&#243; sa&#237;das</option>
+                    <select id="typeFilter" name="type" class="form-select" aria-label="Filtrar por tipo">
+                        <option value="" {% if not type_filter %}selected{% endif %}>Entradas e sa&#237;das</option>
+                        <option value="income" {% if type_filter == 'income' %}selected{% endif %}>S&#243; entradas</option>
+                        <option value="expense" {% if type_filter == 'expense' %}selected{% endif %}>S&#243; sa&#237;das</option>
                     </select>
                     {% if responsible_users %}
                     <select id="responsibleFilter" name="responsible" class="form-select" aria-label="Filtrar por respons&aacute;vel">
@@ -280,7 +280,7 @@
                     </select>
                     {% endif %}
                     <div class="form-check align-self-center">
-                        <input class="form-check-input" type="checkbox" id="selectedOnly" aria-label="Somente destacados">
+                        <input class="form-check-input" type="checkbox" id="selectedOnly" name="selected_only" value="1" aria-label="Somente destacados" {% if selected_only %}checked{% endif %}>
                         <label class="form-check-label small text-secondary" for="selectedOnly">Destacados</label>
                     </div>
                     <button class="btn btn-outline-light page-action-btn" id="applyRange" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de per&#237;odo e tipo">
@@ -635,6 +635,7 @@
     const expenseCard = document.getElementById('expenseCard');
     const balanceCard = document.getElementById('balanceCard');
     const applyBtn = document.getElementById('applyRange');
+    const form = document.getElementById('rangeForm');
     const clearFiltersBtn = document.getElementById('clearFilters');
     const categoryFilterInfo = document.getElementById('categoryFilterInfo');
     const chartUrl = "{% url 'tracker:chart_data' %}";
@@ -655,6 +656,24 @@
     let activeCategoryId = null;
     let activeCategoryLabel = '';
     let activeType = '';
+    let chartsLoaded = false;
+
+    const submitRangeForm = () => {
+        if (form) {
+            if (form.requestSubmit) {
+                form.requestSubmit();
+            } else {
+                form.submit();
+            }
+            return;
+        }
+        requestChartLoad();
+    };
+
+    function requestChartLoad() {
+        chartsLoaded = true;
+        loadChart();
+    }
 
     const cssRoot = getComputedStyle(document.documentElement);
     const chartBorder = (cssRoot.getPropertyValue('--card-bg') || '#0f172a').trim();
@@ -1029,7 +1048,7 @@
         if (typeFilter) {
             typeFilter.value = activeType;
         }
-        loadChart();
+        requestChartLoad();
     }
 
     function setCategoryFilter(categoryId, label) {
@@ -1041,7 +1060,7 @@
             activeCategoryLabel = label || '';
         }
         updateCategoryFilterInfo();
-        loadChart();
+        requestChartLoad();
     }
 
     function updateCategoryFilterInfo() {
@@ -1139,7 +1158,18 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         updateCategoryFilterInfo();
-        loadChart();
+        const chartAnchor = ctx || categorySkeleton || document.querySelector('.chart-box');
+        if ('IntersectionObserver' in window && chartAnchor) {
+            const observer = new IntersectionObserver((entries, obs) => {
+                if (entries.some(entry => entry.isIntersecting)) {
+                    requestChartLoad();
+                    obs.disconnect();
+                }
+            }, { rootMargin: '120px' });
+            observer.observe(chartAnchor);
+        } else {
+            requestChartLoad();
+        }
         hideSkeleton(latestTxSkeleton);
         hideSkeleton(latestTasksSkeleton);
         if (clearFiltersBtn) {
@@ -1155,10 +1185,9 @@
                 const defaultEnd = clearFiltersBtn.dataset.defaultEnd || endHidden.value;
                 setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
                 updateCategoryFilterInfo();
-                loadChart();
+                requestChartLoad();
             });
         }
-        const form = document.getElementById('rangeForm');
         if (form) {
             form.addEventListener('submit', (e) => {
                 const isoStart = parseBrToIso(startDisplay.value.trim());
@@ -1177,6 +1206,11 @@
                 const iso = parseBrToIso(startDisplay.value.trim());
                 if (iso) setRangeValues(iso, endHidden.value || '', { clearMonth: true });
             });
+            startDisplay.addEventListener('change', () => {
+                const iso = parseBrToIso(startDisplay.value.trim());
+                if (iso) setRangeValues(iso, endHidden.value || '', { clearMonth: true });
+                submitRangeForm();
+            });
             startDisplay.addEventListener('focus', () => openPicker(startPicker));
             startDisplay.addEventListener('click', () => openPicker(startPicker));
         }
@@ -1186,6 +1220,11 @@
                 const iso = parseBrToIso(endDisplay.value.trim());
                 if (iso) setRangeValues(startHidden.value || '', iso, { clearMonth: true });
             });
+            endDisplay.addEventListener('change', () => {
+                const iso = parseBrToIso(endDisplay.value.trim());
+                if (iso) setRangeValues(startHidden.value || '', iso, { clearMonth: true });
+                submitRangeForm();
+            });
             endDisplay.addEventListener('focus', () => openPicker(endPicker));
             endDisplay.addEventListener('click', () => openPicker(endPicker));
         }
@@ -1193,6 +1232,7 @@
             startPicker.addEventListener('change', () => {
                 if (startPicker.value) {
                     setRangeValues(startPicker.value, endHidden.value || '', { clearMonth: true });
+                    submitRangeForm();
                 }
             });
         }
@@ -1200,6 +1240,7 @@
             endPicker.addEventListener('change', () => {
                 if (endPicker.value) {
                     setRangeValues(startHidden.value || '', endPicker.value, { clearMonth: true });
+                    submitRangeForm();
                 }
             });
         }
@@ -1211,7 +1252,7 @@
                 const end = option.dataset.end;
                 if (start && end) {
                     setRangeValues(start, end);
-                    loadChart();
+                    submitRangeForm();
                 }
             });
         }
@@ -1225,7 +1266,7 @@
                 const isoStart = parseBrToIso(startDisplay.value.trim());
                 const isoEnd = parseBrToIso(endDisplay.value.trim());
                 if (isoStart || isoEnd) setRangeValues(isoStart || startHidden.value, isoEnd || endHidden.value);
-                loadChart();
+                submitRangeForm();
             });
         });
 

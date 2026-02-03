@@ -78,6 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
         toggle.addEventListener('click', toggleTheme);
     });
 
+    const sidebar = document.getElementById('sidebar');
+    const sidebarInner = sidebar ? sidebar.querySelector('.sidebar-inner') : null;
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarClose = document.getElementById('sidebarClose');
     const sidebarBackdrop = document.getElementById('sidebarBackdrop');
@@ -129,10 +131,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const wasHovering = document.body.classList.contains('sidebar-hovering');
             document.body.classList.remove('sidebar-hovering');
             window.iTrackerSidebarHoverSuppress = true;
+            window.iTrackerSidebarHoverRequireReenter = true;
             window.iTrackerSidebarHoverLockUntil = Date.now() + 350;
             const isCollapsed = document.body.classList.contains('sidebar-collapsed');
             const nextCollapsed = isCollapsed && wasHovering ? true : !isCollapsed;
             setCollapsed(nextCollapsed);
+            sidebarCollapse.classList.add('is-rotating');
+            window.setTimeout(() => {
+                sidebarCollapse.classList.remove('is-rotating');
+            }, 220);
         });
     }
 
@@ -213,6 +220,79 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     setupQuickActionsHover();
+
+    const setupSidebarHover = () => {
+        if (!sidebar) return;
+        let hoverTimer = null;
+        let leaveTimer = null;
+
+        const isDesktop = () => window.matchMedia('(min-width: 992px)').matches;
+        const canHoverOpen = () => (
+            isDesktop()
+            && document.body.classList.contains('sidebar-collapsed')
+            && !window.iTrackerSidebarHoverSuppress
+            && Date.now() > (window.iTrackerSidebarHoverLockUntil || 0)
+        );
+
+        const clearHoverSuppressIfNeeded = () => {
+            if (!window.iTrackerSidebarHoverSuppress) return;
+            if (Date.now() > (window.iTrackerSidebarHoverLockUntil || 0) && !window.iTrackerSidebarHoverRequireReenter) {
+                window.iTrackerSidebarHoverSuppress = false;
+            }
+        };
+
+        const openHover = () => {
+            if (window.iTrackerSidebarHoverRequireReenter) return;
+            clearHoverSuppressIfNeeded();
+            if (!canHoverOpen()) return;
+            document.body.classList.add('sidebar-hovering');
+            updateSidebarCollapseIconFromState();
+        };
+
+        const closeHover = (event) => {
+            const related = event && event.relatedTarget;
+            if (related && sidebar.contains(related)) return;
+            document.body.classList.remove('sidebar-hovering');
+            if (window.iTrackerSidebarHoverRequireReenter) {
+                window.iTrackerSidebarHoverRequireReenter = false;
+                window.iTrackerSidebarHoverSuppress = false;
+            }
+            updateSidebarCollapseIconFromState();
+        };
+
+        const onEnter = () => {
+            if (window.iTrackerSidebarHoverRequireReenter) return;
+            clearHoverSuppressIfNeeded();
+            if (leaveTimer) {
+                window.clearTimeout(leaveTimer);
+                leaveTimer = null;
+            }
+            if (hoverTimer) {
+                window.clearTimeout(hoverTimer);
+            }
+            hoverTimer = window.setTimeout(openHover, 80);
+        };
+
+        const onLeave = (event) => {
+            if (hoverTimer) {
+                window.clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+            if (leaveTimer) {
+                window.clearTimeout(leaveTimer);
+            }
+            leaveTimer = window.setTimeout(() => closeHover(event), 120);
+        };
+
+        sidebar.addEventListener('mouseenter', onEnter);
+        sidebar.addEventListener('mouseleave', onLeave);
+        if (sidebarInner) {
+            sidebarInner.addEventListener('mouseenter', onEnter);
+            sidebarInner.addEventListener('mouseleave', onLeave);
+        }
+    };
+
+    setupSidebarHover();
 
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => openSidebar());

@@ -291,6 +291,28 @@ class PricingConfig(models.Model):
         return cls.objects.create()
 
 
+class SecurityConfig(models.Model):
+    last_rotated_openai = models.DateField(null=True, blank=True)
+    last_rotated_twilio = models.DateField(null=True, blank=True)
+    last_rotated_mp = models.DateField(null=True, blank=True)
+    last_rotated_whatsapp = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Configuração de segurança'
+        verbose_name_plural = 'Configurações de segurança'
+
+    def __str__(self):
+        return 'Configuração de segurança'
+
+    @classmethod
+    def get_solo(cls):
+        obj = cls.objects.first()
+        if obj:
+            return obj
+        return cls.objects.create()
+
+
 class SubscriptionInvite(models.Model):
     PLAN_CHOICES = UserProfile.BILLING_CHOICES
     code = models.CharField(max_length=40, unique=True)

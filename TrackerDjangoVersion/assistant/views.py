@@ -609,6 +609,16 @@ def _history_for_workspace(user, workspace, limit: int):
     return qs.order_by('-created_at')[:limit][::-1]
 
 
+def _rate_limit(request, key, limit=30, window=60):
+    ident = request.user.id if request.user.is_authenticated else request.META.get("REMOTE_ADDR", "anon")
+    cache_key = f"rl:{key}:{ident}"
+    count = cache.get(cache_key, 0)
+    if count >= limit:
+        return True
+    cache.set(cache_key, count + 1, window)
+    return False
+
+
 @login_required
 def chat(request):
     workspace = getattr(request, "workspace", None)
@@ -628,6 +638,9 @@ def chat(request):
     history = _history_for_workspace(request.user, workspace, 30)
 
     if request.method == 'POST':
+        if _rate_limit(request, 'ai_chat', limit=30, window=60):
+            messages.warning(request, "Muitas mensagens em pouco tempo. Aguarde alguns segundos e tente novamente.")
+            return redirect('assistant:chat')
         content = (request.POST.get('message') or '').strip()
         local_only = request.POST.get('local_only') == 'on' or not os.getenv("OPENAI_API_KEY") or quota_blocked
         fallback_reason = None
@@ -674,6 +687,14 @@ def chat_embed(request):
     history = _history_for_workspace(request.user, workspace, 20)
 
     if request.method == 'POST':
+        if _rate_limit(request, 'ai_chat_embed', limit=30, window=60):
+            return render(request, 'assistant/embed.html', {
+                'history': history,
+                'current_workspace': workspace,
+                'ai_quota_label': quota_label,
+                'ai_quota_blocked': quota_blocked,
+                'rate_limited': True,
+            })
         content = (request.POST.get('message') or '').strip()
         local_only = not os.getenv("OPENAI_API_KEY") or quota_blocked
         fallback_reason = None

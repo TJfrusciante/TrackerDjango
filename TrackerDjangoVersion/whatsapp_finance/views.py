@@ -4,6 +4,7 @@ import re
 
 from django.http import HttpResponse
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render
@@ -19,6 +20,16 @@ from .whatsapp import build_twiml, normalize_phone, validate_twilio_request
 
 def _reply(message: str) -> HttpResponse:
     return HttpResponse(build_twiml(message), content_type="text/xml")
+
+
+def _rate_limit(request, key, limit=120, window=60):
+    ident = request.META.get("REMOTE_ADDR", "anon")
+    cache_key = f"rl:{key}:{ident}"
+    count = cache.get(cache_key, 0)
+    if count >= limit:
+        return True
+    cache.set(cache_key, count + 1, window)
+    return False
 
 
 @login_required
@@ -62,6 +73,8 @@ def config(request):
 def webhook(request):
     if request.method != "POST":
         return _reply("Metodo nao permitido.")
+    if _rate_limit(request, "whatsapp_webhook", limit=120, window=60):
+        return _reply("Muitas mensagens em pouco tempo. Tente novamente.")
 
     if not validate_twilio_request(request):
         return _reply("Assinatura invalida.")

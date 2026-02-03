@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -18,6 +19,16 @@ from .models import MpSubscription, MpWebhookEvent
 from .services import build_preapproval_payload, create_preapproval, extract_preapproval_fields, fetch_preapproval
 
 User = get_user_model()
+
+
+def _rate_limit(request, key, limit=120, window=60):
+    ident = request.META.get('REMOTE_ADDR', 'anon')
+    cache_key = f"rl:{key}:{ident}"
+    count = cache.get(cache_key, 0)
+    if count >= limit:
+        return True
+    cache.set(cache_key, count + 1, window)
+    return False
 
 
 def _parse_datetime(value: str | None):
@@ -354,6 +365,8 @@ def _apply_preapproval_data(data, event: MpWebhookEvent | None = None):
 def mp_webhook(request):
     if request.method != 'POST':
         return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+    if _rate_limit(request, 'mp_webhook', limit=120, window=60):
+        return JsonResponse({'detail': 'Rate limit exceeded.'}, status=429)
     try:
         payload = json.loads(request.body.decode('utf-8')) if request.body else {}
     except json.JSONDecodeError:

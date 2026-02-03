@@ -114,6 +114,9 @@
 </form>
 </div>
 {% if filter_chips %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="small text-secondary">Filtros ativos: {{ filter_count }}</span>
+</div>
 <div class="d-flex flex-wrap gap-2 mb-4">
     <a class="filter-chip filter-chip-clear" href="{% url 'tracker:transactions_list' %}" data-bs-toggle="tooltip" title="Limpar todos os filtros">
         Limpar tudo
@@ -444,11 +447,24 @@
         }
         if (filtersForm) {
             const autoInputs = filtersForm.querySelectorAll('.js-auto-filter');
-            autoInputs.forEach(input => {
-                input.addEventListener('change', () => {
+            const submitFilters = () => {
+                if (filtersForm.requestSubmit) {
                     filtersForm.requestSubmit();
-                });
+                } else {
+                    filtersForm.submit();
+                }
+            };
+            const searchInput = filtersForm.querySelector('input[name="q"]');
+            let searchTimer = null;
+            autoInputs.forEach(input => {
+                input.addEventListener('change', submitFilters);
             });
+            if (searchInput) {
+                searchInput.addEventListener('input', () => {
+                    if (searchTimer) clearTimeout(searchTimer);
+                    searchTimer = setTimeout(submitFilters, 450);
+                });
+            }
         }
     })();
 </script>

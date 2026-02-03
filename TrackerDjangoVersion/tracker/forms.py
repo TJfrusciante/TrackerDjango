@@ -22,6 +22,7 @@ from .models import (
     BalanceGoal,
     SubscriptionInvite,
     PricingConfig,
+    SecurityConfig,
 )
 
 User = get_user_model()
@@ -810,6 +811,29 @@ class PricingConfigForm(BaseStyledForm):
             'regular_annual_pro': 'Pro anual/m\u00eas padr\u00e3o',
             'regular_monthly_master': 'Master mensal padr\u00e3o',
             'regular_annual_master': 'Master anual/m\u00eas padr\u00e3o',
+        }
+
+
+class SecurityConfigForm(BaseStyledForm):
+    class Meta:
+        model = SecurityConfig
+        fields = [
+            'last_rotated_openai',
+            'last_rotated_twilio',
+            'last_rotated_mp',
+            'last_rotated_whatsapp',
+        ]
+        widgets = {
+            'last_rotated_openai': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'last_rotated_twilio': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'last_rotated_mp': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'last_rotated_whatsapp': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+        labels = {
+            'last_rotated_openai': 'Última rotação OpenAI',
+            'last_rotated_twilio': 'Última rotação Twilio',
+            'last_rotated_mp': 'Última rotação Mercado Pago',
+            'last_rotated_whatsapp': 'Última rotação WhatsApp',
         }
 
 
