@@ -769,6 +769,92 @@ textarea:focus-visible {
     color: var(--primary-soft);
 }
 
+.filter-chip--period {
+    border-color: rgba(56, 189, 248, 0.45);
+    color: #7dd3fc;
+}
+
+.filter-chip--date {
+    border-color: rgba(129, 140, 248, 0.45);
+    color: #a5b4fc;
+}
+
+.filter-chip--month {
+    border-color: rgba(251, 191, 36, 0.45);
+    color: #fbbf24;
+}
+
+.filter-chip--type {
+    border-color: rgba(34, 197, 94, 0.45);
+    color: #22c55e;
+}
+
+.filter-chip--income {
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #10b981;
+}
+
+.filter-chip--expense {
+    border-color: rgba(239, 68, 68, 0.55);
+    color: #f87171;
+}
+
+.filter-chip--responsible {
+    border-color: rgba(244, 114, 182, 0.45);
+    color: #f9a8d4;
+}
+
+.filter-chip--selected {
+    border-color: rgba(250, 204, 21, 0.55);
+    color: #fde047;
+}
+
+.filter-chip--category {
+    border-color: var(--chip-accent, rgba(14, 165, 233, 0.5));
+    color: var(--chip-accent, #7dd3fc);
+    background: linear-gradient(120deg, rgba(15, 23, 42, 0.45), color-mix(in srgb, var(--chip-accent, #38bdf8) 30%, transparent));
+}
+
+.filter-count-badge {
+    background: rgba(14, 165, 233, 0.12);
+    color: #7dd3fc;
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+.filter-btn {
+    position: relative;
+}
+
+.filter-count-badge--btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+}
+
+.filter-count-pulse {
+    animation: filterCountPulse 0.3s ease;
+}
+
+@keyframes filterCountPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
 .filter-chip-clear {
     border-style: dashed;
     background: rgba(15, 23, 42, 0.15);

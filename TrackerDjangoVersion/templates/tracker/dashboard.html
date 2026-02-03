@@ -231,10 +231,12 @@
 
     <div class="col-12">
         <div class="dashboard-toolbar">
-            <button class="btn btn-outline-light page-action-btn" id="clearFilters" type="button" data-default-start="{{ start_date|date:'Y-m-d' }}" data-default-end="{{ end_date|date:'Y-m-d' }}" data-bs-toggle="tooltip" title="Limpar filtros e voltar ao per&iacute;odo inicial">
+            <button class="btn btn-outline-light page-action-btn filter-btn" id="clearFilters" type="button" data-default-start="{{ start_date|date:'Y-m-d' }}" data-default-end="{{ end_date|date:'Y-m-d' }}" data-bs-toggle="tooltip" title="Limpar filtros e voltar ao per&iacute;odo inicial">
                 <i class="fa-solid fa-eraser me-1"></i>Limpar filtros
+                <span id="filterCountBadge" class="badge filter-count-badge filter-count-badge--btn d-none">0</span>
             </button>
         </div>
+        <div id="filterChips" class="d-flex flex-wrap gap-2 mt-2"></div>
     </div>
 
     <div class="col-lg-7">
@@ -291,9 +293,9 @@
             <div class="mb-3">
                 <div class="d-flex flex-wrap gap-2">
                     {% for code,label in quick_ranges %}
-                        <a class="btn btn-sm {% if period == code %}btn-primary{% else %}btn-outline-light{% endif %}" href="?period={{ code }}">
+                        <button type="button" class="btn btn-sm {% if period == code %}btn-primary{% else %}btn-outline-light{% endif %}" data-period="{{ code }}">
                             {{ label }}
-                        </a>
+                        </button>
                     {% endfor %}
                 </div>
                 <div class="text-secondary small mt-2">
@@ -640,7 +642,7 @@
     const categoryFilterInfo = document.getElementById('categoryFilterInfo');
     const chartUrl = "{% url 'tracker:chart_data' %}";
     const dashboardMeta = document.getElementById('dashboardMeta');
-    const period = dashboardMeta ? (dashboardMeta.dataset.period || '') : '';
+    let period = dashboardMeta ? (dashboardMeta.dataset.period || '') : '';
     const tasksData = {
         open: dashboardMeta ? Number(dashboardMeta.dataset.tasksOpen || 0) : 0,
         done: dashboardMeta ? Number(dashboardMeta.dataset.tasksDone || 0) : 0
@@ -658,16 +660,137 @@
     let activeType = '';
     let chartsLoaded = false;
 
-    const submitRangeForm = () => {
-        if (form) {
-            if (form.requestSubmit) {
-                form.requestSubmit();
-            } else {
-                form.submit();
-            }
-            return;
+    const buildChartParams = () => {
+        const params = new URLSearchParams();
+        if (period) {
+            params.append('period', period);
+        } else {
+            if (startHidden.value) params.append('start', startHidden.value);
+            if (endHidden.value) params.append('end', endHidden.value);
         }
-        requestChartLoad();
+        const typeValue = activeType || (typeFilter ? typeFilter.value : '');
+        if (typeValue) params.append('type', typeValue);
+        if (responsibleFilter && responsibleFilter.value) params.append('responsible', responsibleFilter.value);
+        if (selectedOnly && selectedOnly.checked) params.append('selected_only', '1');
+        if (activeCategoryId) params.append('category_id', activeCategoryId);
+        if (monthSelect && monthSelect.value) params.append('month', monthSelect.value);
+        return params;
+    };
+
+    const updateDashboardUrl = (params) => {
+        if (!params) return;
+        const query = params.toString();
+        const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+        window.history.replaceState({}, '', nextUrl);
+    };
+
+        const applyDashboardFilters = () => {
+            const params = buildChartParams();
+            updateDashboardUrl(params);
+            renderFilterChips();
+            if (!chartsLoaded) {
+                requestChartLoad();
+                return;
+            }
+            loadChart();
+        };
+
+    const debounce = (fn, delay = 250) => {
+        let timer;
+        return (...args) => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => fn(...args), delay);
+        };
+    };
+
+    const applyDashboardFiltersDebounced = debounce(() => {
+        applyDashboardFilters();
+    }, 250);
+
+    const filterChips = document.getElementById('filterChips');
+    const filterCountBadge = document.getElementById('filterCountBadge');
+    let activeCategoryColor = '';
+
+    const getPeriodLabel = () => {
+        if (!period) return '';
+        const match = document.querySelector(`[data-period="${period}"]`);
+        return match ? match.textContent.trim() : period;
+    };
+
+    const clearDateRange = () => {
+        const defaultStart = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultStart || startHidden.value) : startHidden.value;
+        const defaultEnd = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultEnd || endHidden.value) : endHidden.value;
+        setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
+        period = '';
+    };
+
+    const renderFilterChips = () => {
+        if (!filterChips) return;
+        const chips = [];
+        const startVal = startHidden.value;
+        const endVal = endHidden.value;
+        if (period) {
+            const periodLabel = getPeriodLabel();
+            if (periodLabel && periodLabel.toLowerCase() !== 'tudo') {
+                chips.push({ key: 'period', label: `Atalho: ${periodLabel}` });
+            }
+        } else if (startVal && endVal) {
+            chips.push({ key: 'date', label: `Período: ${formatIsoToBr(startVal)} – ${formatIsoToBr(endVal)}` });
+        }
+        if (monthSelect && monthSelect.value) {
+            const option = monthSelect.selectedOptions ? monthSelect.selectedOptions[0] : null;
+            if (option) chips.push({ key: 'month', label: `Mês: ${option.textContent.trim()}` });
+        }
+        if (activeType) {
+            const typeLabel = activeType === 'income' ? 'Só entradas' : 'Só saídas';
+            chips.push({ key: 'type', label: typeLabel });
+        }
+        if (responsibleFilter && responsibleFilter.value) {
+            const opt = responsibleFilter.selectedOptions ? responsibleFilter.selectedOptions[0] : null;
+            chips.push({ key: 'responsible', label: `Responsável: ${opt ? opt.textContent.trim() : responsibleFilter.value}` });
+        }
+        if (selectedOnly && selectedOnly.checked) {
+            chips.push({ key: 'selected', label: 'Destacados' });
+        }
+        if (activeCategoryId && activeCategoryLabel) {
+            chips.push({ key: 'category', label: `Categoria: ${activeCategoryLabel}` });
+        }
+        filterChips.innerHTML = '';
+        chips.forEach(chip => {
+            const el = document.createElement('button');
+            el.type = 'button';
+            const chipClass = `filter-chip filter-chip--${chip.key}`;
+            el.className = chipClass;
+            el.dataset.remove = chip.key;
+            if (chip.key === 'type') {
+                el.classList.add(activeType === 'income' ? 'filter-chip--income' : 'filter-chip--expense');
+            }
+            if (chip.key === 'category' && activeCategoryColor) {
+                el.style.setProperty('--chip-accent', activeCategoryColor);
+            }
+            el.innerHTML = `${chip.label} <i class="fa-solid fa-xmark ms-1"></i>`;
+            filterChips.appendChild(el);
+        });
+        filterChips.classList.toggle('d-none', chips.length === 0);
+        if (filterCountBadge) {
+            const displayCount = chips.length;
+            filterCountBadge.textContent = `${displayCount}`;
+            filterCountBadge.classList.toggle('d-none', displayCount === 0);
+            filterCountBadge.classList.add('filter-count-pulse');
+            setTimeout(() => {
+                filterCountBadge.classList.remove('filter-count-pulse');
+            }, 300);
+        }
+        if (clearFiltersBtn) {
+            const tooltip = bootstrap.Tooltip.getInstance(clearFiltersBtn);
+            const title = chips.length
+                ? `Limpar filtros (${chips.length} ativo${chips.length === 1 ? '' : 's'})`
+                : 'Limpar filtros e voltar ao período inicial';
+            clearFiltersBtn.setAttribute('data-bs-original-title', title);
+            if (tooltip) {
+                tooltip.setContent({ '.tooltip-inner': title });
+            }
+        }
     };
 
     function requestChartLoad() {
@@ -1048,7 +1171,7 @@
         if (typeFilter) {
             typeFilter.value = activeType;
         }
-        requestChartLoad();
+        applyDashboardFiltersDebounced();
     }
 
     function setCategoryFilter(categoryId, label) {
@@ -1060,7 +1183,7 @@
             activeCategoryLabel = label || '';
         }
         updateCategoryFilterInfo();
-        requestChartLoad();
+        applyDashboardFiltersDebounced();
     }
 
     function updateCategoryFilterInfo() {
@@ -1073,16 +1196,7 @@
     }
 
     async function loadChart() {
-        const params = new URLSearchParams();
-        if (startHidden.value) params.append('start', startHidden.value);
-        if (endHidden.value) params.append('end', endHidden.value);
-        if (period) params.append('period', period);
-        const typeValue = activeType || (typeFilter ? typeFilter.value : '');
-        if (typeValue) params.append('type', typeValue);
-        if (responsibleFilter && responsibleFilter.value) params.append('responsible', responsibleFilter.value);
-        if (selectedOnly && selectedOnly.checked) params.append('selected_only', '1');
-        if (activeCategoryId) params.append('category_id', activeCategoryId);
-
+        const params = buildChartParams();
         const res = await fetch(`${chartUrl}?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) return;
         const data = await res.json();
@@ -1100,6 +1214,10 @@
             if (!activeColor && data.colors && data.colors[0]) {
                 activeColor = data.colors[0];
             }
+        }
+        activeCategoryColor = activeColor || '';
+        if (period && data.start && data.end) {
+            setRangeValues(data.start, data.end, { clearMonth: true });
         }
         renderChart(data.labels || [], data.values || [], data.colors || [], data.category_ids || [], activeColor);
         renderTypeChart(data.income_total || 0, data.expense_total || 0);
@@ -1158,6 +1276,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         updateCategoryFilterInfo();
+        renderFilterChips();
         const chartAnchor = ctx || categorySkeleton || document.querySelector('.chart-box');
         if ('IntersectionObserver' in window && chartAnchor) {
             const observer = new IntersectionObserver((entries, obs) => {
@@ -1181,35 +1300,68 @@
                 if (selectedOnly) selectedOnly.checked = false;
                 if (responsibleFilter) responsibleFilter.value = '';
                 if (monthSelect) monthSelect.value = '';
-                const defaultStart = clearFiltersBtn.dataset.defaultStart || startHidden.value;
-                const defaultEnd = clearFiltersBtn.dataset.defaultEnd || endHidden.value;
-                setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
+                period = 'all';
+                setRangeValues('', '', { clearMonth: true });
                 updateCategoryFilterInfo();
-                requestChartLoad();
+                applyDashboardFilters();
+            });
+        }
+        if (filterChips) {
+            filterChips.addEventListener('click', (event) => {
+                const target = event.target.closest('[data-remove]');
+                if (!target) return;
+                const key = target.dataset.remove;
+                if (key === 'date') {
+                    clearDateRange();
+                } else if (key === 'period') {
+                    period = '';
+                } else if (key === 'month') {
+                    if (monthSelect) monthSelect.value = '';
+                } else if (key === 'type') {
+                    activeType = '';
+                    if (typeFilter) typeFilter.value = '';
+                } else if (key === 'responsible') {
+                    if (responsibleFilter) responsibleFilter.value = '';
+                } else if (key === 'selected') {
+                    if (selectedOnly) selectedOnly.checked = false;
+                } else if (key === 'category') {
+                    activeCategoryId = null;
+                    activeCategoryLabel = '';
+                    updateCategoryFilterInfo();
+                }
+                applyDashboardFilters();
             });
         }
         if (form) {
             form.addEventListener('submit', (e) => {
+                e.preventDefault();
                 const isoStart = parseBrToIso(startDisplay.value.trim());
                 const isoEnd = parseBrToIso(endDisplay.value.trim());
                 if (!isoStart || !isoEnd) {
-                    e.preventDefault();
                     alert('Preencha as datas no formato dd/mm/aaaa.');
                     return;
                 }
                 setRangeValues(isoStart, isoEnd);
+                applyDashboardFilters();
             });
         }
         if (startDisplay) {
             startDisplay.addEventListener('input', () => {
                 applyDateMask(startDisplay);
                 const iso = parseBrToIso(startDisplay.value.trim());
-                if (iso) setRangeValues(iso, endHidden.value || '', { clearMonth: true });
+                if (iso) {
+                    period = '';
+                    setRangeValues(iso, endHidden.value || '', { clearMonth: true });
+                    applyDashboardFiltersDebounced();
+                }
             });
             startDisplay.addEventListener('change', () => {
                 const iso = parseBrToIso(startDisplay.value.trim());
-                if (iso) setRangeValues(iso, endHidden.value || '', { clearMonth: true });
-                submitRangeForm();
+                if (iso) {
+                    period = '';
+                    setRangeValues(iso, endHidden.value || '', { clearMonth: true });
+                }
+                applyDashboardFiltersDebounced();
             });
             startDisplay.addEventListener('focus', () => openPicker(startPicker));
             startDisplay.addEventListener('click', () => openPicker(startPicker));
@@ -1218,12 +1370,19 @@
             endDisplay.addEventListener('input', () => {
                 applyDateMask(endDisplay);
                 const iso = parseBrToIso(endDisplay.value.trim());
-                if (iso) setRangeValues(startHidden.value || '', iso, { clearMonth: true });
+                if (iso) {
+                    period = '';
+                    setRangeValues(startHidden.value || '', iso, { clearMonth: true });
+                    applyDashboardFiltersDebounced();
+                }
             });
             endDisplay.addEventListener('change', () => {
                 const iso = parseBrToIso(endDisplay.value.trim());
-                if (iso) setRangeValues(startHidden.value || '', iso, { clearMonth: true });
-                submitRangeForm();
+                if (iso) {
+                    period = '';
+                    setRangeValues(startHidden.value || '', iso, { clearMonth: true });
+                }
+                applyDashboardFiltersDebounced();
             });
             endDisplay.addEventListener('focus', () => openPicker(endPicker));
             endDisplay.addEventListener('click', () => openPicker(endPicker));
@@ -1231,16 +1390,18 @@
         if (startPicker) {
             startPicker.addEventListener('change', () => {
                 if (startPicker.value) {
+                    period = '';
                     setRangeValues(startPicker.value, endHidden.value || '', { clearMonth: true });
-                    submitRangeForm();
+                    applyDashboardFiltersDebounced();
                 }
             });
         }
         if (endPicker) {
             endPicker.addEventListener('change', () => {
                 if (endPicker.value) {
+                    period = '';
                     setRangeValues(startHidden.value || '', endPicker.value, { clearMonth: true });
-                    submitRangeForm();
+                    applyDashboardFiltersDebounced();
                 }
             });
         }
@@ -1251,9 +1412,25 @@
                 const start = option.dataset.start;
                 const end = option.dataset.end;
                 if (start && end) {
+                    period = '';
                     setRangeValues(start, end);
-                    submitRangeForm();
+                    applyDashboardFiltersDebounced();
                 }
+            });
+        }
+        const quickButtons = document.querySelectorAll('[data-period]');
+        if (quickButtons && quickButtons.length) {
+            quickButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const nextPeriod = btn.dataset.period || '';
+                    period = nextPeriod;
+                    if (monthSelect) monthSelect.value = '';
+                    quickButtons.forEach(other => {
+                        other.classList.toggle('btn-primary', other === btn);
+                        other.classList.toggle('btn-outline-light', other !== btn);
+                    });
+                    applyDashboardFilters();
+                });
             });
         }
         [applyBtn, typeFilter, selectedOnly, responsibleFilter].forEach(el => {
@@ -1266,7 +1443,7 @@
                 const isoStart = parseBrToIso(startDisplay.value.trim());
                 const isoEnd = parseBrToIso(endDisplay.value.trim());
                 if (isoStart || isoEnd) setRangeValues(isoStart || startHidden.value, isoEnd || endHidden.value);
-                submitRangeForm();
+                applyDashboardFiltersDebounced();
             });
         });
 
