@@ -5223,6 +5223,12 @@ def user_admin_list(request):
     billing_labels = dict(UserProfile.BILLING_CHOICES)
     payment_labels = {'paid': 'Pago', 'unpaid': 'Pendente'}
 
+    filter_count = sum(
+        1
+        for val in [search, status_filter, plan_filter, billing_filter, payment_filter]
+        if val
+    )
+
     filter_chips = _build_filter_chips(
         request,
         [
