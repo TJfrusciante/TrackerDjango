@@ -3,13 +3,13 @@
 {% block title %}Workspaces | iTracker{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <div>
-        <p class="text-secondary small text-uppercase mb-1">Workspaces e isolamento</p>
-        <h1 class="h4 fw-bold mb-0">Escolha ou crie um workspace</h1>
-        <p class="text-secondary mb-0">Dados, permiss&otilde;es e IA s&atilde;o isolados por workspace. Roles diferentes controlam quem v&ecirc; o qu&ecirc;.</p>
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Workspaces e isolamento</p>
+        <h1 class="page-hero__title">Escolha ou crie um workspace</h1>
+        <p class="page-hero__subtitle">Dados, permiss&otilde;es e IA s&atilde;o isolados por workspace. Roles diferentes controlam quem v&ecirc; o qu&ecirc;.</p>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="page-hero__actions">
         {% if user.is_superuser %}
         <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:workspace_switch' 'global' %}" data-bs-toggle="tooltip" title="Voltar para a vis&atilde;o global">
             <i class="fa-solid fa-earth-americas me-1"></i>Modo global

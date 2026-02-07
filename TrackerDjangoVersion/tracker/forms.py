@@ -94,6 +94,13 @@ class BaseStyledForm(forms.ModelForm):
 class TransactionForm(BaseStyledForm):
     def __init__(self, *args, workspace=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # Allow comma decimal input for better UX (e.g., 45,20)
+        if 'value' in self.fields:
+            self.fields['value'].widget = forms.TextInput(attrs={
+                'class': 'form-control',
+                'inputmode': 'decimal',
+                'placeholder': '0,00',
+            })
         self.fields['date'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
         self.fields['date'].widget.format = '%Y-%m-%d'
         self.fields['date'].widget.attrs.update({
@@ -115,6 +122,9 @@ class TransactionForm(BaseStyledForm):
                 member_ids.add(self.instance.responsible_id)
             self.fields['category'].queryset = Category.objects.filter(workspace=workspace)
             self.fields['responsible'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
+        else:
+            self.fields['category'].queryset = Category.objects.none()
+            self.fields['responsible'].queryset = User.objects.none()
         icon_initial = getattr(self.instance, 'icon', '') or ''
         self.fields['icon'] = forms.ChoiceField(
             required=False,
@@ -169,7 +179,8 @@ class TaskForm(BaseStyledForm):
             self.fields['responsible_user'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
             self.fields['task_category'].queryset = TaskCategory.objects.filter(workspace=workspace)
         else:
-            self.fields['task_category'].queryset = TaskCategory.objects.all()
+            self.fields['responsible_user'].queryset = User.objects.none()
+            self.fields['task_category'].queryset = TaskCategory.objects.none()
         self.fields['task_category'].required = False
         self.fields['task_category'].empty_label = 'Selecione a categoria'
         icon_initial = getattr(self.instance, 'icon', '') or ''
@@ -249,8 +260,8 @@ class TransactionBulkUpdateForm(forms.Form):
                 member_ids.add(workspace.owner_id)
             self.fields['responsible'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
         else:
-            self.fields['category'].queryset = Category.objects.all()
-            self.fields['responsible'].queryset = User.objects.all().order_by('first_name', 'username')
+            self.fields['category'].queryset = Category.objects.none()
+            self.fields['responsible'].queryset = User.objects.none()
         self.fields['category'].widget.attrs.setdefault('class', 'form-select')
         self.fields['responsible'].widget.attrs.setdefault('class', 'form-select')
 
@@ -305,8 +316,8 @@ class TaskBulkUpdateForm(forms.Form):
             self.fields['responsible_user'].queryset = User.objects.filter(id__in=member_ids).order_by('first_name', 'username')
             self.fields['task_category'].queryset = TaskCategory.objects.filter(workspace=workspace)
         else:
-            self.fields['responsible_user'].queryset = User.objects.all().order_by('first_name', 'username')
-            self.fields['task_category'].queryset = TaskCategory.objects.all()
+            self.fields['responsible_user'].queryset = User.objects.none()
+            self.fields['task_category'].queryset = TaskCategory.objects.none()
 
 
 class CategoryForm(BaseStyledForm):

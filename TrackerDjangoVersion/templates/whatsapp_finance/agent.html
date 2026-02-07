@@ -4,6 +4,16 @@
 {% block title %}WhatsApp | iTracker{% endblock %}
 
 {% block content %}
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">WhatsApp</p>
+        <h1 class="page-hero__title">ChatAgent do WhatsApp</h1>
+        <p class="page-hero__subtitle">Lance transa&ccedil;&otilde;es, tarefas e consulte resumos direto do seu WhatsApp.</p>
+    </div>
+    <div class="page-hero__actions">
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:dashboard' %}">Voltar ao dashboard</a>
+    </div>
+</div>
 <div class="row gy-4">
     <div class="col-lg-7">
         {% if not whatsapp_feature_enabled %}

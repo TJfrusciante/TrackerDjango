@@ -3,16 +3,16 @@
 {% block title %}Vis&atilde;o geral | iTracker{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-        <p class="text-secondary small text-uppercase mb-1">Superuser</p>
-        <h1 class="h4 fw-bold mb-0">Painel geral</h1>
-        <p class="text-secondary mb-0">Vis&atilde;o global de usu&aacute;rios, workspaces e volumes. Use o filtro para focar em um usu&aacute;rio.</p>
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Superuser</p>
+        <h1 class="page-hero__title">Painel geral</h1>
+        <p class="page-hero__subtitle">Vis&atilde;o global de usu&aacute;rios, workspaces e volumes. Use o filtro para focar em um usu&aacute;rio.</p>
         {% if app_version %}
         <p class="text-secondary small mb-0">Vers&atilde;o {{ app_version }}</p>
         {% endif %}
     </div>
-    <div class="d-flex gap-2 align-items-center">
+    <div class="page-hero__actions">
         <form method="get" class="d-flex align-items-center gap-2">
             <select name="user" class="form-select form-select-sm">
                 <option value="">Todos os usu&aacute;rios</option>
@@ -717,16 +717,16 @@
     </div>
 </div>
 
-{{ ws_labels|json_script:"wsLabels" }}
-{{ ws_income|json_script:"wsIncome" }}
-{{ ws_expense|json_script:"wsExpense" }}
-{{ monthly_labels|json_script:"monthlyLabels" }}
-{{ monthly_values|json_script:"monthlyValues" }}
-{{ ai_daily_labels|json_script:"aiDailyLabels" }}
-{{ ai_daily_tokens|json_script:"aiDailyTokens" }}
-{{ ai_daily_costs|json_script:"aiDailyCosts" }}
-{{ ai_feature_labels|json_script:"aiFeatureLabels" }}
-{{ ai_feature_tokens|json_script:"aiFeatureTokens" }}
+<script id="wsLabels" type="application/json">{{ ws_labels_json|safe }}</script>
+<script id="wsIncome" type="application/json">{{ ws_income_json|safe }}</script>
+<script id="wsExpense" type="application/json">{{ ws_expense_json|safe }}</script>
+<script id="monthlyLabels" type="application/json">{{ monthly_labels_json|safe }}</script>
+<script id="monthlyValues" type="application/json">{{ monthly_values_json|safe }}</script>
+<script id="aiDailyLabels" type="application/json">{{ ai_daily_labels_json|safe }}</script>
+<script id="aiDailyTokens" type="application/json">{{ ai_daily_tokens_json|safe }}</script>
+<script id="aiDailyCosts" type="application/json">{{ ai_daily_costs_json|safe }}</script>
+<script id="aiFeatureLabels" type="application/json">{{ ai_feature_labels_json|safe }}</script>
+<script id="aiFeatureTokens" type="application/json">{{ ai_feature_tokens_json|safe }}</script>
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

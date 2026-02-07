@@ -3,13 +3,23 @@
 {% block title %}Escolha seu plano | iTracker{% endblock %}
 
 {% block content %}
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Assinaturas</p>
+        <h1 class="page-hero__title">Escolha seu plano</h1>
+        <p class="page-hero__subtitle">Selecione o ciclo e conclua o pagamento para liberar o iTracker.</p>
+    </div>
+    <div class="page-hero__actions">
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:profile_edit' %}">Voltar</a>
+    </div>
+</div>
 <div class="row gy-4 align-items-stretch">
     <div class="col-lg-7">
         <div class="glass-card p-4 h-100">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
                 <div>
-                    <h1 class="h4 fw-bold mb-2">Escolha seu plano</h1>
-                    <p class="text-secondary mb-0">Selecione o ciclo e conclua o pagamento para liberar o iTracker.</p>
+                    <h2 class="section-title mb-2">Planos dispon&iacute;veis</h2>
+                    <p class="text-secondary mb-0">Compare benef&iacute;cios e escolha o ciclo ideal.</p>
                 </div>
                 {% if pricing_state.promo_active %}
                 <span class="badge bg-warning text-dark align-self-md-center">{{ pricing_state.promo_label }}</span>

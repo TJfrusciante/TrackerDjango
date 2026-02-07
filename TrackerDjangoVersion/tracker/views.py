@@ -362,6 +362,10 @@ def _login_rate_limit_key(request) -> str:
 
 
 def _is_login_blocked(request) -> bool:
+    if getattr(settings, 'DEBUG', False):
+        return False
+    if request.META.get('REMOTE_ADDR') in {'127.0.0.1', '::1'}:
+        return False
     max_attempts = int(getattr(settings, 'LOGIN_RATE_LIMIT_ATTEMPTS', 5))
     window_seconds = int(getattr(settings, 'LOGIN_RATE_LIMIT_WINDOW', 900))
     key = _login_rate_limit_key(request)
@@ -380,6 +384,10 @@ def _is_login_blocked(request) -> bool:
 
 
 def _register_login_failure(request) -> None:
+    if getattr(settings, 'DEBUG', False):
+        return
+    if request.META.get('REMOTE_ADDR') in {'127.0.0.1', '::1'}:
+        return
     max_attempts = int(getattr(settings, 'LOGIN_RATE_LIMIT_ATTEMPTS', 5))
     window_seconds = int(getattr(settings, 'LOGIN_RATE_LIMIT_WINDOW', 900))
     key = _login_rate_limit_key(request)
@@ -1262,15 +1270,33 @@ def transactions_list(request):
         tx_ids = cached.get('ids', [])
         income_total = cached.get('income_total', 0)
         expense_total = cached.get('expense_total', 0)
+        top_income_item = cached.get('top_income')
+        top_expense_item = cached.get('top_expense')
     else:
         tx_ids = list(transactions.values_list('id', flat=True))
         income_total = transactions.filter(type='income').aggregate(total=Sum('value'))['total'] or 0
         expense_total = transactions.filter(type='expense').aggregate(total=Sum('value'))['total'] or 0
+        top_income_item = (
+            transactions.filter(type='income')
+            .values('category__name')
+            .annotate(total=Sum('value'))
+            .order_by('-total')
+            .first()
+        )
+        top_expense_item = (
+            transactions.filter(type='expense')
+            .values('category__name')
+            .annotate(total=Sum('value'))
+            .order_by('-total')
+            .first()
+        )
         if list_ttl > 0:
             cache.set(cache_key, {
                 'ids': tx_ids,
                 'income_total': income_total,
                 'expense_total': expense_total,
+                'top_income': top_income_item,
+                'top_expense': top_expense_item,
             }, list_ttl)
 
     paginator = Paginator(tx_ids, 12)
@@ -1319,6 +1345,8 @@ def transactions_list(request):
         'bulk_form': TransactionBulkUpdateForm(workspace=workspace),
         'query_string': query_string,
         'today': timezone.now().date(),
+        'top_income': top_income_item,
+        'top_expense': top_expense_item,
         'filters': {
             'q': search,
             'type': tx_type,
@@ -2277,6 +2305,7 @@ def tasks_list(request):
 
     today = timezone.now().date()
     soon_threshold = today + datetime.timedelta(days=3)
+    overdue_count = tasks_qs.filter(status='ongoing', due_date__lt=today).count()
 
     def fmt(val):
         try:
@@ -2302,6 +2331,7 @@ def tasks_list(request):
         'tasks_total': paginator.count,
         'open_count': tasks_qs.filter(status='ongoing').count(),
         'done_count': tasks_qs.filter(status='done').count(),
+        'overdue_count': overdue_count,
         'today': today,
         'soon_threshold': soon_threshold,
         'bulk_form': TaskBulkUpdateForm(workspace=workspace),
@@ -3351,6 +3381,12 @@ def chart_data(request):
         .order_by('-total')[:5]
     )
 
+    top_net_label = None
+    top_net_value = 0
+    if category_net:
+        top_net_label = category_net[0]['category__name']
+        top_net_value = category_net[0]['total'] or 0
+
     daily = (
         qs.values('date')
         .annotate(
@@ -3379,6 +3415,142 @@ def chart_data(request):
         running_values.append(running_total)
         cursor += datetime.timedelta(days=1)
 
+    period_days = max(1, (end_date - start_date).days + 1)
+    net_period = income_total - expense_total
+    avg_daily_expense_period = (expense_total / period_days) if expense_total else 0
+
+    tasks_qs = Task.objects.filter(
+        Q(workspace__owner=request.user) | Q(workspace__memberships__user=request.user)
+    ).distinct()
+    if workspace:
+        tasks_qs = tasks_qs.filter(workspace=workspace)
+    if responsible_id.isdigit():
+        tasks_qs = tasks_qs.filter(responsible_user_id=int(responsible_id))
+    tasks_period_qs = tasks_qs.filter(
+        Q(due_date__gte=start_date, due_date__lte=end_date) |
+        Q(created_at__date__gte=start_date, created_at__date__lte=end_date)
+    )
+    tasks_period_total = tasks_period_qs.count()
+    tasks_period_done = tasks_period_qs.filter(status='done').count()
+    tasks_period_open = tasks_period_qs.filter(status='ongoing').count()
+    tasks_period_overdue = tasks_period_qs.filter(status='ongoing', due_date__lt=today).count()
+    tasks_progress_pct = round((tasks_period_done / tasks_period_total) * 100, 1) if tasks_period_total else 0
+    category_count = Category.objects.filter(workspace=workspace).count() if workspace else 0
+
+    finance_eval = {
+        'class': 'text-secondary',
+        'title': 'Sem dados recentes',
+        'message': 'Sem movimentações no período selecionado. Registre entradas e saídas para desbloquear insights.',
+    }
+    if net_period > 0:
+        finance_eval = {
+            'class': 'value-positive',
+            'title': 'Saldo positivo',
+            'message': 'Boa! Seu saldo no período selecionado está positivo. Considere reservar parte para metas ou emergências.',
+        }
+    elif net_period < 0:
+        finance_eval = {
+            'class': 'value-negative',
+            'title': 'Saldo negativo',
+            'message': 'Atenção: seu saldo no período selecionado ficou negativo. Revise categorias críticas e ajuste limites.',
+        }
+
+    task_eval = {
+        'class': 'text-secondary',
+        'title': 'Sem tarefas',
+        'message': 'Sem tarefas no período selecionado. Crie tarefas para acompanhar prazos e evolução.',
+    }
+    if tasks_period_total:
+        overdue_ratio = (tasks_period_overdue / tasks_period_total) if tasks_period_total else 0
+        done_ratio = (tasks_period_done / tasks_period_total) if tasks_period_total else 0
+        if overdue_ratio >= 0.5:
+            task_eval = {
+                'class': 'value-negative',
+                'title': 'Muitas tarefas atrasadas',
+                'message': 'Priorize as tarefas vencidas e reavalie prazos. O foco agora é reduzir atrasos.',
+            }
+        elif overdue_ratio > 0:
+            task_eval = {
+                'class': 'text-warning',
+                'title': 'Algumas tarefas atrasadas',
+                'message': 'Organize prazos e finalize as pendentes para evitar acúmulo.',
+            }
+        elif done_ratio >= 0.7:
+            task_eval = {
+                'class': 'value-positive',
+                'title': 'Tarefas em dia',
+                'message': 'Boa! A maioria das tarefas está concluída. Continue mantendo o ritmo.',
+            }
+        else:
+            task_eval = {
+                'class': 'text-info',
+                'title': 'Progresso em andamento',
+                'message': 'Continue avançando e revise prioridades quando precisar.',
+            }
+
+    finance_items = [
+        {
+            'label': 'Saldo do período',
+            'value': net_period,
+            'class': 'value-positive' if net_period >= 0 else 'value-negative',
+            'icon': 'fa-solid fa-scale-balanced',
+        },
+        {
+            'label': 'Entradas do período',
+            'value': income_total,
+            'class': 'value-positive' if income_total > 0 else 'text-secondary',
+            'icon': 'fa-solid fa-arrow-trend-up',
+        },
+        {
+            'label': 'Saídas do período',
+            'value': expense_total,
+            'class': 'value-negative' if expense_total > 0 else 'text-secondary',
+            'icon': 'fa-solid fa-arrow-trend-down',
+        },
+        {
+            'label': 'Despesa média/dia',
+            'value': avg_daily_expense_period,
+            'class': 'text-danger' if avg_daily_expense_period > 0 else 'text-secondary',
+            'icon': 'fa-solid fa-calendar-day',
+        },
+    ]
+    top_expense_item = top_expense[0] if top_expense else None
+    if top_expense_item:
+        finance_items.append({
+            'label': f"Maior gasto: {top_expense_item['category__name']}",
+            'value': top_expense_item['total'],
+            'class': 'value-negative' if top_expense_item['total'] else 'text-secondary',
+            'icon': 'fa-solid fa-money-bill-trend-down',
+        })
+
+    task_items = [
+        {
+            'label': 'Abertas no período',
+            'value': tasks_period_open,
+            'class': 'text-warning' if tasks_period_overdue else 'text-info',
+            'icon': 'fa-regular fa-circle-dot',
+        },
+        {
+            'label': 'Concluídas no período',
+            'value': tasks_period_done,
+            'class': 'value-positive' if tasks_period_done else 'text-secondary',
+            'icon': 'fa-solid fa-circle-check',
+        },
+        {
+            'label': 'Atrasadas no período',
+            'value': tasks_period_overdue,
+            'class': 'value-negative' if tasks_period_overdue else 'text-secondary',
+            'icon': 'fa-solid fa-triangle-exclamation',
+        },
+        {
+            'label': 'Progresso',
+            'value': tasks_progress_pct,
+            'suffix': '%',
+            'class': 'value-positive' if (tasks_period_total and (tasks_period_done / tasks_period_total) >= 0.7) else ('text-warning' if (tasks_period_total and (tasks_period_done / tasks_period_total) >= 0.4) else 'value-negative'),
+            'icon': 'fa-solid fa-gauge-high',
+        },
+    ]
+
     payload = {
         'labels': labels,
         'values': values,
@@ -3388,12 +3560,32 @@ def chart_data(request):
         'income_total': float(income_total),
         'expense_total': float(expense_total),
         'balance_total': float(income_total - expense_total),
+        'tx_count_period': qs.count(),
+        'net_period': float(net_period),
+        'avg_daily_expense_period': float(avg_daily_expense_period),
+        'tasks_open': tasks_period_open,
+        'tasks_done': tasks_period_done,
+        'tasks_overdue': tasks_period_overdue,
+        'tasks_progress_pct': float(tasks_progress_pct),
+        'category_count': category_count,
         'start': start_date.isoformat(),
         'end': end_date.isoformat(),
         'monthly_labels': monthly_labels,
         'monthly_values': monthly_values,
         'top_income': [{'label': item['category__name'], 'total': float(item['total'] or 0)} for item in top_income],
         'top_expense': [{'label': item['category__name'], 'total': float(item['total'] or 0)} for item in top_expense],
+        'insights': {
+            'top_income_label': top_income[0]['category__name'] if top_income else None,
+            'top_income_value': float(top_income[0]['total'] or 0) if top_income else 0,
+            'top_expense_label': top_expense[0]['category__name'] if top_expense else None,
+            'top_expense_value': float(top_expense[0]['total'] or 0) if top_expense else 0,
+            'top_net_label': top_net_label,
+            'top_net_value': float(top_net_value or 0),
+        },
+        'agent_eval': {
+            'finance': {**finance_eval, 'items': finance_items},
+            'tasks': {**task_eval, 'items': task_items},
+        },
         'daily_labels': daily_labels,
         'daily_values': daily_values,
         'running_labels': running_labels,
@@ -3469,6 +3661,8 @@ def login_view(request):
         if _is_login_blocked(request):
             messages.error(request, 'Muitas tentativas. Aguarde alguns minutos e tente novamente.')
             record_metric('login_blocked', metadata={'ip': request.META.get('REMOTE_ADDR')})
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'ok': False, 'error': 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'}, status=429)
             return render(request, 'tracker/auth_login.html', {'form': form})
         if form.is_valid():
             user = form.get_user()
@@ -3480,6 +3674,8 @@ def login_view(request):
                     messages.error(request, 'Confirme seu e-mail antes de entrar.')
                     _register_login_failure(request)
                     record_metric('login_failed', user=user, metadata={'reason': 'email_not_verified'})
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({'ok': False, 'error': 'Confirme seu e-mail antes de entrar.'}, status=403)
                     return render(request, 'tracker/auth_login.html', {'form': form})
             login(request, user)
             _clear_login_failures(request)
@@ -3491,6 +3687,8 @@ def login_view(request):
                     remaining = max(remaining, 0)
                     messages.info(request, f'Per\u00edodo de teste ativo. Restam {remaining} dia(s).')
                 else:
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({'ok': True, 'redirect': reverse('payments:subscription_start')})
                     messages.info(request, 'Finalize a assinatura para liberar o acesso ao sistema.')
                     return redirect('payments:subscription_start')
             if profile and profile.subscription_expires:
@@ -3500,10 +3698,29 @@ def login_view(request):
                 if today > profile.subscription_expires and today <= grace_until:
                     remaining = (grace_until - today).days
                     messages.warning(request, f'Assinatura expirada. Voc\u00ea tem {remaining} dia(s) de car\u00eancia.')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                display_name = user.get_full_name() or user.username
+                return JsonResponse({
+                    'ok': True,
+                    'redirect': request.GET.get('next') or reverse('tracker:workspace_select'),
+                    'message': f'Login realizado com sucesso, bem-vindo {display_name}.'
+                })
             messages.success(request, 'Bem-vindo(a) de volta!')
             return redirect(request.GET.get('next') or 'tracker:workspace_select')
         _register_login_failure(request)
         record_metric('login_failed', metadata={'ip': request.META.get('REMOTE_ADDR')})
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            error_msg = ''
+            if form.non_field_errors():
+                error_msg = form.non_field_errors().as_text().replace('* ', '').strip()
+            if not error_msg:
+                for field in form:
+                    if field.errors:
+                        error_msg = field.errors.as_text().replace('* ', '').strip()
+                        break
+            if not error_msg:
+                error_msg = 'N\u00e3o foi poss\u00edvel entrar. Verifique os dados.'
+            return JsonResponse({'ok': False, 'error': error_msg}, status=400)
     return render(request, 'tracker/auth_login.html', {'form': form})
 
 
@@ -5063,6 +5280,11 @@ def superuser_overview(request):
         'ws_expense': ws_expense,
         'monthly_labels': monthly_labels,
         'monthly_values': monthly_values,
+        'ws_labels_json': json.dumps(ws_labels, ensure_ascii=False),
+        'ws_income_json': json.dumps(ws_income, ensure_ascii=False),
+        'ws_expense_json': json.dumps(ws_expense, ensure_ascii=False),
+        'monthly_labels_json': json.dumps(monthly_labels, ensure_ascii=False),
+        'monthly_values_json': json.dumps(monthly_values, ensure_ascii=False),
         'top_users': top_users,
         'users_all': users_all,
         'selected_user': selected_user,
@@ -5079,6 +5301,11 @@ def superuser_overview(request):
         'ai_daily_costs': ai_daily_costs,
         'ai_feature_labels': ai_feature_labels,
         'ai_feature_tokens': ai_feature_tokens,
+        'ai_daily_labels_json': json.dumps(ai_daily_labels, ensure_ascii=False),
+        'ai_daily_tokens_json': json.dumps(ai_daily_tokens, ensure_ascii=False),
+        'ai_daily_costs_json': json.dumps(ai_daily_costs, ensure_ascii=False),
+        'ai_feature_labels_json': json.dumps(ai_feature_labels, ensure_ascii=False),
+        'ai_feature_tokens_json': json.dumps(ai_feature_tokens, ensure_ascii=False),
         'login_success_30': login_success_30,
         'login_failed_30': login_failed_30,
         'login_blocked_30': login_blocked_30,
@@ -5123,6 +5350,7 @@ def user_admin_list(request):
         workspace_count=Count('workspace_memberships'),
         last_login_ts=F('last_login'),
     ).order_by('-date_joined')
+    filter_count = 0
     today = timezone.localdate()
     now = timezone.now()
     pending_count = 0

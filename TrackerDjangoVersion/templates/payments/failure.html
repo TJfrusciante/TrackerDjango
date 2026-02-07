@@ -3,6 +3,16 @@
 {% block title %}Pagamento falhou | iTracker{% endblock %}
 
 {% block content %}
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Assinaturas</p>
+        <h1 class="page-hero__title">Pagamento n&atilde;o conclu&iacute;do</h1>
+        <p class="page-hero__subtitle">Tente novamente ou atualize o m&eacute;todo de pagamento.</p>
+    </div>
+    <div class="page-hero__actions">
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:profile_edit' %}">Voltar ao perfil</a>
+    </div>
+</div>
 <div class="row justify-content-center">
     <div class="col-lg-6">
         <div class="glass-card p-4 text-center">

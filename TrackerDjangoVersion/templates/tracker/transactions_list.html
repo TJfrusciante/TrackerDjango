@@ -4,6 +4,155 @@
 
 {% block extra_css %}
 <style>
+    .tx-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: 18px;
+    }
+    .tx-hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -20% -60% auto;
+        width: 420px;
+        height: 420px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(59, 130, 246, 0.25), transparent 65%);
+        opacity: 0.35;
+        pointer-events: none;
+    }
+    .tx-hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(15, 118, 110, 0.2);
+        color: var(--primary-soft);
+        font-weight: 600;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .tx-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-end;
+    }
+    .tx-actions .btn {
+        border-radius: 999px;
+    }
+    .tx-kpi-card {
+        position: relative;
+        border-radius: 16px;
+        padding: 1rem 1.25rem;
+        overflow: hidden;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.6));
+        border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .tx-kpi-card i {
+        font-size: 1.1rem;
+        opacity: 0.8;
+    }
+    .tx-kpi-card--income {
+        border-color: rgba(34, 197, 94, 0.4);
+        box-shadow: 0 18px 40px rgba(16, 185, 129, 0.12);
+    }
+    .tx-kpi-card--expense {
+        border-color: rgba(239, 68, 68, 0.35);
+        box-shadow: 0 18px 40px rgba(239, 68, 68, 0.12);
+    }
+    .tx-kpi-card--balance {
+        border-color: rgba(56, 189, 248, 0.35);
+        box-shadow: 0 18px 40px rgba(59, 130, 246, 0.14);
+    }
+    .tx-filter-card {
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.72));
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+    }
+    .tx-filter-card .form-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+    }
+    .tx-filter-card .form-control,
+    .tx-filter-card .form-select {
+        border-radius: 12px;
+    }
+    .tx-filter-actions .btn {
+        border-radius: 12px;
+    }
+    .tx-mini-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .tx-mini-card {
+        border-radius: 16px;
+        padding: 1rem 1.25rem;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .tx-mini-card h6 {
+        margin: 0 0 0.2rem;
+        font-weight: 700;
+    }
+    .tx-mini-card .value {
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
+    .tx-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+        align-items: flex-end;
+    }
+    .tx-toolbar-meta {
+        min-width: 160px;
+    }
+    .tx-toolbar-field {
+        min-width: 160px;
+        flex: 1 1 160px;
+    }
+    .tx-toolbar-field .form-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+    }
+    .tx-toolbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-left: auto;
+    }
+    .tx-toolbar-actions .btn {
+        border-radius: 999px;
+        padding-inline: 1rem;
+    }
+    .tx-table-shell {
+        border-radius: 18px;
+    }
+    #tx-table thead th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    #tx-table tbody tr {
+        transition: background 0.2s ease, transform 0.2s ease;
+    }
+    #tx-table tbody tr:hover {
+        background: rgba(59, 130, 246, 0.08);
+        transform: translateY(-1px);
+    }
     #tx-table tbody tr {
         border-bottom: 1px solid var(--border, #e2e8f0);
     }
@@ -27,40 +176,43 @@
         line-height: 1;
     }
     .due-warning {
-        background: rgba(245, 158, 11, 0.08);
+        background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), transparent);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
-    <div>
-        <p class="text-secondary small mb-1">Finan&ccedil;as</p>
-        <h1 class="h4 fw-bold mb-0">Transa&ccedil;&otilde;es</h1>
-    </div>
-    <div class="d-flex gap-2">
-        <a class="btn btn-primary page-action-btn" href="{% url 'tracker:transaction_create' %}" data-bs-toggle="tooltip" title="Criar nova transa&ccedil;&atilde;o">
-            <i class="fa-solid fa-plus me-2"></i>Nova transa&ccedil;&atilde;o
-        </a>
-        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" title="Gerenciar categorias">
-            <i class="fa-solid fa-tags me-2"></i>Categorias
-        </a>
-        <a class="btn btn-success page-action-btn" href="{% url 'tracker:transaction_import' %}" data-bs-toggle="tooltip" title="Importar extrato CSV e sugerir categorias">
-            <i class="fa-solid fa-file-import me-2"></i>Importar CSV
-        </a>
-        <form method="get" class="d-inline-flex align-items-center">
-            {% for key, value in filters.items %}
-                {% if value %}
-                    <input type="hidden" name="{{ key }}" value="{{ value }}">
-                {% endif %}
-            {% endfor %}
-            <button class="btn btn-outline-light page-action-btn" type="submit" name="export" value="csv" data-bs-toggle="tooltip" title="Exportar transa&ccedil;&otilde;es em CSV">
-                <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
-            </button>
-        </form>
-        <a class="btn btn-warning page-action-btn" href="{% url 'tracker:transaction_import_pdf' %}" data-bs-toggle="tooltip" title="Importar extrato PDF e sugerir categorias">
-            <i class="fa-solid fa-file-pdf me-2"></i>Importar PDF
-        </a>
+<div class="tx-hero glass-card p-4 mb-4">
+    <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+        <div>
+            <span class="tx-hero-badge">Finan&ccedil;as</span>
+            <h1 class="h4 fw-bold mb-1 mt-2">Transa&ccedil;&otilde;es</h1>
+            <p class="text-secondary mb-0">Centralize entradas e sa&iacute;das com filtros r&aacute;pidos e vis&atilde;o clara.</p>
+        </div>
+        <div class="tx-actions">
+            <a class="btn btn-primary page-action-btn" href="{% url 'tracker:transaction_create' %}" data-bs-toggle="tooltip" title="Criar nova transa&ccedil;&atilde;o">
+                <i class="fa-solid fa-plus me-2"></i>Nova transa&ccedil;&atilde;o
+            </a>
+            <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:categories_list' %}" data-bs-toggle="tooltip" title="Gerenciar categorias">
+                <i class="fa-solid fa-tags me-2"></i>Categorias
+            </a>
+            <a class="btn btn-success page-action-btn" href="{% url 'tracker:transaction_import' %}" data-bs-toggle="tooltip" title="Importar extrato CSV e sugerir categorias">
+                <i class="fa-solid fa-file-import me-2"></i>Importar CSV
+            </a>
+            <form method="get" class="d-inline-flex align-items-center" data-no-transition="1">
+                {% for key, value in filters.items %}
+                    {% if value %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+                <button class="btn btn-outline-light page-action-btn" type="submit" name="export" value="csv" data-bs-toggle="tooltip" title="Exportar transa&ccedil;&otilde;es em CSV">
+                    <i class="fa-solid fa-file-csv me-2"></i>Exportar CSV
+                </button>
+            </form>
+            <a class="btn btn-warning page-action-btn" href="{% url 'tracker:transaction_import_pdf' %}" data-bs-toggle="tooltip" title="Importar extrato PDF e sugerir categorias">
+                <i class="fa-solid fa-file-pdf me-2"></i>Importar PDF
+            </a>
+        </div>
     </div>
 </div>
 
@@ -70,7 +222,19 @@
     </button>
 </div>
 <div class="collapse d-lg-block filters-drawer" id="txFiltersCollapse">
-<form id="txFilters" method="get" class="glass-card p-3 mb-4">
+<form id="txFilters" method="get" class="tx-filter-card p-3 mb-4" data-no-transition="1">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+            <div class="text-secondary small">Filtros</div>
+            <h5 class="mb-0 fw-bold">Encontre a transa&ccedil;&atilde;o certa</h5>
+        </div>
+        <div class="tx-filter-actions">
+            <button class="btn btn-outline-light btn-sm" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transa&ccedil;&atilde;o">
+                <i class="fa-solid fa-filter me-2"></i>Aplicar
+            </button>
+            <a href="{% url 'tracker:transactions_list' %}" class="btn btn-outline-light btn-sm">Limpar filtros</a>
+        </div>
+    </div>
     <div class="row g-3 align-items-end">
         <div class="col-md-3">
             <label class="form-label">Buscar</label>
@@ -101,18 +265,35 @@
             <label class="form-label">At&eacute;</label>
             <input aria-label="Data final" id="txEndDate" type="date" name="end" class="form-control js-auto-filter" value="{{ filters.end }}">
         </div>
-        <div class="col-md-1 d-flex gap-2">
-            <button class="btn btn-primary w-100" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros de transa&ccedil;&atilde;o">Filtrar</button>
-        </div>
         <div class="col-12 d-flex justify-content-between mt-2">
             <div class="small text-secondary">
                 {{ transactions_total }} resultado(s)
             </div>
-            <a href="{% url 'tracker:transactions_list' %}" class="btn btn-sm btn-outline-light">Limpar filtros</a>
+            <span class="small text-secondary">Use busca + tipo + data para refinar.</span>
         </div>
     </div>
 </form>
 </div>
+{% if top_income or top_expense %}
+<div class="tx-mini-summary">
+    <div class="tx-mini-card">
+        <div>
+            <div class="text-secondary small">Maior receita</div>
+            <h6>{{ top_income.category__name|default:"-" }}</h6>
+            <div class="value text-success">R$ {{ top_income.total|default:0|floatformat:2 }}</div>
+        </div>
+        <i class="fa-solid fa-arrow-trend-up text-success fs-4"></i>
+    </div>
+    <div class="tx-mini-card">
+        <div>
+            <div class="text-secondary small">Maior gasto</div>
+            <h6>{{ top_expense.category__name|default:"-" }}</h6>
+            <div class="value text-danger">R$ {{ top_expense.total|default:0|floatformat:2 }}</div>
+        </div>
+        <i class="fa-solid fa-arrow-trend-down text-danger fs-4"></i>
+    </div>
+</div>
+{% endif %}
 {% if filter_chips %}
 <div class="d-flex justify-content-between align-items-center mb-2">
     <span class="small text-secondary">Filtros ativos: {{ filter_count }}</span>
@@ -173,7 +354,7 @@
 
 <div class="row g-3 mb-4">
     <div class="col-12">
-        <form id="txBulkForm" method="post" action="{% url 'tracker:transactions_bulk_update' %}" class="glass-card p-3 bulk-actions d-none" data-total="{{ transactions_total }}">
+        <form id="txBulkForm" method="post" action="{% url 'tracker:transactions_bulk_update' %}" class="glass-card p-4 bulk-actions d-none" data-total="{{ transactions_total }}">
             {% csrf_token %}
             <input type="hidden" name="ids" id="txBulkIds">
             <input type="hidden" name="select_all" id="txSelectAllFlag" value="0">
@@ -182,79 +363,92 @@
             <input type="hidden" name="category" value="{{ filters.category }}">
             <input type="hidden" name="start" value="{{ filters.start }}">
             <input type="hidden" name="end" value="{{ filters.end }}">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-2">
-                    <label class="form-label">A&ccedil;&atilde;o em massa</label>
-                    <div class="small text-secondary">Selecionadas: <span id="txSelectedCount">0</span></div>
+            <div class="bulk-actions__header">
+                <div>
+                    <div class="bulk-actions__title">A&ccedil;&atilde;o em massa</div>
+                    <div class="bulk-actions__meta">
+                        Workspace: {{ current_workspace.name|default:"Global" }} &middot; Selecionadas: <span id="txSelectedCount">0</span>
+                    </div>
                 </div>
-                <div class="col-md-3">
+                <div class="bulk-actions__hint text-secondary small">Ajuste campos e aplique para todas as transações selecionadas.</div>
+            </div>
+            <div class="row g-3 align-items-end bulk-actions__grid">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">Categoria</label>
                     {{ bulk_form.category }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">Ícone</label>
                     {{ bulk_form.icon }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">Respons&aacute;vel</label>
                     {{ bulk_form.responsible }}
                 </div>
-                <div class="col-md-2">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">Nova data</label>
                     {{ bulk_form.date }}
                 </div>
-                <div class="col-md-2">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">Tipo</label>
                     {{ bulk_form.type }}
                 </div>
-                <div class="col-md-2">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">Destaque</label>
                     {{ bulk_form.selected_action }}
                 </div>
-                <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-danger" type="submit" name="bulk_delete" value="1" title="Remove todas as transações selecionadas">
-                        Excluir selecionadas
-                    </button>
-                </div>
-                <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-success" type="submit" name="bulk_mark" value="1" title="Marca todas as selecionadas como destaque">
-                        Destacar selecionadas
-                    </button>
-                </div>
-                <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-warning" type="submit" name="bulk_convert" value="1" title="Converte entrada ↔ saída em todas as selecionadas">
-                        Converter selecionadas
-                    </button>
-                </div>
-                <div class="col-md-2 d-grid">
-                    <button class="btn btn-primary" type="submit" title="Aplica as alterações selecionadas">
-                        Aplicar
-                    </button>
+                <div class="col-12">
+                    <div class="bulk-actions__buttons">
+                        <button class="btn btn-outline-danger" type="submit" name="bulk_delete" value="1" title="Remove todas as transações selecionadas">
+                            Excluir selecionadas
+                        </button>
+                        <button class="btn btn-outline-success" type="submit" name="bulk_mark" value="1" title="Marca todas as selecionadas como destaque">
+                            Destacar selecionadas
+                        </button>
+                        <button class="btn btn-outline-warning" type="submit" name="bulk_convert" value="1" title="Converte entrada ↔ saída em todas as selecionadas">
+                            Converter selecionadas
+                        </button>
+                        <button class="btn btn-primary" type="submit" title="Aplica as alterações selecionadas">
+                            Aplicar
+                        </button>
+                    </div>
                 </div>
             </div>
         </form>
     </div>
     <div class="col-md-4">
-        <div class="glass-card p-3">
-            <p class="text-secondary small mb-1">Entradas</p>
+        <div class="tx-kpi-card tx-kpi-card--income">
+            <div class="d-flex align-items-center justify-content-between">
+                <p class="text-secondary small mb-1">Entradas</p>
+                <i class="fa-solid fa-arrow-trend-up text-success"></i>
+            </div>
             <h4 class="text-success mb-0">R$ {{ income_total|floatformat:2 }}</h4>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="glass-card p-3">
-            <p class="text-secondary small mb-1">Sa&iacute;das</p>
+        <div class="tx-kpi-card tx-kpi-card--expense">
+            <div class="d-flex align-items-center justify-content-between">
+                <p class="text-secondary small mb-1">Sa&iacute;das</p>
+                <i class="fa-solid fa-arrow-trend-down text-danger"></i>
+            </div>
             <h4 class="text-danger mb-0">R$ {{ expense_total|floatformat:2 }}</h4>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="glass-card p-3">
-            <p class="text-secondary small mb-1">Saldo</p>
+        <div class="tx-kpi-card tx-kpi-card--balance">
+            <div class="d-flex align-items-center justify-content-between">
+                <p class="text-secondary small mb-1">Saldo</p>
+                <i class="fa-solid fa-scale-balanced text-info"></i>
+            </div>
             <h4 class="{% if balance_total >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">R$ {{ balance_total|floatformat:2 }}</h4>
         </div>
     </div>
 </div>
 
-<div class="glass-card p-4">
+<div class="glass-card p-4 tx-table-shell">
+    <div class="text-secondary small mb-2">
+        Caso queira aplicar ações em mais de um item ao mesmo tempo, selecione-os na tabela!
+    </div>
     <div id="txTableSkeleton" class="skeleton table-skeleton mb-3"></div>
     <div class="table-responsive">
         <table id="tx-table" class="table table-borderless table-striped table-sticky align-middle mb-0">
@@ -306,13 +500,13 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex justify-content-end gap-2">
-                                <form method="post" action="{% url 'tracker:transaction_toggle_type' tx.id %}">
+                                <form method="post" action="{% url 'tracker:transaction_toggle_type' tx.id %}" data-no-transition="1">
                                     {% csrf_token %}
                                     <button class="btn btn-sm tx-action-btn btn-outline-info" type="submit" aria-label="Alternar tipo" data-bs-toggle="tooltip" title="Converter entrada/sa&iacute;da">
                                         <i class="fa-solid fa-arrows-rotate"></i>
                                     </button>
                                 </form>
-                                <form method="post" action="{% url 'tracker:transaction_toggle_selected' tx.id %}">
+                                <form method="post" action="{% url 'tracker:transaction_toggle_selected' tx.id %}" data-no-transition="1">
                                     {% csrf_token %}
                                     <button class="btn btn-sm tx-action-btn {% if tx.selected %}btn-warning{% else %}btn-outline-warning{% endif %}" type="submit" aria-label="Destacar transa&ccedil;&atilde;o" data-bs-toggle="tooltip" title="Marcar como destaque">
                                         <i class="fa-solid fa-star"></i>
@@ -324,7 +518,7 @@
                                 <a class="btn btn-sm tx-action-btn btn-outline-light" href="{% url 'tracker:transaction_update' tx.id %}" aria-label="Editar" data-bs-toggle="tooltip" title="Editar transa&ccedil;&atilde;o">
                                     <i class="fa-solid fa-pen"></i>
                                 </a>
-                                <form method="post" action="{% url 'tracker:transaction_delete' tx.id %}" onsubmit="return confirm('Excluir esta transa&ccedil;&atilde;o?');">
+                                <form method="post" action="{% url 'tracker:transaction_delete' tx.id %}" onsubmit="return confirm('Excluir esta transa&ccedil;&atilde;o?');" data-no-transition="1">
                                     {% csrf_token %}
                                     <button class="btn btn-sm tx-action-btn btn-outline-danger" type="submit" aria-label="Excluir" data-bs-toggle="tooltip" title="Excluir transa&ccedil;&atilde;o">
                                         <i class="fa-solid fa-trash"></i>
@@ -454,10 +648,32 @@
                     filtersForm.submit();
                 }
             };
+            const scheduleSubmit = (() => {
+                let timer = null;
+                return () => {
+                    if (timer) clearTimeout(timer);
+                    timer = setTimeout(submitFilters, 150);
+                };
+            })();
             const searchInput = filtersForm.querySelector('input[name="q"]');
             let searchTimer = null;
+            const shouldAutoSubmit = (target) => {
+                if (!target) return false;
+                if (target.classList && target.classList.contains('js-auto-filter')) return true;
+                if (target.tagName === 'SELECT') return true;
+                if (target.type === 'date') return true;
+                return false;
+            };
+            filtersForm.addEventListener('change', (event) => {
+                if (shouldAutoSubmit(event.target)) {
+                    scheduleSubmit();
+                }
+            });
             autoInputs.forEach(input => {
-                input.addEventListener('change', submitFilters);
+                input.addEventListener('change', scheduleSubmit);
+                if (input.tagName === 'SELECT' || input.type === 'date') {
+                    input.addEventListener('input', scheduleSubmit);
+                }
             });
             if (searchInput) {
                 searchInput.addEventListener('input', () => {

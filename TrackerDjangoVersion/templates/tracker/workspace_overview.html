@@ -3,13 +3,13 @@
 {% block title %}Workspaces | iTracker{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-    <div>
-        <p class="text-secondary small text-uppercase mb-1">Ambientes</p>
-        <h1 class="h4 fw-bold mb-0">Workspaces</h1>
-        <p class="text-secondary mb-0">Gerencie os workspaces em que voc&ecirc; participa e convide novos membros.</p>
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Ambientes</p>
+        <h1 class="page-hero__title">Workspaces</h1>
+        <p class="page-hero__subtitle">Gerencie os workspaces em que voc&ecirc; participa e convide novos membros.</p>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="page-hero__actions">
         {% if can_create %}
             <a class="btn btn-primary page-action-btn" href="{% url 'tracker:workspace_select' %}">Criar workspace</a>
         {% endif %}

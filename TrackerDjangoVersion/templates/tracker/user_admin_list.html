@@ -56,13 +56,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-    <div>
-        <p class="text-secondary small text-uppercase mb-1">Admin</p>
-        <h1 class="h4 fw-bold mb-0">Usu&aacute;rios</h1>
-        <p class="text-secondary mb-0">Controle de aprova&ccedil;&atilde;o, assinatura e acesso global.</p>
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Admin</p>
+        <h1 class="page-hero__title">Usu&aacute;rios</h1>
+        <p class="page-hero__subtitle">Controle de aprova&ccedil;&atilde;o, assinatura e acesso global.</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="page-hero__actions">
         <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:superuser_overview' %}">Vis&atilde;o geral</a>
         <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:subscription_invite_list' %}">Convites</a>
         <a class="btn btn-primary page-action-btn" href="{% url 'tracker:user_admin_create' %}"><i class="fa-solid fa-plus me-1"></i>Novo usu&aacute;rio</a>

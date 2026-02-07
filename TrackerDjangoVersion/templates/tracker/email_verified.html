@@ -3,16 +3,22 @@
 {% block title %}Verificação de e-mail | iTracker{% endblock %}
 
 {% block content %}
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Conta</p>
+        <h1 class="page-hero__title">{% if success %}E-mail confirmado{% else %}Link inv&aacute;lido{% endif %}</h1>
+        <p class="page-hero__subtitle">
+            {% if success %}Sua conta est&aacute; pronta para acesso.{% else %}O link de confirma&ccedil;&atilde;o expirou ou j&aacute; foi usado.{% endif %}
+        </p>
+    </div>
+</div>
 <div class="row justify-content-center">
     <div class="col-lg-6">
         <div class="glass-card p-4 text-center">
             {% if success %}
-                <h1 class="h5 fw-bold mb-2">E-mail confirmado</h1>
-                <p class="text-secondary mb-3">Sua conta est&aacute; pronta para acesso.</p>
                 <a class="btn btn-primary" href="{% url 'tracker:login' %}">Entrar</a>
             {% else %}
-                <h1 class="h5 fw-bold mb-2">Link inv&aacute;lido</h1>
-                <p class="text-secondary mb-0">O link de confirma&ccedil;&atilde;o expirou ou j&aacute; foi usado.</p>
+                <p class="text-secondary mb-0">Solicite um novo link ou entre em contato com o admin.</p>
             {% endif %}
         </div>
     </div>

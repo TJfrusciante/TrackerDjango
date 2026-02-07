@@ -3,13 +3,13 @@
 {% block title %}Convidar | iTracker{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
-    <div>
-        <p class="text-secondary small mb-1">Workspace</p>
-        <h1 class="h4 fw-bold mb-0">Convidar membros</h1>
-        <p class="text-secondary small mb-0">{{ workspace.name }}</p>
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Workspace</p>
+        <h1 class="page-hero__title">Convidar membros</h1>
+        <p class="page-hero__subtitle">{{ workspace.name }}</p>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="page-hero__actions">
         <a class="btn btn-outline-light" href="{% url 'tracker:workspace_members' workspace.slug %}">Gerenciar membros</a>
         <a class="btn btn-outline-light" href="{% url 'tracker:workspace_select' %}">Trocar workspace</a>
     </div>

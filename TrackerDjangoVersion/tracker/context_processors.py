@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from django.conf import settings
 from django.utils import timezone
 
@@ -16,9 +18,20 @@ def workspace_context(request):
     user = getattr(request, "user", None)
 
     available = []
+    superuser_search = []
     if user and user.is_authenticated:
         if user.is_superuser:
-            available = list(Workspace.objects.filter(is_active=True).order_by("name"))
+            owned_qs = Workspace.objects.filter(is_active=True, owner=user).order_by("name")
+            available = list(owned_qs)
+            other_qs = Workspace.objects.filter(is_active=True).exclude(owner=user).order_by("name")
+            superuser_search = [
+                {
+                    "name": ws.name,
+                    "slug": ws.slug,
+                    "owner": ws.owner.username if ws.owner else "",
+                }
+                for ws in other_qs
+            ]
         else:
             available = [
                 m.workspace
@@ -35,9 +48,13 @@ def workspace_context(request):
     grace_until = getattr(request, "subscription_grace_until", None)
     grace_remaining = getattr(request, "subscription_grace_remaining", None)
     avatar_missing = _avatar_missing(user)
+    superuser_search_json = json.dumps(superuser_search, ensure_ascii=False)
+
     return {
         "current_workspace": current,
         "available_workspaces": available,
+        "superuser_workspace_search": superuser_search,
+        "superuser_workspace_search_json": superuser_search_json,
         "current_workspace_role": getattr(request, "workspace_role", None),
         "user_avatar_url": _avatar_url(user),
         "user_avatar_missing": avatar_missing,

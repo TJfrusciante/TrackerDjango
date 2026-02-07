@@ -714,11 +714,38 @@ body.sidebar-open {
     will-change: transform, box-shadow;
 }
 
+.glass-card.fade-in-panel {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: panelFadeIn 0.4s ease forwards;
+}
+
 .glass-card:hover {
     transform: translateY(-6px) scale(1.01);
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
     border-color: rgba(94, 234, 212, 0.35);
     z-index: 1;
+}
+
+.btn,
+.form-control,
+.form-select,
+.page-action-btn {
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.btn:hover,
+.form-control:focus,
+.form-select:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+@keyframes panelFadeIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -832,16 +859,16 @@ textarea:focus-visible {
 
 .filter-count-badge--btn {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    min-width: 22px;
-    height: 22px;
+    top: 6px;
+    right: 6px;
+    min-width: 18px;
+    height: 18px;
     border-radius: 999px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
 }
 
@@ -931,6 +958,48 @@ textarea:focus-visible {
 .bulk-actions.d-none {
     opacity: 0;
     transform: translateY(-6px);
+}
+
+.bulk-actions__header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.bulk-actions__title {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.bulk-actions__meta {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.bulk-actions__hint {
+    max-width: 320px;
+}
+
+.bulk-actions__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.bulk-actions__buttons .btn {
+    min-width: 170px;
+}
+
+.bulk-actions__grid .form-text {
+    margin-top: 0.35rem;
+}
+
+.bulk-actions--tasks .bulk-actions__buttons {
+    justify-content: flex-end;
 }
 
 .alert-save {

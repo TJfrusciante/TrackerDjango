@@ -26,9 +26,16 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <div id="pageTransition" class="page-transition" aria-hidden="true">
+        <div class="page-transition__content">
+            <div class="spinner-border text-info" role="status" aria-hidden="true"></div>
+            <span id="pageTransitionText">Carregando...</span>
+        </div>
+    </div>
     <div class="layout-shell">
         {% with request.resolver_match.url_name as url_name %}
         <aside class="sidebar" id="sidebar">
@@ -80,16 +87,38 @@
                             {% if user.is_superuser %}
                                 <li><a class="dropdown-item" href="{% url 'tracker:workspace_switch' 'global' %}">Modo global</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                            {% endif %}
-                            {% for ws in available_workspaces %}
-                                <li>
-                                    <a class="dropdown-item {% if current_workspace and current_workspace.id == ws.id %}active{% endif %}" href="{% url 'tracker:workspace_switch' ws.slug %}">
-                                        {{ ws.name }}
-                                    </a>
+                                <li><h6 class="dropdown-header text-uppercase small mb-1">Meus workspaces</h6></li>
+                                {% for ws in available_workspaces %}
+                                    <li>
+                                        <a class="dropdown-item {% if current_workspace and current_workspace.id == ws.id %}active{% endif %}" href="{% url 'tracker:workspace_switch' ws.slug %}">
+                                            {{ ws.name }}
+                                        </a>
+                                    </li>
+                                {% empty %}
+                                    <li><span class="dropdown-item small text-secondary">Nenhum workspace próprio</span></li>
+                                {% endfor %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li class="px-3 py-2">
+                                    <div class="small text-secondary mb-1">Procurar outros workspaces</div>
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" class="form-control" id="superWsSearch" placeholder="Nome ou slug">
+                                        <button class="btn btn-outline-light" type="button" id="superWsSearchBtn" aria-label="Buscar workspace">
+                                            <i class="fa-solid fa-magnifying-glass"></i>
+                                        </button>
+                                    </div>
+                                    <div id="superWsResults" class="list-group mt-2 d-none" data-switch-base="{% url 'tracker:workspace_switch' 'slug-placeholder' %}"></div>
                                 </li>
-                            {% empty %}
-                                <li><span class="dropdown-item small text-secondary">Nenhum workspace</span></li>
-                            {% endfor %}
+                            {% else %}
+                                {% for ws in available_workspaces %}
+                                    <li>
+                                        <a class="dropdown-item {% if current_workspace and current_workspace.id == ws.id %}active{% endif %}" href="{% url 'tracker:workspace_switch' ws.slug %}">
+                                            {{ ws.name }}
+                                        </a>
+                                    </li>
+                                {% empty %}
+                                    <li><span class="dropdown-item small text-secondary">Nenhum workspace</span></li>
+                                {% endfor %}
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'tracker:workspace_overview' %}">Painel de workspaces</a></li>
                             <li><a class="dropdown-item" href="{% url 'tracker:workspace_select' %}">Selecionar / criar workspace</a></li>
@@ -342,7 +371,15 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'js/theme.js' %}"></script>
+    <script src="{% static 'js/app.js' %}"></script>
+    {% if user.is_superuser %}
+        <script id="superWorkspaceData" type="application/json">{{ superuser_workspace_search_json|safe }}</script>
+    {% endif %}
     <script>
+        document.querySelectorAll('.glass-card').forEach((el, idx) => {
+            el.classList.add('fade-in-panel');
+            el.style.animationDelay = `${Math.min(idx * 0.03, 0.2)}s`;
+        });
         document.querySelectorAll('[data-bs-toggle="tooltip"], .js-tooltip').forEach(el => {
             if (!window.bootstrap || !bootstrap.Tooltip) return;
             new bootstrap.Tooltip(el);

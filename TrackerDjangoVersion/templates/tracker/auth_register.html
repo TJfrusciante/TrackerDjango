@@ -57,126 +57,136 @@
 {% endblock %}
 
 {% block content %}
-<div class="row g-4 align-items-center">
-    <div class="col-lg-6">
-        <div class="glass-card p-4 h-100">
-            <p class="text-secondary small text-uppercase mb-1">Comece em minutos</p>
-            <h1 class="fw-bold h3 mb-2">Crie sua conta e seu primeiro workspace</h1>
-            <p class="text-secondary mb-3">Convide o time, isole dados por workspace e use a IA para classificar transa&ccedil;&otilde;es e tarefas.</p>
-            <div class="row g-3">
-                <div class="col-sm-6">
-                    <div class="p-3 rounded-3 border border-dark-subtle h-100">
-                        <div class="fw-bold">Onboarding guiado</div>
-                        <div class="text-secondary small">Geramos o slug automaticamente e voc&ecirc; pode ajustar antes de convidar pessoas.</div>
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="p-3 rounded-3 border border-dark-subtle h-100">
-                        <div class="fw-bold">Seguran&ccedil;a e acesso</div>
-                        <div class="text-secondary small">Permiss&otilde;es por workspace; cada usu&aacute;rio v&ecirc; apenas o que pertence ao espa&ccedil;o atual.</div>
-                    </div>
+<div class="auth-shell">
+    <section class="auth-hero glass-card">
+        <span class="auth-hero-badge">Comece em minutos</span>
+        <h1 class="fw-bold h3 mb-2">Crie sua conta e seu primeiro workspace</h1>
+        <p class="text-secondary mb-3">Convide o time, isole dados por workspace e use a IA para classificar transa&ccedil;&otilde;es e tarefas.</p>
+        <div class="auth-hero-grid">
+            <div class="auth-feature">
+                <i class="fa-solid fa-compass"></i>
+                <div>
+                    <div class="fw-bold">Onboarding guiado</div>
+                    <div class="small text-secondary">Slug autom&aacute;tico e checklist com passos essenciais.</div>
                 </div>
             </div>
-            <div class="d-flex flex-wrap gap-3 mt-3">
+            <div class="auth-feature">
+                <i class="fa-solid fa-user-shield"></i>
                 <div>
-                    <div class="fw-bold">IA ativa</div>
-                    <div class="text-secondary small">Sugere categorias, explica decis&otilde;es e registra motivos.</div>
+                    <div class="fw-bold">Seguran&ccedil;a e acesso</div>
+                    <div class="small text-secondary">Permiss&otilde;es por workspace; cada usu&aacute;rio v&ecirc; apenas o que pertence ao espa&ccedil;o.</div>
                 </div>
+            </div>
+            <div class="auth-feature">
+                <i class="fa-solid fa-file-import"></i>
                 <div>
                     <div class="fw-bold">Importe r&aacute;pido</div>
-                    <div class="text-secondary small">CSV ou PDF com progresso vis&iacute;vel e preview edit&aacute;vel.</div>
+                    <div class="small text-secondary">CSV ou PDF com preview edit&aacute;vel e IA sugerindo categorias.</div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="glass-card p-4">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 fw-bold mb-0">Criar conta</h2>
-                <div class="d-flex gap-2">
-                    <a class="small" href="{% url 'tracker:login' %}">J&aacute; tem login? Entrar</a>
-                    <span class="text-secondary small">&middot;</span>
-                    <a class="small" href="{% url 'tracker:register_guest' %}" onclick="return confirm('Conta de convidado acessa tarefas e pode lan\u00e7ar transa\u00e7\u00f5es. Dashboard, edi\u00e7\u00e3o de transa\u00e7\u00f5es e IA permanecem bloqueados.');">Sou convidado</a>
-                </div>
+        <div class="auth-metrics">
+            <div>
+                <div class="auth-metric-value">IA</div>
+                <div class="auth-metric-label">Sugest&otilde;es inteligentes</div>
             </div>
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger py-2 small mb-3">
-                    {{ form.non_field_errors|striptags }}
-                </div>
-            {% endif %}
-            <form method="post" novalidate enctype="multipart/form-data" class="row g-3">
-                {% csrf_token %}
-                {% for field in form %}
-                    {% if field.name == 'invite_code' %}
-                        <div class="col-12 invite-highlight">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <label class="form-label">{{ field.label }}</label>
-                                <span class="badge text-bg-success">C&oacute;digo de convite</span>
+            <div>
+                <div class="auth-metric-value">+CSV</div>
+                <div class="auth-metric-label">Importa&ccedil;&atilde;o assistida</div>
+            </div>
+            <div>
+                <div class="auth-metric-value">Multi</div>
+                <div class="auth-metric-label">Workspaces separados</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="auth-card glass-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h5 fw-bold mb-0">Criar conta</h2>
+            <div class="d-flex gap-2">
+                <a class="small" href="{% url 'tracker:login' %}">J&aacute; tem login? Entrar</a>
+                <span class="text-secondary small">&middot;</span>
+                <a class="small" href="{% url 'tracker:register_guest' %}" onclick="return confirm('Conta de convidado acessa tarefas e pode lan\u00e7ar transa\u00e7\u00f5es. Dashboard, edi\u00e7\u00e3o de transa\u00e7\u00f5es e IA permanecem bloqueados.');">Sou convidado</a>
+            </div>
+        </div>
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger py-2 small mb-3" data-auto-dismiss="1">
+                {{ form.non_field_errors|striptags }}
+            </div>
+        {% endif %}
+        <form method="post" novalidate enctype="multipart/form-data" class="row g-3" data-no-transition="1">
+            {% csrf_token %}
+            {% for field in form %}
+                {% if field.name == 'invite_code' %}
+                    <div class="col-12 invite-highlight">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label class="form-label">{{ field.label }}</label>
+                            <span class="badge text-bg-success">C&oacute;digo de convite</span>
+                        </div>
+                        {{ field }}
+                        <div class="form-text">Tem um c&oacute;digo? Cole aqui para ativar a assinatura sem pagamento imediato.</div>
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% elif field.name == 'master_guest_limit' %}
+                    <div class="col-12 d-none" id="masterGuestField">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="col-12">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% if field.name == 'email' %}
+                            <div class="form-text">Use um e-mail v&aacute;lido para iniciar o pagamento da assinatura.</div>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                        {% if field.name == 'password1' %}
+                            <div class="password-rules" id="passwordRules" aria-live="polite">
+                                <div class="small fw-semibold text-secondary mb-2">Sua senha precisa:</div>
+                                <ul>
+                                    <li data-rule="length"><span class="rule-dot"></span><span>Conter pelo menos 8 caracteres.</span></li>
+                                    <li data-rule="similar"><span class="rule-dot"></span><span>N&atilde;o ser parecida com seus dados pessoais.</span></li>
+                                    <li data-rule="common"><span class="rule-dot"></span><span>N&atilde;o ser uma senha comumente utilizada.</span></li>
+                                    <li data-rule="numeric"><span class="rule-dot"></span><span>N&atilde;o ser inteiramente num&eacute;rica.</span></li>
+                                    <li data-rule="special"><span class="rule-dot"></span><span>Conter ao menos 1 caractere especial.</span></li>
+                                    <li data-rule="match"><span class="rule-dot"></span><span>Confirma&ccedil;&atilde;o igual &agrave; senha.</span></li>
+                                </ul>
                             </div>
-                            {{ field }}
-                            <div class="form-text">Tem um c&oacute;digo? Cole aqui para ativar a assinatura sem pagamento imediato.</div>
-                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                            {% if field.errors %}
-                                <div class="text-danger small">{{ field.errors|striptags }}</div>
-                            {% endif %}
-                        </div>
-                    {% elif field.name == 'master_guest_limit' %}
-                        <div class="col-12 d-none" id="masterGuestField">
-                            <label class="form-label">{{ field.label }}</label>
-                            {{ field }}
-                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                            {% if field.errors %}
-                                <div class="text-danger small">{{ field.errors|striptags }}</div>
-                            {% endif %}
-                        </div>
-                    {% else %}
-                        <div class="col-12">
-                            <label class="form-label">{{ field.label }}</label>
-                            {{ field }}
-                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                            {% if field.name == 'email' %}
-                                <div class="form-text">Use um e-mail válido para iniciar o pagamento da assinatura.</div>
-                            {% endif %}
-                            {% if field.errors %}
-                                <div class="text-danger small">{{ field.errors|striptags }}</div>
-                            {% endif %}
-                            {% if field.name == 'password1' %}
-                                <div class="password-rules" id="passwordRules" aria-live="polite">
-                                    <div class="small fw-semibold text-secondary mb-2">Sua senha precisa:</div>
-                                    <ul>
-                                        <li data-rule="length"><span class="rule-dot"></span><span>Conter pelo menos 8 caracteres.</span></li>
-                                        <li data-rule="similar"><span class="rule-dot"></span><span>N&atilde;o ser parecida com seus dados pessoais.</span></li>
-                                        <li data-rule="common"><span class="rule-dot"></span><span>N&atilde;o ser uma senha comumente utilizada.</span></li>
-                                        <li data-rule="numeric"><span class="rule-dot"></span><span>N&atilde;o ser inteiramente num&eacute;rica.</span></li>
-                                        <li data-rule="special"><span class="rule-dot"></span><span>Conter ao menos 1 caractere especial.</span></li>
-                                        <li data-rule="match"><span class="rule-dot"></span><span>Confirma&ccedil;&atilde;o igual &agrave; senha.</span></li>
-                                    </ul>
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                {% endfor %}
-                <div class="col-12 d-grid">
-                    <button class="btn btn-primary" type="submit">Criar conta</button>
-                </div>
-            </form>
-            {% if social_instagram_url or social_facebook_url %}
-            <div class="d-flex flex-wrap gap-2 mt-3">
-                {% if social_instagram_url %}
-                <a class="btn btn-outline-light btn-sm" href="{{ social_instagram_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Instagram" aria-label="Instagram">
-                    <i class="fa-brands fa-instagram me-1"></i>Instagram
-                </a>
+                        {% endif %}
+                    </div>
                 {% endif %}
-                {% if social_facebook_url %}
-                <a class="btn btn-outline-light btn-sm" href="{{ social_facebook_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Facebook" aria-label="Facebook">
-                    <i class="fa-brands fa-facebook me-1"></i>Facebook
-                </a>
-                {% endif %}
+            {% endfor %}
+            <div class="col-12 d-grid">
+                <button class="btn btn-primary" type="submit">Criar conta</button>
             </div>
+        </form>
+        {% if social_instagram_url or social_facebook_url %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            {% if social_instagram_url %}
+            <a class="btn btn-outline-light btn-sm" href="{{ social_instagram_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Instagram" aria-label="Instagram">
+                <i class="fa-brands fa-instagram me-1"></i>Instagram
+            </a>
             {% endif %}
-            <p class="small mt-3 mb-0 text-secondary">Seu cadastro fica pendente at&eacute; a aprova&ccedil;&atilde;o do administrador.</p>
+            {% if social_facebook_url %}
+            <a class="btn btn-outline-light btn-sm" href="{{ social_facebook_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Facebook" aria-label="Facebook">
+                <i class="fa-brands fa-facebook me-1"></i>Facebook
+            </a>
+            {% endif %}
         </div>
-    </div>
+        {% endif %}
+        <p class="small mt-3 mb-0 text-secondary">Seu cadastro fica pendente at&eacute; a aprova&ccedil;&atilde;o do administrador.</p>
+    </section>
 </div>
 {% endblock %}
 

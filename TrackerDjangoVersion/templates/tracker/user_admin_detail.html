@@ -14,8 +14,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-    <div class="d-flex align-items-center gap-3">
+<div class="page-hero">
+    <div class="page-hero__info d-flex align-items-center gap-3">
         {% if profile and profile.avatar %}
             <img src="{{ profile.avatar.url }}" alt="Avatar" class="avatar-lg">
         {% else %}
@@ -24,12 +24,12 @@
             </span>
         {% endif %}
         <div>
-            <p class="text-secondary small text-uppercase mb-1">Perfil</p>
-            <h1 class="h4 fw-bold mb-0">{{ object.get_full_name|default:object.username }}</h1>
-            <div class="text-secondary">{{ object.email|default:"-" }}</div>
+            <p class="page-hero__eyebrow">Perfil</p>
+            <h1 class="page-hero__title">{{ object.get_full_name|default:object.username }}</h1>
+            <div class="page-hero__subtitle">{{ object.email|default:"-" }}</div>
         </div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="page-hero__actions">
         <a class="btn btn-outline-light" href="{% url 'tracker:user_admin_list' %}">Voltar</a>
         <a class="btn btn-primary" href="{% url 'tracker:user_admin_edit' object.id %}">Editar perfil</a>
     </div>

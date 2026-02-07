@@ -10,19 +10,21 @@
 {% endblock %}
 
 {% block content %}
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Produtividade</p>
+        <h1 class="page-hero__title">{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} tarefa</h1>
+        <p class="page-hero__subtitle">Organize tarefas por categoria, respons&aacute;vel, prazo e etapas.</p>
+    </div>
+    <div class="page-hero__actions">
+        <a href="{% url 'tracker:tasks_list' %}" class="btn btn-outline-light page-action-btn">
+            <i class="fa-solid fa-arrow-left me-2"></i>Voltar
+        </a>
+    </div>
+</div>
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="glass-card p-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <p class="text-secondary small mb-1">Produtividade</p>
-                    <h1 class="h4 fw-bold mb-0">{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} tarefa</h1>
-                </div>
-                <a href="{% url 'tracker:tasks_list' %}" class="btn btn-outline-light">
-                    <i class="fa-solid fa-arrow-left me-2"></i>Voltar
-                </a>
-            </div>
-
             {% if form.errors %}
                 <div class="alert alert-danger">Confira os campos destacados.</div>
             {% endif %}

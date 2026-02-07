@@ -4,12 +4,13 @@
 {% block title %}Importar extrato | iTracker{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4">
-    <div>
-        <p class="text-secondary small mb-1">Automatize lançamentos</p>
-        <h1 class="h4 fw-bold mb-0">Importar extrato</h1>
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Automatize lan&ccedil;amentos</p>
+        <h1 class="page-hero__title">Importar extrato</h1>
+        <p class="page-hero__subtitle">Envie CSV/PDF, revise o preview e importe em poucos cliques.</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="page-hero__actions">
         <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:transactions_list' %}" data-bs-toggle="tooltip" title="Voltar para transações">
             <i class="fa-solid fa-arrow-left me-2"></i>Voltar
         </a>

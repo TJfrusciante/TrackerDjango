@@ -4,6 +4,16 @@
 {% block title %}Configurar WhatsApp | iTracker{% endblock %}
 
 {% block content %}
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">WhatsApp</p>
+        <h1 class="page-hero__title">Configurar WhatsApp</h1>
+        <p class="page-hero__subtitle">Conecte seu n&uacute;mero ao agente do iTracker para lan&ccedil;ar transa&ccedil;&otilde;es e tarefas.</p>
+    </div>
+    <div class="page-hero__actions">
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'whatsapp_finance:agent' %}">Voltar ao WhatsApp</a>
+    </div>
+</div>
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="glass-card p-4 mb-4">

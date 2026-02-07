@@ -6,27 +6,25 @@
 {% block content %}
 <div class="row gy-4">
     <div class="col-12">
-        <div class="glass-card p-4">
-            <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
-                <div>
-                    <p class="text-uppercase small mb-1 text-secondary">Dashboard</p>
-                    <h1 class="h3 fw-bold mb-2">Controle de finan&ccedil;as e tarefas</h1>
-                    <p class="mb-0 text-secondary">An&aacute;lises detalhadas do per&iacute;odo selecionado.</p>
-                </div>
-                <div class="d-flex gap-2 flex-wrap">
-                    <a href="{% url 'tracker:transactions_list' %}" class="btn btn-outline-light page-action-btn">
-                        <i class="fa-solid fa-coins me-2 text-warning"></i>Ver transa&ccedil;&otilde;es
-                    </a>
-                    <a href="{% url 'tracker:tasks_list' %}" class="btn btn-outline-light page-action-btn">
-                        <i class="fa-solid fa-list-check me-2"></i>Ver tarefas
-                    </a>
-                    <a href="{% url 'tracker:transaction_create' %}" class="btn btn-outline-light page-action-btn">
-                        <i class="fa-solid fa-plus me-2"></i>Criar transa&ccedil;&atilde;o
-                    </a>
-                    <a href="{% url 'tracker:tasks_list' %}" class="btn btn-primary page-action-btn">
-                        <i class="fa-solid fa-plus me-2"></i>Nova tarefa
-                    </a>
-                </div>
+        <div class="page-hero">
+            <div class="page-hero__info">
+                <p class="page-hero__eyebrow">Dashboard</p>
+                <h1 class="page-hero__title">Controle de finan&ccedil;as e tarefas</h1>
+                <p class="page-hero__subtitle">An&aacute;lises detalhadas do per&iacute;odo selecionado.</p>
+            </div>
+            <div class="page-hero__actions">
+                <a href="{% url 'tracker:transactions_list' %}" class="btn btn-outline-light page-action-btn">
+                    <i class="fa-solid fa-coins me-2 text-warning"></i>Ver transa&ccedil;&otilde;es
+                </a>
+                <a href="{% url 'tracker:tasks_list' %}" class="btn btn-outline-light page-action-btn">
+                    <i class="fa-solid fa-list-check me-2"></i>Ver tarefas
+                </a>
+                <a href="{% url 'tracker:transaction_create' %}" class="btn btn-outline-light page-action-btn">
+                    <i class="fa-solid fa-plus me-2"></i>Criar transa&ccedil;&atilde;o
+                </a>
+                <a href="{% url 'tracker:tasks_list' %}" class="btn btn-primary page-action-btn">
+                    <i class="fa-solid fa-plus me-2"></i>Nova tarefa
+                </a>
             </div>
         </div>
     </div>
@@ -122,6 +120,7 @@
                         <h3 class="mb-0 {% if income_total > 0 %}value-positive{% else %}text-secondary{% endif %}" id="incomeValue">R$ {{ income_total|floatformat:2 }}</h3>
                         <i class="fa-solid fa-arrow-trend-up text-success"></i>
                     </div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
@@ -131,6 +130,7 @@
                         <h3 class="mb-0 {% if expense_total > 0 %}value-negative{% else %}text-secondary{% endif %}" id="expenseValue">R$ {{ expense_total|floatformat:2 }}</h3>
                         <i class="fa-solid fa-arrow-trend-down text-danger"></i>
                     </div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
@@ -140,18 +140,18 @@
                         <h3 class="mb-0 {% if balance_total >= 0 %}value-positive{% else %}value-negative{% endif %}" id="balanceValue">R$ {{ balance_total|floatformat:2 }}</h3>
                         <i class="fa-solid fa-wallet text-warning"></i>
                     </div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="glass-card p-3 h-100 kpi-secondary {% if tasks_overdue > 0 %}kpi-negative{% elif tasks_done > 0 %}kpi-positive{% endif %}" id="tasksCard">
                 <p class="text-secondary small mb-1">Tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h3 class="mb-0 {% if tasks_overdue > 0 %}text-warning{% else %}text-info{% endif %}">{{ tasks_open }} abertas</h3>
-                        <span class="badge {% if tasks_done > 0 %}bg-success{% else %}bg-secondary{% endif %} px-3 py-2">{{ tasks_done }} feitas</span>
+                        <h3 class="mb-0 {% if tasks_overdue > 0 %}text-warning{% else %}text-info{% endif %}" id="tasksOpenValue">{{ tasks_open }} abertas</h3>
+                        <span class="badge {% if tasks_done > 0 %}bg-success{% else %}bg-secondary{% endif %} px-3 py-2" id="tasksDoneBadge">{{ tasks_done }} feitas</span>
                     </div>
-                    {% if tasks_overdue > 0 %}
-                        <div class="small text-warning mt-2">{{ tasks_overdue }} atrasada(s)</div>
-                    {% endif %}
+                    <div class="small text-warning mt-2 {% if not tasks_overdue %}d-none{% endif %}" id="tasksOverdueValue">{{ tasks_overdue }} atrasada(s)</div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
         </div>
@@ -162,28 +162,32 @@
             <div class="col-md-3">
                 <div class="glass-card p-3 h-100 kpi-secondary {% if tx_count_period > 0 %}kpi-positive{% endif %}" id="txCountCard">
                 <p class="text-secondary small mb-1">Movimenta&#231;&#245;es no per&#237;odo</p>
-                    <h4 class="mb-0 {% if tx_count_period > 0 %}text-success{% else %}text-secondary{% endif %}">{{ tx_count_period }}</h4>
+                    <h4 class="mb-0 {% if tx_count_period > 0 %}text-success{% else %}text-secondary{% endif %}" id="txCountValue">{{ tx_count_period }}</h4>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="glass-card p-3 h-100 kpi-secondary {% if net_30 >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="net30Card">
                 <p class="text-secondary small mb-1">Saldo &#250;ltimos 30 dias</p>
-                    <h4 class="mb-0 {% if net_30 >= 0 %}value-positive{% else %}value-negative{% endif %}">R$ {{ net_30|floatformat:2 }}</h4>
+                    <h4 class="mb-0 {% if net_30 >= 0 %}value-positive{% else %}value-negative{% endif %}" id="net30Value">R$ {{ net_30|floatformat:2 }}</h4>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="glass-card p-3 h-100 kpi-secondary {% if avg_daily_expense > 0 %}kpi-negative{% endif %}" id="avgExpenseCard">
                 <p class="text-secondary small mb-1">Despesa m&#233;dia (30d)</p>
-                    <h4 class="mb-0 {% if avg_daily_expense > 0 %}value-negative{% else %}text-secondary{% endif %}">R$ {{ avg_daily_expense|floatformat:2 }}/dia</h4>
+                    <h4 class="mb-0 {% if avg_daily_expense > 0 %}value-negative{% else %}text-secondary{% endif %}" id="avgExpenseValue">R$ {{ avg_daily_expense|floatformat:2 }}/dia</h4>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="glass-card p-3 h-100 kpi-secondary {% if tasks_progress_pct >= 70 %}kpi-positive{% elif tasks_progress_pct < 40 %}kpi-negative{% endif %}" id="tasksProgressCard">
                 <p class="text-secondary small mb-1">Progresso tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h4 class="mb-0 {% if tasks_progress_pct >= 70 %}value-positive{% elif tasks_progress_pct >= 40 %}text-warning{% else %}value-negative{% endif %}">{{ tasks_progress_pct }}%</h4>
-                        <span class="badge bg-primary px-3 py-2">{{ category_count }} categorias</span>
+                        <h4 class="mb-0 {% if tasks_progress_pct >= 70 %}value-positive{% elif tasks_progress_pct >= 40 %}text-warning{% else %}value-negative{% endif %}" id="tasksProgressValue">{{ tasks_progress_pct }}%</h4>
+                        <span class="badge bg-primary px-3 py-2" id="categoryCountBadge">{{ category_count }} categorias</span>
                     </div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
         </div>
@@ -192,38 +196,32 @@
     <div class="col-12">
         <div class="row g-3">
             <div class="col-md-4">
-                <div class="glass-card p-3 h-100 {% if insights.top_income_value %}kpi-positive{% endif %}">
+                <div class="glass-card p-3 h-100 {% if insights.top_income_value %}kpi-positive{% endif %}" id="topIncomeCard">
                     <p class="text-secondary small mb-1">Maior receita</p>
-                    {% if insights.top_income_label %}
-                        <h4 class="mb-0 text-success">{{ insights.top_income_label }}</h4>
-                        <div class="text-secondary small">R$ {{ insights.top_income_value|floatformat:2 }}</div>
-                    {% else %}
-                        <div class="text-secondary small">Sem dados no per&iacute;odo.</div>
-                    {% endif %}
+                    <h4 class="mb-0 text-success {% if not insights.top_income_label %}d-none{% endif %}" id="topIncomeLabel">{{ insights.top_income_label }}</h4>
+                    <div class="text-secondary small {% if not insights.top_income_label %}d-none{% endif %}" id="topIncomeValue">R$ {{ insights.top_income_value|floatformat:2 }}</div>
+                    <div class="text-secondary small {% if insights.top_income_label %}d-none{% endif %}" id="topIncomeEmpty">Sem dados no per&iacute;odo.</div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="glass-card p-3 h-100 {% if insights.top_expense_value %}kpi-negative{% endif %}">
+                <div class="glass-card p-3 h-100 {% if insights.top_expense_value %}kpi-negative{% endif %}" id="topExpenseCard">
                     <p class="text-secondary small mb-1">Maior gasto</p>
-                    {% if insights.top_expense_label %}
-                        <h4 class="mb-0 text-danger">{{ insights.top_expense_label }}</h4>
-                        <div class="text-secondary small">R$ {{ insights.top_expense_value|floatformat:2 }}</div>
-                    {% else %}
-                        <div class="text-secondary small">Sem dados no per&iacute;odo.</div>
-                    {% endif %}
+                    <h4 class="mb-0 text-danger {% if not insights.top_expense_label %}d-none{% endif %}" id="topExpenseLabel">{{ insights.top_expense_label }}</h4>
+                    <div class="text-secondary small {% if not insights.top_expense_label %}d-none{% endif %}" id="topExpenseValue">R$ {{ insights.top_expense_value|floatformat:2 }}</div>
+                    <div class="text-secondary small {% if insights.top_expense_label %}d-none{% endif %}" id="topExpenseEmpty">Sem dados no per&iacute;odo.</div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="glass-card p-3 h-100 {% if insights.top_net_value >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}">
+                <div class="glass-card p-3 h-100 {% if insights.top_net_value >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="topNetCard">
                     <p class="text-secondary small mb-1">Categoria com maior impacto</p>
-                    {% if insights.top_net_label %}
-                        <h4 class="mb-0">{{ insights.top_net_label }}</h4>
-                        <div class="small {% if insights.top_net_value >= 0 %}value-positive{% else %}value-negative{% endif %}">
-                            Saldo l&iacute;quido: R$ {{ insights.top_net_value|floatformat:2 }}
-                        </div>
-                    {% else %}
-                        <div class="text-secondary small">Sem dados no per&iacute;odo.</div>
-                    {% endif %}
+                    <h4 class="mb-0 {% if not insights.top_net_label %}d-none{% endif %}" id="topNetLabel">{{ insights.top_net_label }}</h4>
+                    <div class="small {% if insights.top_net_value >= 0 %}value-positive{% else %}value-negative{% endif %} {% if not insights.top_net_label %}d-none{% endif %}" id="topNetValue">
+                        Saldo l&iacute;quido: R$ {{ insights.top_net_value|floatformat:2 }}
+                    </div>
+                    <div class="text-secondary small {% if insights.top_net_label %}d-none{% endif %}" id="topNetEmpty">Sem dados no per&iacute;odo.</div>
+                    <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
         </div>
@@ -241,7 +239,7 @@
 
     <div class="col-lg-7">
         <div class="glass-card p-4 h-100">
-            <form id="rangeForm" method="get" class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3" data-tour="dashboard-filters">
+            <form id="rangeForm" method="get" class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3" data-tour="dashboard-filters" data-no-transition="1">
                 <div>
                     <h5 class="mb-0">Distribui&#231;&#227;o por categoria</h5>
                     <span class="text-secondary small">Entradas - sa&#237;das (filtr&#225;vel)</span>
@@ -257,7 +255,7 @@
                     <input id="rangeEndPicker" type="date" lang="pt-BR" class="form-control visually-hidden" value="{{ end_date|date:'Y-m-d' }}" aria-hidden="true" tabindex="-1">
                     <input id="rangeStart" name="start" type="hidden" value="{{ start_date|date:'Y-m-d' }}">
                     <input id="rangeEnd" name="end" type="hidden" value="{{ end_date|date:'Y-m-d' }}">
-                    <input type="hidden" name="period" value="">
+                    <input type="hidden" name="period" value="{{ period }}">
                     <select id="rangeMonth" name="month" class="form-select" aria-label="Selecionar m&ecirc;s">
                         <option value="">M&ecirc;s/ano</option>
                         {% for opt in month_options %}
@@ -299,7 +297,7 @@
                     {% endfor %}
                 </div>
                 <div class="text-secondary small mt-2">
-                    Intervalo atual: {{ start_date|date:"d/m/Y" }} &ndash; {{ end_date|date:"d/m/Y" }}
+                    Intervalo atual: <span id="intervalCurrent">{{ start_date|date:"d/m/Y" }} &ndash; {{ end_date|date:"d/m/Y" }}</span>
                 </div>
             </div>
             <div id="categorySkeleton" class="skeleton chart-skeleton mb-3"></div>
@@ -335,7 +333,7 @@
                 <div class="glass-card p-4 h-100">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Despesas por categoria</h5>
-                        <span class="text-secondary small">No per&#237;odo</span>
+                        <span class="text-secondary small js-interval-label"></span>
                     </div>
                     <div id="expenseCategorySkeleton" class="skeleton chart-skeleton mb-3"></div>
                     <div class="chart-box chart-box--sm chart-box--pie">
@@ -347,7 +345,7 @@
                 <div class="glass-card p-4 h-100">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Entradas por categoria</h5>
-                        <span class="text-secondary small">No per&#237;odo</span>
+                        <span class="text-secondary small js-interval-label"></span>
                     </div>
                     <div id="incomeCategorySkeleton" class="skeleton chart-skeleton mb-3"></div>
                     <div class="chart-box chart-box--sm chart-box--pie">
@@ -366,9 +364,10 @@
                         <h5 class="mb-0">Avalia&ccedil;&atilde;o do agente</h5>
                         <span class="badge bg-primary-subtle text-primary px-3">Finan&ccedil;as</span>
                     </div>
-                    <h4 class="mb-2 {{ agent_eval.finance.class }}">{{ agent_eval.finance.title }}</h4>
-                    <p class="text-secondary mb-3">{{ agent_eval.finance.message }}</p>
-                    <div class="row g-2">
+                    <div class="small text-secondary mb-2 js-interval-label"></div>
+                    <h4 class="mb-2 {{ agent_eval.finance.class }}" id="agentFinanceTitle">{{ agent_eval.finance.title }}</h4>
+                    <p class="text-secondary mb-3" id="agentFinanceMessage">{{ agent_eval.finance.message }}</p>
+                    <div class="row g-2" id="agentFinanceItems">
                         {% for item in agent_eval.finance.items %}
                         <div class="col-6">
                             <div class="d-flex justify-content-between align-items-center small">
@@ -391,9 +390,10 @@
                         <h5 class="mb-0">Avalia&ccedil;&atilde;o do agente</h5>
                         <span class="badge bg-warning-subtle text-warning px-3">Tarefas</span>
                     </div>
-                    <h4 class="mb-2 {{ agent_eval.tasks.class }}">{{ agent_eval.tasks.title }}</h4>
-                    <p class="text-secondary mb-3">{{ agent_eval.tasks.message }}</p>
-                    <div class="row g-2">
+                    <div class="small text-secondary mb-2 js-interval-label"></div>
+                    <h4 class="mb-2 {{ agent_eval.tasks.class }}" id="agentTasksTitle">{{ agent_eval.tasks.title }}</h4>
+                    <p class="text-secondary mb-3" id="agentTasksMessage">{{ agent_eval.tasks.message }}</p>
+                    <div class="row g-2" id="agentTasksItems">
                         {% for item in agent_eval.tasks.items %}
                         <div class="col-6">
                             <div class="d-flex justify-content-between align-items-center small">
@@ -419,6 +419,7 @@
                 <h5 class="mb-0">&Uacute;ltimas transa&ccedil;&otilde;es</h5>
                 <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:transactions_list' %}">Ver todas</a>
             </div>
+            <div class="small text-secondary mb-2 js-interval-label"></div>
             <div id="latestTxSkeleton" class="skeleton table-skeleton mb-3"></div>
             <div class="table-responsive">
                 <table class="table table-borderless align-middle mb-0">
@@ -484,6 +485,7 @@
                 <div>
                     <h5 class="mb-0">Saldo mensal</h5>
                     <span class="text-secondary small">Linha temporal (positivo/negativo)</span>
+                    <div class="small text-secondary js-interval-label"></div>
                 </div>
             </div>
             <div id="monthlySkeleton" class="skeleton chart-skeleton mb-3"></div>
@@ -499,6 +501,7 @@
                 <div>
                     <h5 class="mb-0">Evolu&#231;&#227;o di&#225;ria</h5>
                     <span class="text-secondary small">Saldo l&#237;quido por dia no per&#237;odo</span>
+                    <div class="small text-secondary js-interval-label"></div>
                 </div>
             </div>
             <div id="dailySkeleton" class="skeleton chart-skeleton mb-3"></div>
@@ -514,6 +517,7 @@
                 <div>
                     <h5 class="mb-0">Saldo acumulado</h5>
                     <span class="text-secondary small">Somat&#243;rio progressivo no per&#237;odo</span>
+                    <div class="small text-secondary js-interval-label"></div>
                 </div>
             </div>
             <div id="runningSkeleton" class="skeleton chart-skeleton mb-3"></div>
@@ -529,10 +533,11 @@
                 <h5 class="mb-0">Maiores categorias (per&#237;odo)</h5>
                 <span class="text-secondary small">Baseado no filtro selecionado</span>
             </div>
+            <div class="small text-secondary mb-3 js-interval-label"></div>
             <div class="row g-3">
                 <div class="col-md-6">
                     <h6 class="fw-bold mb-2 text-success">Top Receitas</h6>
-                    <ul class="list-group list-group-flush">
+                    <ul class="list-group list-group-flush" id="topIncomeList">
                         {% for item in top_income %}
                             <li class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between">
                                 <span>{{ item.category__name }}</span>
@@ -545,7 +550,7 @@
                 </div>
                 <div class="col-md-6">
                     <h6 class="fw-bold mb-2 text-danger">Top Despesas</h6>
-                    <ul class="list-group list-group-flush">
+                    <ul class="list-group list-group-flush" id="topExpenseList">
                         {% for item in top_expense %}
                             <li class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between">
                                 <span>{{ item.category__name }}</span>
@@ -636,6 +641,39 @@
     const incomeCard = document.getElementById('incomeCard');
     const expenseCard = document.getElementById('expenseCard');
     const balanceCard = document.getElementById('balanceCard');
+    const tasksCard = document.getElementById('tasksCard');
+    const tasksOpenEl = document.getElementById('tasksOpenValue');
+    const tasksDoneBadge = document.getElementById('tasksDoneBadge');
+    const tasksOverdueEl = document.getElementById('tasksOverdueValue');
+    const txCountEl = document.getElementById('txCountValue');
+    const net30El = document.getElementById('net30Value');
+    const avgExpenseEl = document.getElementById('avgExpenseValue');
+    const tasksProgressEl = document.getElementById('tasksProgressValue');
+    const categoryCountBadge = document.getElementById('categoryCountBadge');
+    const txCountCard = document.getElementById('txCountCard');
+    const net30Card = document.getElementById('net30Card');
+    const avgExpenseCard = document.getElementById('avgExpenseCard');
+    const tasksProgressCard = document.getElementById('tasksProgressCard');
+    const topIncomeLabel = document.getElementById('topIncomeLabel');
+    const topIncomeValue = document.getElementById('topIncomeValue');
+    const topExpenseLabel = document.getElementById('topExpenseLabel');
+    const topExpenseValue = document.getElementById('topExpenseValue');
+    const topNetLabel = document.getElementById('topNetLabel');
+    const topNetValue = document.getElementById('topNetValue');
+    const topIncomeCard = document.getElementById('topIncomeCard');
+    const topExpenseCard = document.getElementById('topExpenseCard');
+    const topNetCard = document.getElementById('topNetCard');
+    const topIncomeEmpty = document.getElementById('topIncomeEmpty');
+    const topExpenseEmpty = document.getElementById('topExpenseEmpty');
+    const topNetEmpty = document.getElementById('topNetEmpty');
+    const topIncomeList = document.getElementById('topIncomeList');
+    const topExpenseList = document.getElementById('topExpenseList');
+    const agentFinanceTitle = document.getElementById('agentFinanceTitle');
+    const agentFinanceMessage = document.getElementById('agentFinanceMessage');
+    const agentFinanceItems = document.getElementById('agentFinanceItems');
+    const agentTasksTitle = document.getElementById('agentTasksTitle');
+    const agentTasksMessage = document.getElementById('agentTasksMessage');
+    const agentTasksItems = document.getElementById('agentTasksItems');
     const applyBtn = document.getElementById('applyRange');
     const form = document.getElementById('rangeForm');
     const clearFiltersBtn = document.getElementById('clearFilters');
@@ -709,6 +747,8 @@
 
     const filterChips = document.getElementById('filterChips');
     const filterCountBadge = document.getElementById('filterCountBadge');
+    const intervalLabels = document.querySelectorAll('.js-interval-label');
+    const intervalCurrent = document.getElementById('intervalCurrent');
     let activeCategoryColor = '';
 
     const getPeriodLabel = () => {
@@ -724,17 +764,51 @@
         period = '';
     };
 
+    const getIntervalText = () => {
+        const startVal = startHidden ? startHidden.value : '';
+        const endVal = endHidden ? endHidden.value : '';
+        if (period) {
+            const label = getPeriodLabel();
+            if (label && label.toLowerCase() !== 'tudo') {
+                return `Atalho: ${label}`;
+            }
+        }
+        if (startVal && endVal) {
+            return `${formatIsoToBr(startVal)} – ${formatIsoToBr(endVal)}`;
+        }
+        if (period) {
+            const label = getPeriodLabel();
+            if (label) return `Atalho: ${label}`;
+        }
+        return '';
+    };
+
+    const updateIntervalLabels = () => {
+        const text = getIntervalText();
+        const label = text ? (text.toLowerCase().startsWith('atalho') ? text : `Período: ${text}`) : '';
+        intervalLabels.forEach(el => {
+            el.textContent = label;
+            el.classList.toggle('d-none', !label);
+        });
+        if (intervalCurrent) {
+            intervalCurrent.textContent = text || '';
+        }
+    };
+
     const renderFilterChips = () => {
         if (!filterChips) return;
         const chips = [];
         const startVal = startHidden.value;
         const endVal = endHidden.value;
+        const defaultStart = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultStart || '') : '';
+        const defaultEnd = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultEnd || '') : '';
+        const isDefaultRange = !!(defaultStart && defaultEnd && startVal === defaultStart && endVal === defaultEnd);
         if (period) {
             const periodLabel = getPeriodLabel();
             if (periodLabel && periodLabel.toLowerCase() !== 'tudo') {
                 chips.push({ key: 'period', label: `Atalho: ${periodLabel}` });
             }
-        } else if (startVal && endVal) {
+        } else if (startVal && endVal && !isDefaultRange) {
             chips.push({ key: 'date', label: `Período: ${formatIsoToBr(startVal)} – ${formatIsoToBr(endVal)}` });
         }
         if (monthSelect && monthSelect.value) {
@@ -791,6 +865,7 @@
                 tooltip.setContent({ '.tooltip-inner': title });
             }
         }
+        updateIntervalLabels();
     };
 
     function requestChartLoad() {
@@ -1258,12 +1333,199 @@
             balanceCard.classList.toggle('kpi-negative', (data.balance_total || 0) < 0);
         }
 
+        if (txCountEl) {
+            txCountEl.textContent = data.tx_count_period ?? 0;
+            txCountEl.classList.toggle('text-success', (data.tx_count_period || 0) > 0);
+            txCountEl.classList.toggle('text-secondary', !(data.tx_count_period > 0));
+        }
+        if (txCountCard) {
+            txCountCard.classList.toggle('kpi-positive', (data.tx_count_period || 0) > 0);
+        }
+        if (net30El) {
+            net30El.textContent = formatMoney(data.net_period);
+            net30El.classList.toggle('value-positive', (data.net_period || 0) >= 0);
+            net30El.classList.toggle('value-negative', (data.net_period || 0) < 0);
+        }
+        if (net30Card) {
+            net30Card.classList.toggle('kpi-positive', (data.net_period || 0) >= 0);
+            net30Card.classList.toggle('kpi-negative', (data.net_period || 0) < 0);
+        }
+        if (avgExpenseEl) {
+            avgExpenseEl.textContent = `${formatMoney(data.avg_daily_expense_period)}/dia`;
+            avgExpenseEl.classList.toggle('value-negative', (data.avg_daily_expense_period || 0) > 0);
+            avgExpenseEl.classList.toggle('text-secondary', !(data.avg_daily_expense_period > 0));
+        }
+        if (avgExpenseCard) {
+            avgExpenseCard.classList.toggle('kpi-negative', (data.avg_daily_expense_period || 0) > 0);
+        }
+        if (tasksProgressEl) {
+            const pct = data.tasks_progress_pct ?? 0;
+            tasksProgressEl.textContent = `${pct}%`;
+            tasksProgressEl.classList.toggle('value-positive', pct >= 70);
+            tasksProgressEl.classList.toggle('text-warning', pct >= 40 && pct < 70);
+            tasksProgressEl.classList.toggle('value-negative', pct < 40);
+        }
+        if (tasksProgressCard) {
+            const pct = data.tasks_progress_pct ?? 0;
+            tasksProgressCard.classList.toggle('kpi-positive', pct >= 70);
+            tasksProgressCard.classList.toggle('kpi-negative', pct < 40);
+        }
+        if (categoryCountBadge) {
+            const count = (data.category_count ?? null);
+            if (count !== null) {
+                categoryCountBadge.textContent = `${count} categorias`;
+            }
+        }
+
+        if (tasksOpenEl) tasksOpenEl.textContent = `${data.tasks_open ?? 0} abertas`;
+        if (tasksOpenEl) {
+            const overdue = data.tasks_overdue ?? 0;
+            tasksOpenEl.classList.toggle('text-warning', overdue > 0);
+            tasksOpenEl.classList.toggle('text-info', overdue === 0);
+        }
+        if (tasksDoneBadge) {
+            const done = data.tasks_done ?? 0;
+            tasksDoneBadge.textContent = `${done} feitas`;
+            tasksDoneBadge.classList.toggle('bg-success', done > 0);
+            tasksDoneBadge.classList.toggle('bg-secondary', !(done > 0));
+        }
+        if (tasksOverdueEl) {
+            const overdue = data.tasks_overdue ?? 0;
+            tasksOverdueEl.textContent = `${overdue} atrasada(s)`;
+            tasksOverdueEl.classList.toggle('d-none', overdue === 0);
+        }
+        if (tasksCard) {
+            const overdue = data.tasks_overdue ?? 0;
+            const done = data.tasks_done ?? 0;
+            tasksCard.classList.toggle('kpi-negative', overdue > 0);
+            tasksCard.classList.toggle('kpi-positive', overdue === 0 && done > 0);
+        }
+
+        if (topIncomeLabel && topIncomeValue) {
+            const label = data.insights?.top_income_label;
+            const value = data.insights?.top_income_value;
+            if (label) {
+                topIncomeLabel.textContent = label;
+                topIncomeValue.textContent = formatMoney(value);
+                if (topIncomeEmpty) topIncomeEmpty.classList.add('d-none');
+                topIncomeLabel.classList.remove('d-none');
+                topIncomeValue.classList.remove('d-none');
+                if (topIncomeCard) topIncomeCard.classList.add('kpi-positive');
+            } else if (topIncomeEmpty) {
+                topIncomeEmpty.textContent = 'Sem dados no período.';
+                topIncomeEmpty.classList.remove('d-none');
+                topIncomeLabel.classList.add('d-none');
+                topIncomeValue.classList.add('d-none');
+                if (topIncomeCard) topIncomeCard.classList.remove('kpi-positive');
+            }
+        }
+        if (topExpenseLabel && topExpenseValue) {
+            const label = data.insights?.top_expense_label;
+            const value = data.insights?.top_expense_value;
+            if (label) {
+                topExpenseLabel.textContent = label;
+                topExpenseValue.textContent = formatMoney(value);
+                if (topExpenseEmpty) topExpenseEmpty.classList.add('d-none');
+                topExpenseLabel.classList.remove('d-none');
+                topExpenseValue.classList.remove('d-none');
+                if (topExpenseCard) topExpenseCard.classList.add('kpi-negative');
+            } else if (topExpenseEmpty) {
+                topExpenseEmpty.textContent = 'Sem dados no período.';
+                topExpenseEmpty.classList.remove('d-none');
+                topExpenseLabel.classList.add('d-none');
+                topExpenseValue.classList.add('d-none');
+                if (topExpenseCard) topExpenseCard.classList.remove('kpi-negative');
+            }
+        }
+        if (topNetLabel && topNetValue) {
+            const label = data.insights?.top_net_label;
+            const value = data.insights?.top_net_value ?? 0;
+            if (label) {
+                topNetLabel.textContent = label;
+                topNetValue.textContent = `Saldo líquido: ${formatMoney(value)}`;
+                topNetValue.classList.toggle('value-positive', value >= 0);
+                topNetValue.classList.toggle('value-negative', value < 0);
+                if (topNetEmpty) topNetEmpty.classList.add('d-none');
+                topNetLabel.classList.remove('d-none');
+                topNetValue.classList.remove('d-none');
+                if (topNetCard) {
+                    topNetCard.classList.toggle('kpi-positive', value >= 0);
+                    topNetCard.classList.toggle('kpi-negative', value < 0);
+                }
+            } else if (topNetEmpty) {
+                topNetEmpty.textContent = 'Sem dados no período.';
+                topNetEmpty.classList.remove('d-none');
+                topNetLabel.classList.add('d-none');
+                topNetValue.classList.add('d-none');
+                if (topNetCard) {
+                    topNetCard.classList.remove('kpi-positive');
+                    topNetCard.classList.remove('kpi-negative');
+                }
+            }
+        }
+
+        const renderTopList = (container, items, className) => {
+            if (!container) return;
+            const list = Array.isArray(items) ? items : [];
+            if (!list.length) {
+                container.innerHTML = '<li class="list-group-item bg-transparent border-0 px-0 text-secondary">Sem dados.</li>';
+                return;
+            }
+            container.innerHTML = list.map(item => (
+                `<li class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between">
+                    <span>${item.label || '-'}</span>
+                    <span class="${className}">${formatMoney(item.total || 0)}</span>
+                </li>`
+            )).join('');
+        };
+        renderTopList(topIncomeList, data.top_income || [], 'text-success');
+        renderTopList(topExpenseList, data.top_expense || [], 'text-danger');
+
+        if (data.agent_eval) {
+            if (agentFinanceTitle) {
+                agentFinanceTitle.textContent = data.agent_eval.finance?.title || '';
+                agentFinanceTitle.className = `mb-2 ${data.agent_eval.finance?.class || ''}`.trim();
+            }
+            if (agentFinanceMessage) {
+                agentFinanceMessage.textContent = data.agent_eval.finance?.message || '';
+            }
+            if (agentFinanceItems) {
+                const items = data.agent_eval.finance?.items || [];
+                agentFinanceItems.innerHTML = items.map(item => (
+                    `<div class="col-6">
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary">${item.icon ? `<i class="${item.icon} me-1 text-secondary"></i>` : ''}${item.label}</span>
+                            <span class="${item.class}">${formatMoney(item.value || 0)}</span>
+                        </div>
+                    </div>`
+                )).join('');
+            }
+            if (agentTasksTitle) {
+                agentTasksTitle.textContent = data.agent_eval.tasks?.title || '';
+                agentTasksTitle.className = `mb-2 ${data.agent_eval.tasks?.class || ''}`.trim();
+            }
+            if (agentTasksMessage) {
+                agentTasksMessage.textContent = data.agent_eval.tasks?.message || '';
+            }
+            if (agentTasksItems) {
+                const items = data.agent_eval.tasks?.items || [];
+                agentTasksItems.innerHTML = items.map(item => (
+                    `<div class="col-6">
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary">${item.icon ? `<i class="${item.icon} me-1 text-secondary"></i>` : ''}${item.label}</span>
+                            <span class="${item.class}">${item.value ?? 0}${item.suffix || ''}</span>
+                        </div>
+                    </div>`
+                )).join('');
+            }
+        }
+
         if (emptyMsg) {
             const isEmpty = !data.labels || data.labels.length === 0;
             emptyMsg.classList.toggle('d-none', !isEmpty);
         }
 
-        renderTasksChart(tasksData.open, tasksData.done);
+        renderTasksChart(data.tasks_open ?? tasksData.open, data.tasks_done ?? tasksData.done);
         hideSkeleton(categorySkeleton);
         hideSkeleton(typeSkeleton);
         hideSkeleton(tasksSkeleton);
@@ -1292,19 +1554,21 @@
         hideSkeleton(latestTxSkeleton);
         hideSkeleton(latestTasksSkeleton);
         if (clearFiltersBtn) {
-            clearFiltersBtn.addEventListener('click', () => {
-                activeType = '';
-                activeCategoryId = null;
-                activeCategoryLabel = '';
-                if (typeFilter) typeFilter.value = '';
-                if (selectedOnly) selectedOnly.checked = false;
-                if (responsibleFilter) responsibleFilter.value = '';
-                if (monthSelect) monthSelect.value = '';
-                period = 'all';
-                setRangeValues('', '', { clearMonth: true });
-                updateCategoryFilterInfo();
-                applyDashboardFilters();
-            });
+                clearFiltersBtn.addEventListener('click', () => {
+                    activeType = '';
+                    activeCategoryId = null;
+                    activeCategoryLabel = '';
+                    if (typeFilter) typeFilter.value = '';
+                    if (selectedOnly) selectedOnly.checked = false;
+                    if (responsibleFilter) responsibleFilter.value = '';
+                    if (monthSelect) monthSelect.value = '';
+                    period = 'all';
+                    const defaultStart = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultStart || startHidden.value) : startHidden.value;
+                    const defaultEnd = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultEnd || endHidden.value) : endHidden.value;
+                    setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
+                    updateCategoryFilterInfo();
+                    applyDashboardFilters();
+                });
         }
         if (filterChips) {
             filterChips.addEventListener('click', (event) => {
@@ -1337,16 +1601,16 @@
                 e.preventDefault();
                 const isoStart = parseBrToIso(startDisplay.value.trim());
                 const isoEnd = parseBrToIso(endDisplay.value.trim());
-                if (!isoStart || !isoEnd) {
-                    alert('Preencha as datas no formato dd/mm/aaaa.');
-                    return;
+                if (isoStart || isoEnd) {
+                    period = '';
+                    if (monthSelect) monthSelect.value = '';
+                    setRangeValues(isoStart || startHidden.value, isoEnd || endHidden.value, { clearMonth: true });
                 }
-                setRangeValues(isoStart, isoEnd);
                 applyDashboardFilters();
             });
         }
         if (startDisplay) {
-            startDisplay.addEventListener('input', () => {
+            const handleStartInput = () => {
                 applyDateMask(startDisplay);
                 const iso = parseBrToIso(startDisplay.value.trim());
                 if (iso) {
@@ -1354,20 +1618,14 @@
                     setRangeValues(iso, endHidden.value || '', { clearMonth: true });
                     applyDashboardFiltersDebounced();
                 }
-            });
-            startDisplay.addEventListener('change', () => {
-                const iso = parseBrToIso(startDisplay.value.trim());
-                if (iso) {
-                    period = '';
-                    setRangeValues(iso, endHidden.value || '', { clearMonth: true });
-                }
-                applyDashboardFiltersDebounced();
-            });
+            };
+            startDisplay.addEventListener('input', handleStartInput);
+            startDisplay.addEventListener('change', handleStartInput);
             startDisplay.addEventListener('focus', () => openPicker(startPicker));
             startDisplay.addEventListener('click', () => openPicker(startPicker));
         }
         if (endDisplay) {
-            endDisplay.addEventListener('input', () => {
+            const handleEndInput = () => {
                 applyDateMask(endDisplay);
                 const iso = parseBrToIso(endDisplay.value.trim());
                 if (iso) {
@@ -1375,15 +1633,9 @@
                     setRangeValues(startHidden.value || '', iso, { clearMonth: true });
                     applyDashboardFiltersDebounced();
                 }
-            });
-            endDisplay.addEventListener('change', () => {
-                const iso = parseBrToIso(endDisplay.value.trim());
-                if (iso) {
-                    period = '';
-                    setRangeValues(startHidden.value || '', iso, { clearMonth: true });
-                }
-                applyDashboardFiltersDebounced();
-            });
+            };
+            endDisplay.addEventListener('input', handleEndInput);
+            endDisplay.addEventListener('change', handleEndInput);
             endDisplay.addEventListener('focus', () => openPicker(endPicker));
             endDisplay.addEventListener('click', () => openPicker(endPicker));
         }
@@ -1436,9 +1688,13 @@
         [applyBtn, typeFilter, selectedOnly, responsibleFilter].forEach(el => {
             if (!el) return;
             el.addEventListener(el === applyBtn ? 'click' : 'change', (ev) => {
-                if (el !== applyBtn) ev.preventDefault();
+                ev.preventDefault();
                 if (el === typeFilter) {
                     activeType = typeFilter.value;
+                }
+                if (el === applyBtn) {
+                    period = '';
+                    if (monthSelect) monthSelect.value = '';
                 }
                 const isoStart = parseBrToIso(startDisplay.value.trim());
                 const isoEnd = parseBrToIso(endDisplay.value.trim());

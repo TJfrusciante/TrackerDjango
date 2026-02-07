@@ -3,17 +3,19 @@
 {% block title %}Pedir acesso | iTracker{% endblock %}
 
 {% block content %}
+<div class="page-hero">
+    <div class="page-hero__info">
+        <p class="page-hero__eyebrow">Convite e permiss&atilde;o</p>
+        <h1 class="page-hero__title">Pedir acesso a um workspace</h1>
+        <p class="page-hero__subtitle">Informe o slug recebido. O pedido vai para os admins do workspace.</p>
+    </div>
+    <div class="page-hero__actions">
+        <a class="btn btn-outline-light page-action-btn" href="{% url 'tracker:dashboard' %}">Voltar</a>
+    </div>
+</div>
 <div class="row g-4 justify-content-center">
     <div class="col-lg-7">
         <div class="glass-card p-4">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                    <p class="text-secondary small text-uppercase mb-1">Convite e permissão</p>
-                    <h1 class="h5 fw-bold mb-0">Pedir acesso a um workspace</h1>
-                    <p class="text-secondary mb-0">Informe o slug que recebeu. O pedido vai para os admins do workspace.</p>
-                </div>
-                <a class="btn btn-outline-light" href="{% url 'tracker:dashboard' %}">Voltar</a>
-            </div>
             <form method="post" class="row g-3">
                 {% csrf_token %}
                 <div class="col-12">
