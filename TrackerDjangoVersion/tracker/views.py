@@ -261,6 +261,7 @@ def _rate_limit(request, key, limit=60, window=60):
 def _invalidate_workspace_caches(workspace):
     if not workspace:
         cache.clear()
+        cache.set("cache:ws:global:v", timezone.now().timestamp(), None)
         return
     user_ids = set(
         WorkspaceMembership.objects.filter(workspace=workspace).values_list('user_id', flat=True)
@@ -271,8 +272,10 @@ def _invalidate_workspace_caches(workspace):
         return
     if not _cache_delete_pattern("dash:*"):
         cache.clear()
+        cache.set(f"cache:ws:{workspace.id}:v", timezone.now().timestamp(), None)
         return
     ws_key = workspace.id
+    cache.set(f"cache:ws:{ws_key}:v", timezone.now().timestamp(), None)
     for uid in user_ids:
         _cache_delete_pattern(f"dash:{uid}:{ws_key}:*")
         _cache_delete_pattern(f"chart:{uid}:{ws_key}:*")
@@ -785,6 +788,7 @@ def dashboard(request):
 
     period = request.GET.get('period', '') or 'all'
     month_param = request.GET.get('month') or ''
+    year_param = (request.GET.get('year') or '').strip()
     start_param = request.GET.get('start')
     end_param = request.GET.get('end')
     responsible_param = request.GET.get('responsible') or ''
@@ -810,11 +814,20 @@ def dashboard(request):
             start_date = datetime.date(year, month, 1)
             last_day = calendar.monthrange(year, month)[1]
             end_date = datetime.date(year, month, last_day)
+            year_param = ''
         except (ValueError, TypeError):
             month_param = ''
+    elif year_param.isdigit():
+        year = int(year_param)
+        start_date = datetime.date(year, 1, 1)
+        end_date = datetime.date(year, 12, 31)
 
     if not start_date or not end_date:
         start_date, end_date = range_from_period(period)
+
+    all_period_start, all_period_end = range_from_period('all')
+    if not all_period_start or not all_period_end:
+        all_period_start, all_period_end = start_date, end_date
 
     base_qs = _apply_workspace_filter(
         Transaction.objects.select_related('category', 'responsible').filter(date__gte=start_date, date__lte=end_date),
@@ -922,6 +935,14 @@ def dashboard(request):
             'start': start_month,
             'end': end_month,
         })
+
+    year_set = set()
+    if can_finance:
+        tx_years = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user).dates('date', 'year', order='DESC')
+        year_set.update(item.year for item in tx_years)
+    task_years = _apply_workspace_filter(Task.objects.all(), workspace, request.user).dates('due_date', 'year', order='DESC')
+    year_set.update(item.year for item in task_years)
+    year_options = sorted(year_set, reverse=True)
 
     tasks_qs = _apply_workspace_filter(
         Task.objects.select_related('responsible_user').prefetch_related('steps'),
@@ -1156,6 +1177,10 @@ def dashboard(request):
         },
     ]
 
+    all_period_start, all_period_end = range_from_period('all')
+    if not all_period_start or not all_period_end:
+        all_period_start, all_period_end = start_date, end_date
+
     context = {
         'income_total': income_total,
         'expense_total': expense_total,
@@ -1186,6 +1211,10 @@ def dashboard(request):
         'quick_ranges': quick_ranges,
         'month_options': month_options,
         'selected_month': month_param,
+        'year_options': year_options,
+        'selected_year': year_param,
+        'all_period_start': all_period_start,
+        'all_period_end': all_period_end,
         'period_has_data': period_has_data,
         'workspace_mode': workspace,
         'can_finance': can_finance,
@@ -1223,14 +1252,18 @@ def transactions_list(request):
         return _finance_access_denied_redirect(request)
 
     transactions_qs = _apply_workspace_filter(Transaction.objects.select_related('category', 'responsible'), workspace, request.user)
+    transactions_years_qs = _apply_workspace_filter(Transaction.objects.all(), workspace, request.user)
     search = request.GET.get('q', '').strip()
     tx_type = request.GET.get('type', '')
     category_id = request.GET.get('category', '')
+    month_param = (request.GET.get('month') or '').strip()
+    year_param = (request.GET.get('year') or '').strip()
     start_raw = request.GET.get('start', '')
     end_raw = request.GET.get('end', '')
     start = _parse_date_input(start_raw)
     end = _parse_date_input(end_raw)
     cursor = request.GET.get('cursor', '').strip()
+    selected_month = ''
 
     def _parse_tx_cursor(value):
         parts = value.split('|')
@@ -1246,6 +1279,28 @@ def transactions_list(request):
 
     cursor_data = _parse_tx_cursor(cursor) if cursor else None
 
+    if month_param:
+        try:
+            year_str, month_str = month_param.split('-')
+            year = int(year_str)
+            month = int(month_str)
+            start = datetime.date(year, month, 1)
+            last_day = calendar.monthrange(year, month)[1]
+            end = datetime.date(year, month, last_day)
+            start_raw = start.isoformat()
+            end_raw = end.isoformat()
+            selected_month = month_param
+            year_param = ''
+        except (ValueError, TypeError):
+            month_param = ''
+    elif year_param.isdigit():
+        year = int(year_param)
+        start = datetime.date(year, 1, 1)
+        end = datetime.date(year, 12, 31)
+        start_raw = start.isoformat()
+        end_raw = end.isoformat()
+        selected_month = ''
+
     if search:
         transactions_qs = transactions_qs.filter(Q(description__icontains=search) | Q(category__name__icontains=search))
     if tx_type in ('income', 'expense'):
@@ -1257,14 +1312,34 @@ def transactions_list(request):
     if end:
         transactions_qs = transactions_qs.filter(date__lte=end)
 
-    transactions = transactions_qs.order_by('-date', '-created_at', '-id')
+    sort_param = (request.GET.get('sort') or '').strip()
+    sort_dir = (request.GET.get('dir') or 'desc').strip().lower()
+    allowed_sorts = {
+        'date': 'date',
+        'value': 'value',
+        'description': 'description',
+        'category': 'category__name',
+        'type': 'type',
+        'responsible': 'responsible__username',
+        'icon': 'icon',
+    }
+    orderings = ['-date', '-created_at', '-id']
+    sort_field = allowed_sorts.get(sort_param)
+    if sort_field:
+        direction = '-' if sort_dir == 'desc' else ''
+        if sort_field == 'date':
+            orderings = [f'{direction}date', f'{direction}created_at', f'{direction}id']
+        else:
+            orderings = [f'{direction}{sort_field}', '-date', '-created_at', '-id']
+    transactions = transactions_qs.order_by(*orderings)
 
     if request.GET.get('export') == 'csv':
         return _export_transactions_csv(transactions)
 
     list_ttl = int(getattr(settings, "LIST_CACHE_TTL", 120))
     ws_key = workspace.id if workspace else 'global'
-    cache_key = f"list:tx:{request.user.id}:{ws_key}:{search}:{tx_type}:{category_id}:{start_raw}:{end_raw}"
+    cache_ver = cache.get(f"cache:ws:{ws_key}:v", 0)
+    cache_key = f"list:tx:{request.user.id}:{ws_key}:{cache_ver}:{search}:{tx_type}:{category_id}:{month_param}:{year_param}:{start_raw}:{end_raw}:{sort_param}:{sort_dir}"
     cached = cache.get(cache_key) if list_ttl > 0 else None
     if cached:
         tx_ids = cached.get('ids', [])
@@ -1312,6 +1387,27 @@ def transactions_list(request):
     query_params.pop('page', None)
     query_string = query_params.urlencode()
 
+    def build_sort_url(field, default_dir='asc'):
+        params = request.GET.copy()
+        params.pop('page', None)
+        if sort_param == field:
+            next_dir = 'asc' if sort_dir == 'desc' else 'desc'
+        else:
+            next_dir = default_dir
+        params['sort'] = field
+        params['dir'] = next_dir
+        return f"?{params.urlencode()}"
+
+    sort_urls = {
+        'description': build_sort_url('description', 'asc'),
+        'category': build_sort_url('category', 'asc'),
+        'responsible': build_sort_url('responsible', 'asc'),
+        'date': build_sort_url('date', 'desc'),
+        'value': build_sort_url('value', 'desc'),
+        'type': build_sort_url('type', 'asc'),
+        'icon': build_sort_url('icon', 'asc'),
+    }
+
     def fmt(val):
         try:
             return datetime.date.fromisoformat(val).strftime('%d/%m/%Y')
@@ -1323,17 +1419,51 @@ def transactions_list(request):
         category_obj = Category.objects.filter(id=category_id).first()
         category_label = category_obj.name if category_obj else str(category_id)
     type_label = {'income': 'Entrada', 'expense': 'Sa\u00edda'}.get(tx_type, '')
+    month_label = ''
+    if month_param:
+        try:
+            year_str, month_str = month_param.split('-')
+            month_label = f"{calendar.month_abbr[int(month_str)].capitalize()}/{year_str[-2:]}"
+        except Exception:
+            month_label = month_param
+    year_label = year_param if year_param else ''
     filter_chips = _build_filter_chips(
         request,
         [
             ('q', 'Busca', search),
             ('type', 'Tipo', type_label),
             ('category', 'Categoria', category_label),
+            ('month', 'M\u00eas', month_label),
+            ('year', 'Ano', year_label),
             ('start', 'De', fmt(start_raw)),
             ('end', 'At\u00e9', fmt(end_raw)),
         ],
     )
-    filter_count = sum(1 for val in [search, tx_type, category_id, start_raw, end_raw] if val)
+    filter_count = sum(1 for val in [search, tx_type, category_id, start_raw, end_raw, month_param, year_param] if val)
+
+    month_labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    month_options = []
+    base_month = timezone.now().date().replace(day=1)
+    for idx in range(0, 24):
+        month_date = base_month
+        if idx:
+            year = month_date.year + ((month_date.month - 1 - idx) // 12)
+            month = (month_date.month - 1 - idx) % 12 + 1
+            month_date = datetime.date(year, month, 1)
+        start_month = month_date.replace(day=1)
+        last_day = calendar.monthrange(month_date.year, month_date.month)[1]
+        end_month = datetime.date(month_date.year, month_date.month, last_day)
+        month_options.append({
+            'value': f'{month_date.year:04d}-{month_date.month:02d}',
+            'label': f'{month_labels[month_date.month - 1]}/{str(month_date.year)[2:]}',
+            'start': start_month,
+            'end': end_month,
+        })
+
+    year_options = sorted(
+        {item.year for item in transactions_years_qs.dates('date', 'year', order='DESC')},
+        reverse=True,
+    )
 
     context = {
         'transactions_page': page_obj,
@@ -1351,6 +1481,8 @@ def transactions_list(request):
             'q': search,
             'type': tx_type,
             'category': category_id,
+            'month': month_param,
+            'year': year_param,
             'start': start.isoformat() if start else '',
             'end': end.isoformat() if end else '',
         },
@@ -1359,6 +1491,14 @@ def transactions_list(request):
             'end': fmt(end_raw),
         },
         'filter_chips': filter_chips,
+        'filter_count': filter_count,
+        'selected_month': selected_month,
+        'month_options': month_options,
+        'year_options': year_options,
+        'selected_year': year_param,
+        'sort_param': sort_param,
+        'sort_dir': sort_dir,
+        'sort_urls': sort_urls,
     }
     return render(request, 'tracker/transactions_list.html', context)
 
@@ -1494,6 +1634,10 @@ def transactions_bulk_update(request):
 @login_required
 def transaction_create(request):
     workspace = getattr(request, "workspace", None)
+    if not workspace and request.user.is_superuser:
+        slug = request.GET.get("workspace") or request.session.get("workspace_slug")
+        if slug:
+            workspace = Workspace.objects.filter(slug=slug, is_active=True).first()
     profile = getattr(request.user, "profile", None)
     if not _user_can_create_transaction(request, workspace):
         messages.error(request, 'Voc\u00ea n\u00e3o pode lan\u00e7ar finan\u00e7as neste workspace.')
@@ -1522,6 +1666,10 @@ def transaction_create(request):
 @login_required
 def transaction_update(request, pk):
     workspace = getattr(request, "workspace", None)
+    if not workspace and request.user.is_superuser:
+        slug = request.GET.get("workspace") or request.session.get("workspace_slug")
+        if slug:
+            workspace = Workspace.objects.filter(slug=slug, is_active=True).first()
     if not _user_can_view_finance(request, workspace):
         messages.error(request, 'Você não pode editar finanças deste workspace.')
         return _finance_access_denied_redirect(request)
@@ -1531,7 +1679,8 @@ def transaction_update(request, pk):
     elif not request.user.is_superuser:
         qs = qs.none()
     transaction = get_object_or_404(qs, pk=pk)
-    form = TransactionForm(request.POST or None, instance=transaction, workspace=workspace)
+    form_workspace = workspace or transaction.workspace
+    form = TransactionForm(request.POST or None, instance=transaction, workspace=form_workspace)
     is_detail = request.GET.get('detail') == '1'
     if request.method == 'POST' and form.is_valid():
         form.save()
@@ -2233,13 +2382,32 @@ def tasks_list(request):
         workspace,
         request.user,
     )
+    tasks_years_qs = tasks_qs
     status = request.GET.get('status', '')
     search = request.GET.get('q', '').strip()
     category = request.GET.get('category', '').strip()
+    month_param = (request.GET.get('month') or '').strip()
+    year_param = (request.GET.get('year') or '').strip()
     start_raw = request.GET.get('start', '')
     end_raw = request.GET.get('end', '')
     start = _parse_date_input(start_raw)
     end = _parse_date_input(end_raw)
+    selected_month = ''
+
+    if month_param:
+        try:
+            year_str, month_str = month_param.split('-')
+            year = int(year_str)
+            month = int(month_str)
+            start = datetime.date(year, month, 1)
+            last_day = calendar.monthrange(year, month)[1]
+            end = datetime.date(year, month, last_day)
+            start_raw = start.isoformat()
+            end_raw = end.isoformat()
+            selected_month = month_param
+            year_param = ''
+        except (ValueError, TypeError):
+            month_param = ''
 
     task_category_qs = TaskCategory.objects.all()
     if workspace:
@@ -2266,14 +2434,34 @@ def tasks_list(request):
     if end:
         tasks_qs = tasks_qs.filter(due_date__lte=end)
 
-    tasks = tasks_qs.order_by('due_date', '-created_at', '-id')
+    sort_param = (request.GET.get('sort') or '').strip()
+    sort_dir = (request.GET.get('dir') or 'asc').strip().lower()
+    allowed_sorts = {
+        'due_date': 'due_date',
+        'title': 'title',
+        'status': 'status',
+        'progress': 'progress',
+        'category': 'category',
+        'responsible': 'responsible_user__username',
+        'icon': 'icon',
+    }
+    orderings = ['due_date', '-created_at', '-id']
+    sort_field = allowed_sorts.get(sort_param)
+    if sort_field:
+        direction = '-' if sort_dir == 'desc' else ''
+        if sort_field == 'due_date':
+            orderings = [f'{direction}due_date', f'{direction}created_at', f'{direction}id']
+        else:
+            orderings = [f'{direction}{sort_field}', 'due_date', '-created_at', '-id']
+    tasks = tasks_qs.order_by(*orderings)
 
     if request.GET.get('export') == 'csv':
         return _export_tasks_csv(tasks)
 
     list_ttl = int(getattr(settings, "LIST_CACHE_TTL", 120))
     ws_key = workspace.id if workspace else 'global'
-    cache_key = f"list:tasks:{request.user.id}:{ws_key}:{search}:{status}:{category}:{start_raw}:{end_raw}"
+    cache_ver = cache.get(f"cache:ws:{ws_key}:v", 0)
+    cache_key = f"list:tasks:{request.user.id}:{ws_key}:{cache_ver}:{search}:{status}:{category}:{month_param}:{year_param}:{start_raw}:{end_raw}:{sort_param}:{sort_dir}"
     cached = cache.get(cache_key) if list_ttl > 0 else None
     if cached:
         task_ids = cached.get('ids', [])
@@ -2314,17 +2502,72 @@ def tasks_list(request):
             return val or ''
 
     status_label = {'ongoing': 'Em andamento', 'done': 'Finalizada'}.get(status, '')
+    month_label = ''
+    if month_param:
+        try:
+            year_str, month_str = month_param.split('-')
+            month_label = f"{calendar.month_abbr[int(month_str)].capitalize()}/{year_str[-2:]}"
+        except Exception:
+            month_label = month_param
+    year_label = year_param if year_param else ''
     filter_chips = _build_filter_chips(
         request,
         [
             ('q', 'Busca', search),
             ('status', 'Status', status_label),
             ('category', 'Categoria', category),
+            ('month', 'Mês', month_label),
+            ('year', 'Ano', year_label),
             ('start', 'De', fmt(start_raw)),
             ('end', 'Até', fmt(end_raw)),
         ],
     )
-    filter_count = sum(1 for val in [search, status, category, start_raw, end_raw] if val)
+    filter_count = sum(1 for val in [search, status, category, start_raw, end_raw, month_param, year_param] if val)
+
+    month_labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    month_options = []
+    base_month = timezone.now().date().replace(day=1)
+    for idx in range(0, 24):
+        month_date = base_month
+        if idx:
+            year = month_date.year + ((month_date.month - 1 - idx) // 12)
+            month = (month_date.month - 1 - idx) % 12 + 1
+            month_date = datetime.date(year, month, 1)
+        start_month = month_date.replace(day=1)
+        last_day = calendar.monthrange(month_date.year, month_date.month)[1]
+        end_month = datetime.date(month_date.year, month_date.month, last_day)
+        month_options.append({
+            'value': f'{month_date.year:04d}-{month_date.month:02d}',
+            'label': f'{month_labels[month_date.month - 1]}/{str(month_date.year)[2:]}',
+            'start': start_month,
+            'end': end_month,
+        })
+
+    year_options = sorted(
+        {item.year for item in tasks_years_qs.exclude(due_date__isnull=True).dates('due_date', 'year', order='DESC')},
+        reverse=True,
+    )
+
+    def build_sort_url(field, default_dir='asc'):
+        params = request.GET.copy()
+        params.pop('page', None)
+        if sort_param == field:
+            next_dir = 'asc' if sort_dir == 'desc' else 'desc'
+        else:
+            next_dir = default_dir
+        params['sort'] = field
+        params['dir'] = next_dir
+        return f"?{params.urlencode()}"
+
+    sort_urls = {
+        'title': build_sort_url('title', 'asc'),
+        'status': build_sort_url('status', 'asc'),
+        'category': build_sort_url('category', 'asc'),
+        'responsible': build_sort_url('responsible', 'asc'),
+        'due_date': build_sort_url('due_date', 'desc'),
+        'progress': build_sort_url('progress', 'desc'),
+        'icon': build_sort_url('icon', 'asc'),
+    }
 
     context = {
         'tasks_page': page_obj,
@@ -2341,6 +2584,8 @@ def tasks_list(request):
             'status': status,
             'q': search,
             'category': category,
+            'month': month_param,
+            'year': year_param,
             'start': start.isoformat() if start else '',
             'end': end.isoformat() if end else '',
         },
@@ -2350,6 +2595,13 @@ def tasks_list(request):
         },
         'filter_chips': filter_chips,
         'filter_count': filter_count,
+        'selected_month': selected_month,
+        'month_options': month_options,
+        'year_options': year_options,
+        'selected_year': year_param,
+        'sort_param': sort_param,
+        'sort_dir': sort_dir,
+        'sort_urls': sort_urls,
     }
     return render(request, 'tracker/tasks_list.html', context)
 
@@ -2402,7 +2654,6 @@ def tasks_bulk_update(request):
     updates = {}
     responsible_user = form.cleaned_data.get('responsible_user')
     task_category = form.cleaned_data.get('task_category')
-    category = (form.cleaned_data.get('category') or '').strip()
     due_date = form.cleaned_data.get('due_date')
     status = form.cleaned_data.get('status')
     icon = form.cleaned_data.get('icon')
@@ -2476,10 +2727,7 @@ def tasks_bulk_update(request):
         return redirect('tracker:tasks_list')
     if responsible_user:
         updates['responsible_user'] = responsible_user
-    if category:
-        updates['category'] = category
-        updates['task_category'] = None
-    elif task_category:
+    if task_category:
         updates['task_category'] = task_category
         updates['category'] = task_category.name
     if icon:
@@ -3223,6 +3471,7 @@ def chart_data(request):
     start_param = request.GET.get('start')
     end_param = request.GET.get('end')
     period = request.GET.get('period') or ''
+    year_param = (request.GET.get('year') or '').strip()
     type_filter = request.GET.get('type') or ''
     selected_only = request.GET.get('selected_only') == '1'
     category_id = request.GET.get('category_id') or ''
@@ -3267,8 +3516,34 @@ def chart_data(request):
 
     start_date = parse_date(start_param, None)
     end_date = parse_date(end_param, None)
+    if (not start_date or not end_date) and year_param.isdigit():
+        year = int(year_param)
+        start_date = datetime.date(year, 1, 1)
+        end_date = datetime.date(year, 12, 31)
     if not start_date or not end_date:
         start_date, end_date = range_from_period(period)
+
+    all_period_start, all_period_end = range_from_period('all')
+    if not all_period_start or not all_period_end:
+        all_period_start, all_period_end = start_date, end_date
+
+    all_period_start, all_period_end = range_from_period('all')
+    if not all_period_start or not all_period_end:
+        all_period_start, all_period_end = start_date, end_date
+
+    all_period_start, all_period_end = range_from_period('all')
+    if not all_period_start or not all_period_end:
+        all_period_start, all_period_end = start_date, end_date
+
+    all_period_start, all_period_end = range_from_period('all')
+    if not all_period_start or not all_period_end:
+        all_period_start, all_period_end = start_date, end_date
+
+    all_period_start, all_period_end = range_from_period('all')
+
+    all_period_start, all_period_end = range_from_period('all')
+    if not all_period_start or not all_period_end:
+        all_period_start, all_period_end = start_date, end_date
     if not start_date or not end_date:
         start_date, end_date = range_from_period('month')
 
@@ -3276,7 +3551,7 @@ def chart_data(request):
     if start_date and end_date:
         cache_key = (
             f"chart:{request.user.id}:{workspace.id if workspace else 'global'}:"
-            f"{start_date.isoformat()}:{end_date.isoformat()}:{period}:"
+            f"{start_date.isoformat()}:{end_date.isoformat()}:{period}:{year_param}:"
             f"{type_filter}:{selected_only}:{category_id}:{responsible_id}"
         )
         cached_payload = cache.get(cache_key)

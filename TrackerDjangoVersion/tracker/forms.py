@@ -96,7 +96,22 @@ class TransactionForm(BaseStyledForm):
         super().__init__(*args, **kwargs)
         # Allow comma decimal input for better UX (e.g., 45,20)
         if 'value' in self.fields:
-            self.fields['value'].widget = forms.TextInput(attrs={
+            existing = self.fields['value']
+            self.fields['value'] = forms.CharField(
+                required=existing.required,
+                label=existing.label,
+                help_text=existing.help_text,
+                widget=forms.TextInput(attrs={
+                    'class': 'form-control',
+                    'inputmode': 'decimal',
+                    'placeholder': '0,00',
+                }),
+            )
+            if getattr(self.instance, 'value', None) is not None:
+                self.fields['value'].initial = f"{self.instance.value:.2f}".replace('.', ',')
+            else:
+                self.fields['value'].initial = existing.initial
+            self.fields['value'].widget.attrs.update({
                 'class': 'form-control',
                 'inputmode': 'decimal',
                 'placeholder': '0,00',
@@ -280,10 +295,6 @@ class TaskBulkUpdateForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     icon = forms.ChoiceField(required=False, choices=ICON_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
-    category = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Outra categoria (opcional)'})
-    )
     due_date = forms.DateField(
         required=False,
         input_formats=['%Y-%m-%d'],

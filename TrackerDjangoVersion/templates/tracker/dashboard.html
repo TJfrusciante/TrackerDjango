@@ -229,7 +229,7 @@
 
     <div class="col-12">
         <div class="dashboard-toolbar">
-            <button class="btn btn-outline-light page-action-btn filter-btn" id="clearFilters" type="button" data-default-start="{{ start_date|date:'Y-m-d' }}" data-default-end="{{ end_date|date:'Y-m-d' }}" data-bs-toggle="tooltip" title="Limpar filtros e voltar ao per&iacute;odo inicial">
+            <button class="btn btn-outline-light page-action-btn filter-btn" id="clearFilters" type="button" data-default-start="{{ all_period_start|date:'Y-m-d' }}" data-default-end="{{ all_period_end|date:'Y-m-d' }}" data-bs-toggle="tooltip" title="Limpar filtros e voltar ao per&iacute;odo inicial">
                 <i class="fa-solid fa-eraser me-1"></i>Limpar filtros
                 <span id="filterCountBadge" class="badge filter-count-badge filter-count-badge--btn d-none">0</span>
             </button>
@@ -262,6 +262,12 @@
                             <option value="{{ opt.value }}" data-start="{{ opt.start|date:'Y-m-d' }}" data-end="{{ opt.end|date:'Y-m-d' }}" {% if selected_month == opt.value %}selected{% endif %}>
                                 {{ opt.label }}
                             </option>
+                        {% endfor %}
+                    </select>
+                    <select id="rangeYear" name="year" class="form-select" aria-label="Selecionar ano">
+                        <option value="">Todos</option>
+                        {% for year in year_options %}
+                            <option value="{{ year }}" {% if selected_year|stringformat:'s' == year|stringformat:'s' %}selected{% endif %}>{{ year }}</option>
                         {% endfor %}
                     </select>
                     <select id="typeFilter" name="type" class="form-select" aria-label="Filtrar por tipo">
@@ -422,18 +428,18 @@
             <div class="small text-secondary mb-2 js-interval-label"></div>
             <div id="latestTxSkeleton" class="skeleton table-skeleton mb-3"></div>
             <div class="table-responsive">
-                <table class="table table-borderless align-middle mb-0">
+                <table class="table table-borderless align-middle mb-0" id="latestTxTable">
                     <thead>
                         <tr class="text-secondary">
-                            <th>Ícone</th>
-                            <th>Descri&#231;&#227;o</th>
-                            <th>Categoria</th>
+                            <th data-sort="icon">Ícone</th>
+                            <th data-sort="description">Descri&#231;&#227;o</th>
+                            <th data-sort="category">Categoria</th>
                             {% if show_responsible_column %}
-                            <th>Respons&aacute;vel</th>
+                            <th data-sort="responsible">Respons&aacute;vel</th>
                             {% endif %}
-                            <th>Data</th>
-                            <th class="text-end">Valor</th>
-                            <th></th>
+                            <th data-sort="date">Data</th>
+                            <th class="text-end" data-sort="value">Valor</th>
+                            <th data-sort="type">Tipo</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -631,6 +637,7 @@
     const startPicker = document.getElementById('rangeStartPicker');
     const endPicker = document.getElementById('rangeEndPicker');
     const monthSelect = document.getElementById('rangeMonth');
+    const yearSelect = document.getElementById('rangeYear');
     const typeFilter = document.getElementById('typeFilter');
     const responsibleFilter = document.getElementById('responsibleFilter');
     const selectedOnly = document.getElementById('selectedOnly');
@@ -712,6 +719,7 @@
         if (selectedOnly && selectedOnly.checked) params.append('selected_only', '1');
         if (activeCategoryId) params.append('category_id', activeCategoryId);
         if (monthSelect && monthSelect.value) params.append('month', monthSelect.value);
+        if (yearSelect && yearSelect.value) params.append('year', yearSelect.value);
         return params;
     };
 
@@ -726,6 +734,7 @@
             const params = buildChartParams();
             updateDashboardUrl(params);
             renderFilterChips();
+            syncQuickButtons();
             if (!chartsLoaded) {
                 requestChartLoad();
                 return;
@@ -749,6 +758,7 @@
     const filterCountBadge = document.getElementById('filterCountBadge');
     const intervalLabels = document.querySelectorAll('.js-interval-label');
     const intervalCurrent = document.getElementById('intervalCurrent');
+    const quickButtons = document.querySelectorAll('[data-period]');
     let activeCategoryColor = '';
 
     const getPeriodLabel = () => {
@@ -757,11 +767,20 @@
         return match ? match.textContent.trim() : period;
     };
 
+    const syncQuickButtons = () => {
+        if (!quickButtons || !quickButtons.length) return;
+        quickButtons.forEach(btn => {
+            btn.classList.toggle('btn-primary', btn.dataset.period === period);
+            btn.classList.toggle('btn-outline-light', btn.dataset.period !== period);
+        });
+    };
+
     const clearDateRange = () => {
         const defaultStart = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultStart || startHidden.value) : startHidden.value;
         const defaultEnd = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultEnd || endHidden.value) : endHidden.value;
-        setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
-        period = '';
+        setRangeValues(defaultStart, defaultEnd, { clearMonth: true, clearYear: true });
+        period = 'all';
+        syncQuickButtons();
     };
 
     const getIntervalText = () => {
@@ -769,7 +788,8 @@
         const endVal = endHidden ? endHidden.value : '';
         if (period) {
             const label = getPeriodLabel();
-            if (label && label.toLowerCase() !== 'tudo') {
+            const normalized = (label || '').trim().toLowerCase();
+            if (normalized && normalized !== 'tudo') {
                 return `Atalho: ${label}`;
             }
         }
@@ -805,7 +825,8 @@
         const isDefaultRange = !!(defaultStart && defaultEnd && startVal === defaultStart && endVal === defaultEnd);
         if (period) {
             const periodLabel = getPeriodLabel();
-            if (periodLabel && periodLabel.toLowerCase() !== 'tudo') {
+            const normalized = (periodLabel || '').trim().toLowerCase();
+            if (normalized && normalized !== 'tudo') {
                 chips.push({ key: 'period', label: `Atalho: ${periodLabel}` });
             }
         } else if (startVal && endVal && !isDefaultRange) {
@@ -814,6 +835,9 @@
         if (monthSelect && monthSelect.value) {
             const option = monthSelect.selectedOptions ? monthSelect.selectedOptions[0] : null;
             if (option) chips.push({ key: 'month', label: `Mês: ${option.textContent.trim()}` });
+        }
+        if (yearSelect && yearSelect.value) {
+            chips.push({ key: 'year', label: `Ano: ${yearSelect.value}` });
         }
         if (activeType) {
             const typeLabel = activeType === 'income' ? 'Só entradas' : 'Só saídas';
@@ -913,13 +937,14 @@
     }
 
     function setRangeValues(startIso, endIso, options = {}) {
-        if (startIso && startHidden) startHidden.value = startIso;
-        if (endIso && endHidden) endHidden.value = endIso;
-        if (startDisplay && startIso) startDisplay.value = formatIsoToBr(startIso);
-        if (endDisplay && endIso) endDisplay.value = formatIsoToBr(endIso);
-        if (startPicker && startIso) startPicker.value = startIso;
-        if (endPicker && endIso) endPicker.value = endIso;
+        if (startHidden && startIso !== undefined) startHidden.value = startIso || '';
+        if (endHidden && endIso !== undefined) endHidden.value = endIso || '';
+        if (startDisplay && startIso !== undefined) startDisplay.value = startIso ? formatIsoToBr(startIso) : '';
+        if (endDisplay && endIso !== undefined) endDisplay.value = endIso ? formatIsoToBr(endIso) : '';
+        if (startPicker && startIso !== undefined) startPicker.value = startIso || '';
+        if (endPicker && endIso !== undefined) endPicker.value = endIso || '';
         if (options.clearMonth && monthSelect) monthSelect.value = '';
+        if (options.clearYear && yearSelect) yearSelect.value = '';
     }
 
     function formatMoney(value) {
@@ -1553,6 +1578,60 @@
         }
         hideSkeleton(latestTxSkeleton);
         hideSkeleton(latestTasksSkeleton);
+        const latestTxTable = document.getElementById('latestTxTable');
+        if (latestTxTable) {
+            const tbody = latestTxTable.querySelector('tbody');
+            const headers = Array.from(latestTxTable.querySelectorAll('thead th[data-sort]'));
+            const indexMap = {};
+            headers.forEach((th, idx) => {
+                indexMap[th.dataset.sort] = idx;
+                th.style.cursor = 'pointer';
+            });
+            const parseMoney = (value) => {
+                const cleaned = String(value || '').replace(/[^0-9,-]/g, '').replace(/\./g, '').replace(',', '.');
+                const num = parseFloat(cleaned);
+                return Number.isFinite(num) ? num : 0;
+            };
+            const parseDate = (value) => {
+                const parts = String(value || '').trim().split('/');
+                if (parts.length !== 3) return 0;
+                return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime() || 0;
+            };
+            let sortState = { key: '', dir: 'asc' };
+            const getCellText = (row, key) => {
+                const idx = indexMap[key];
+                const cell = row.children[idx];
+                return cell ? cell.textContent.trim() : '';
+            };
+            const sortRows = (key) => {
+                if (!tbody) return;
+                const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => row.querySelectorAll('td').length);
+                if (!rows.length) return;
+                sortState.dir = (sortState.key === key && sortState.dir === 'asc') ? 'desc' : 'asc';
+                sortState.key = key;
+                rows.sort((a, b) => {
+                    let aVal = getCellText(a, key);
+                    let bVal = getCellText(b, key);
+                    if (key === 'value') {
+                        aVal = parseMoney(aVal);
+                        bVal = parseMoney(bVal);
+                    } else if (key === 'date') {
+                        aVal = parseDate(aVal);
+                        bVal = parseDate(bVal);
+                    } else {
+                        aVal = String(aVal).toLowerCase();
+                        bVal = String(bVal).toLowerCase();
+                    }
+                    if (aVal < bVal) return sortState.dir === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return sortState.dir === 'asc' ? 1 : -1;
+                    return 0;
+                });
+                rows.forEach(row => tbody.appendChild(row));
+            };
+            headers.forEach(th => {
+                th.addEventListener('click', () => sortRows(th.dataset.sort));
+            });
+        }
         if (clearFiltersBtn) {
                 clearFiltersBtn.addEventListener('click', () => {
                     activeType = '';
@@ -1562,10 +1641,11 @@
                     if (selectedOnly) selectedOnly.checked = false;
                     if (responsibleFilter) responsibleFilter.value = '';
                     if (monthSelect) monthSelect.value = '';
+                    if (yearSelect) yearSelect.value = '';
                     period = 'all';
                     const defaultStart = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultStart || startHidden.value) : startHidden.value;
                     const defaultEnd = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultEnd || endHidden.value) : endHidden.value;
-                    setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
+                    setRangeValues(defaultStart, defaultEnd, { clearMonth: true, clearYear: true });
                     updateCategoryFilterInfo();
                     applyDashboardFilters();
                 });
@@ -1581,6 +1661,8 @@
                     period = '';
                 } else if (key === 'month') {
                     if (monthSelect) monthSelect.value = '';
+                } else if (key === 'year') {
+                    if (yearSelect) yearSelect.value = '';
                 } else if (key === 'type') {
                     activeType = '';
                     if (typeFilter) typeFilter.value = '';
@@ -1604,6 +1686,7 @@
                 if (isoStart || isoEnd) {
                     period = '';
                     if (monthSelect) monthSelect.value = '';
+                    if (yearSelect) yearSelect.value = '';
                     setRangeValues(isoStart || startHidden.value, isoEnd || endHidden.value, { clearMonth: true });
                 }
                 applyDashboardFilters();
@@ -1615,7 +1698,7 @@
                 const iso = parseBrToIso(startDisplay.value.trim());
                 if (iso) {
                     period = '';
-                    setRangeValues(iso, endHidden.value || '', { clearMonth: true });
+                    setRangeValues(iso, endHidden.value || '', { clearMonth: true, clearYear: true });
                     applyDashboardFiltersDebounced();
                 }
             };
@@ -1630,7 +1713,7 @@
                 const iso = parseBrToIso(endDisplay.value.trim());
                 if (iso) {
                     period = '';
-                    setRangeValues(startHidden.value || '', iso, { clearMonth: true });
+                    setRangeValues(startHidden.value || '', iso, { clearMonth: true, clearYear: true });
                     applyDashboardFiltersDebounced();
                 }
             };
@@ -1643,7 +1726,7 @@
             startPicker.addEventListener('change', () => {
                 if (startPicker.value) {
                     period = '';
-                    setRangeValues(startPicker.value, endHidden.value || '', { clearMonth: true });
+                    setRangeValues(startPicker.value, endHidden.value || '', { clearMonth: true, clearYear: true });
                     applyDashboardFiltersDebounced();
                 }
             });
@@ -1652,7 +1735,7 @@
             endPicker.addEventListener('change', () => {
                 if (endPicker.value) {
                     period = '';
-                    setRangeValues(startHidden.value || '', endPicker.value, { clearMonth: true });
+                    setRangeValues(startHidden.value || '', endPicker.value, { clearMonth: true, clearYear: true });
                     applyDashboardFiltersDebounced();
                 }
             });
@@ -1665,9 +1748,33 @@
                 const end = option.dataset.end;
                 if (start && end) {
                     period = '';
-                    setRangeValues(start, end);
+                    setRangeValues(start, end, { clearYear: true });
                     applyDashboardFiltersDebounced();
                 }
+            });
+        }
+        if (yearSelect) {
+            yearSelect.addEventListener('change', () => {
+                if (!yearSelect.value) {
+                    period = 'all';
+                    if (monthSelect) monthSelect.value = '';
+                    const defaultStart = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultStart || '') : '';
+                    const defaultEnd = clearFiltersBtn ? (clearFiltersBtn.dataset.defaultEnd || '') : '';
+                    if (defaultStart && defaultEnd) {
+                        setRangeValues(defaultStart, defaultEnd, { clearMonth: true });
+                    } else {
+                        setRangeValues('', '', { clearMonth: true });
+                    }
+                    applyDashboardFiltersDebounced();
+                    return;
+                }
+                const year = parseInt(yearSelect.value, 10);
+                if (!Number.isFinite(year)) return;
+                period = '';
+                const start = `${year}-01-01`;
+                const end = `${year}-12-31`;
+                setRangeValues(start, end, { clearMonth: true });
+                applyDashboardFiltersDebounced();
             });
         }
         const quickButtons = document.querySelectorAll('[data-period]');
@@ -1677,6 +1784,7 @@
                     const nextPeriod = btn.dataset.period || '';
                     period = nextPeriod;
                     if (monthSelect) monthSelect.value = '';
+                    if (yearSelect) yearSelect.value = '';
                     quickButtons.forEach(other => {
                         other.classList.toggle('btn-primary', other === btn);
                         other.classList.toggle('btn-outline-light', other !== btn);
@@ -1695,6 +1803,7 @@
                 if (el === applyBtn) {
                     period = '';
                     if (monthSelect) monthSelect.value = '';
+                    if (yearSelect) yearSelect.value = '';
                 }
                 const isoStart = parseBrToIso(startDisplay.value.trim());
                 const isoEnd = parseBrToIso(endDisplay.value.trim());

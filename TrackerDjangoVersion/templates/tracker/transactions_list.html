@@ -175,6 +175,17 @@
     .tx-action-btn i {
         line-height: 1;
     }
+    .table-sort {
+        color: inherit;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .table-sort:hover {
+        color: var(--primary-text);
+        text-decoration: none;
+    }
     .due-warning {
         background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), transparent);
     }
@@ -259,11 +270,38 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">De</label>
-            <input aria-label="Data inicial" id="txStartDate" type="date" name="start" class="form-control js-auto-filter" value="{{ filters.start }}">
+            <div class="date-picker-wrap">
+                <input id="txStartDisplay" type="text" class="form-control" placeholder="dd/mm/aaaa" inputmode="numeric">
+                <div class="date-hidden">
+                    <input aria-label="Data inicial" id="txStartDate" type="date" name="start" class="form-control js-auto-filter" value="{{ filters.start }}">
+                </div>
+            </div>
         </div>
         <div class="col-md-2">
             <label class="form-label">At&eacute;</label>
-            <input aria-label="Data final" id="txEndDate" type="date" name="end" class="form-control js-auto-filter" value="{{ filters.end }}">
+            <div class="date-picker-wrap">
+                <input id="txEndDisplay" type="text" class="form-control" placeholder="dd/mm/aaaa" inputmode="numeric">
+                <div class="date-hidden">
+                    <input aria-label="Data final" id="txEndDate" type="date" name="end" class="form-control js-auto-filter" value="{{ filters.end }}">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">M&ecirc;s/ano</label>
+            <select name="month" id="txMonthSelect" class="form-select js-auto-filter" aria-label="Filtrar por m&ecirc;s">
+                <option value="">M&ecirc;s/ano</option>
+                {% for opt in month_options %}
+                    <option value="{{ opt.value }}" data-start="{{ opt.start|date:'Y-m-d' }}" data-end="{{ opt.end|date:'Y-m-d' }}" {% if selected_month == opt.value %}selected{% endif %}>
+                        {{ opt.label }}
+                    </option>
+                {% endfor %}
+            </select>
+            <select name="year" id="txYearSelect" class="form-select js-auto-filter" aria-label="Filtrar por ano">
+                <option value="">Todos</option>
+                {% for year in year_options %}
+                    <option value="{{ year }}" {% if selected_year|stringformat:'s' == year|stringformat:'s' %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="col-12 d-flex justify-content-between mt-2">
             <div class="small text-secondary">
@@ -466,14 +504,49 @@
                             </div>
                         </div>
                     </th>
-                    <th>Descri&ccedil;&atilde;o</th>
-                    <th>Categoria</th>
-                    <th>Respons&aacute;vel</th>
-                    <th>Data</th>
-                    <th class="text-end">Valor</th>
-                    <th class="text-center">Tipo</th>
+                    <th>
+                        <a class="table-sort" href="{{ sort_urls.description }}">
+                            Descri&ccedil;&atilde;o
+                            <i class="fa-solid {% if sort_param == 'description' %}fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}{% else %}fa-sort{% endif %} ms-1"></i>
+                        </a>
+                    </th>
+                    <th>
+                        <a class="table-sort" href="{{ sort_urls.category }}">
+                            Categoria
+                            <i class="fa-solid {% if sort_param == 'category' %}fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}{% else %}fa-sort{% endif %} ms-1"></i>
+                        </a>
+                    </th>
+                    <th>
+                        <a class="table-sort" href="{{ sort_urls.responsible }}">
+                            Respons&aacute;vel
+                            <i class="fa-solid {% if sort_param == 'responsible' %}fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}{% else %}fa-sort{% endif %} ms-1"></i>
+                        </a>
+                    </th>
+                    <th>
+                        <a class="table-sort" href="{{ sort_urls.date }}">
+                            Data
+                            <i class="fa-solid {% if sort_param == 'date' %}fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}{% else %}fa-sort{% endif %} ms-1"></i>
+                        </a>
+                    </th>
+                    <th class="text-end">
+                        <a class="table-sort" href="{{ sort_urls.value }}">
+                            Valor
+                            <i class="fa-solid {% if sort_param == 'value' %}fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}{% else %}fa-sort{% endif %} ms-1"></i>
+                        </a>
+                    </th>
+                    <th class="text-center">
+                        <a class="table-sort" href="{{ sort_urls.type }}">
+                            Tipo
+                            <i class="fa-solid {% if sort_param == 'type' %}fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}{% else %}fa-sort{% endif %} ms-1"></i>
+                        </a>
+                    </th>
                     <th class="text-end">A&ccedil;&otilde;es</th>
-                    <th>Ícone</th>
+                    <th>
+                        <a class="table-sort" href="{{ sort_urls.icon }}">
+                            Ícone
+                            <i class="fa-solid {% if sort_param == 'icon' %}fa-sort-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}{% else %}fa-sort{% endif %} ms-1"></i>
+                        </a>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -648,6 +721,12 @@
                     filtersForm.submit();
                 }
             };
+            const monthSelect = filtersForm.querySelector('select[name="month"]');
+            const yearSelect = filtersForm.querySelector('select[name="year"]');
+            const startInput = filtersForm.querySelector('input[name="start"]');
+            const endInput = filtersForm.querySelector('input[name="end"]');
+            const startDisplay = document.getElementById('txStartDisplay');
+            const endDisplay = document.getElementById('txEndDisplay');
             const scheduleSubmit = (() => {
                 let timer = null;
                 return () => {
@@ -657,6 +736,41 @@
             })();
             const searchInput = filtersForm.querySelector('input[name="q"]');
             let searchTimer = null;
+            const formatIsoToBr = (iso) => {
+                if (!iso) return '';
+                const parts = iso.split('-');
+                if (parts.length !== 3) return iso;
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            };
+            const parseBrToIso = (value) => {
+                const match = (value || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (!match) return '';
+                return `${match[3]}-${match[2]}-${match[1]}`;
+            };
+            const applyDateMask = (input) => {
+                if (!input) return;
+                const digits = (input.value || '').replace(/\D/g, '').slice(0, 8);
+                let out = '';
+                if (digits.length >= 2) out = digits.slice(0, 2);
+                if (digits.length >= 3) out += `/${digits.slice(2, 4)}`;
+                if (digits.length >= 5) out += `/${digits.slice(4, 8)}`;
+                input.value = out;
+            };
+            const syncDisplay = (hidden, display) => {
+                if (hidden && display && hidden.value) {
+                    display.value = formatIsoToBr(hidden.value);
+                }
+            };
+            const openPicker = (picker) => {
+                if (!picker) return;
+                if (picker.showPicker) {
+                    picker.showPicker();
+                } else {
+                    picker.focus();
+                }
+            };
+            syncDisplay(startInput, startDisplay);
+            syncDisplay(endInput, endDisplay);
             const shouldAutoSubmit = (target) => {
                 if (!target) return false;
                 if (target.classList && target.classList.contains('js-auto-filter')) return true;
@@ -675,6 +789,72 @@
                     input.addEventListener('input', scheduleSubmit);
                 }
             });
+            if (monthSelect) {
+                monthSelect.addEventListener('change', () => {
+                    if (monthSelect.value) {
+                        if (yearSelect) yearSelect.value = '';
+                        if (startInput) startInput.value = '';
+                        if (endInput) endInput.value = '';
+                        if (startDisplay) startDisplay.value = '';
+                        if (endDisplay) endDisplay.value = '';
+                    }
+                });
+            }
+            if (yearSelect) {
+                yearSelect.addEventListener('change', () => {
+                    if (!yearSelect.value) {
+                        if (monthSelect) monthSelect.value = '';
+                        if (startInput) startInput.value = '';
+                        if (endInput) endInput.value = '';
+                        if (startDisplay) startDisplay.value = '';
+                        if (endDisplay) endDisplay.value = '';
+                        scheduleSubmit();
+                        return;
+                    }
+                    if (monthSelect) monthSelect.value = '';
+                    const year = parseInt(yearSelect.value, 10);
+                    if (!Number.isFinite(year)) return;
+                    const startIso = `${year}-01-01`;
+                    const endIso = `${year}-12-31`;
+                    if (startInput) startInput.value = startIso;
+                    if (endInput) endInput.value = endIso;
+                    if (startDisplay) startDisplay.value = formatIsoToBr(startIso);
+                    if (endDisplay) endDisplay.value = formatIsoToBr(endIso);
+                    scheduleSubmit();
+                });
+            }
+            if (startDisplay && startInput) {
+                const handleStart = () => {
+                    applyDateMask(startDisplay);
+                    const iso = parseBrToIso(startDisplay.value.trim());
+                    if (iso) {
+                        if (monthSelect) monthSelect.value = '';
+                        if (yearSelect) yearSelect.value = '';
+                        startInput.value = iso;
+                        scheduleSubmit();
+                    }
+                };
+                startDisplay.addEventListener('input', handleStart);
+                startDisplay.addEventListener('change', handleStart);
+                startDisplay.addEventListener('focus', () => openPicker(startInput));
+                startDisplay.addEventListener('click', () => openPicker(startInput));
+            }
+            if (endDisplay && endInput) {
+                const handleEnd = () => {
+                    applyDateMask(endDisplay);
+                    const iso = parseBrToIso(endDisplay.value.trim());
+                    if (iso) {
+                        if (monthSelect) monthSelect.value = '';
+                        if (yearSelect) yearSelect.value = '';
+                        endInput.value = iso;
+                        scheduleSubmit();
+                    }
+                };
+                endDisplay.addEventListener('input', handleEnd);
+                endDisplay.addEventListener('change', handleEnd);
+                endDisplay.addEventListener('focus', () => openPicker(endInput));
+                endDisplay.addEventListener('click', () => openPicker(endInput));
+            }
             if (searchInput) {
                 searchInput.addEventListener('input', () => {
                     if (searchTimer) clearTimeout(searchTimer);
