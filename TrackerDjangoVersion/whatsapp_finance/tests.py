@@ -1,13 +1,18 @@
 from decimal import Decimal
+from pathlib import Path
+import json
 
-from django.test import TestCase, override_settings
+from django.test import TestCase, override_settings, RequestFactory
 from django.utils import timezone
+from django.db import IntegrityError
 
 from tracker.models import Category, Transaction, Workspace
 from django.contrib.auth import get_user_model
 
 from .models import WhatsAppMessage, WhatsAppProfile
+from .providers.dialog360 import Dialog360Provider
 from .services import extract_amount, infer_type, parse_text_to_result, process_incoming_text
+from .whatsapp import normalize_phone
 
 User = get_user_model()
 
@@ -71,3 +76,53 @@ class WhatsAppParserTests(TestCase):
         )
         response = process_incoming_text(profile, message, "/resumo")
         self.assertIn("Resumo do mes", response)
+
+
+class WhatsAppProviderTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _load_fixture(self, name: str) -> dict:
+        base = Path(__file__).resolve().parent / "tests" / "fixtures"
+        with open(base / name, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+    def test_normalize_phone_variants(self):
+        self.assertEqual(normalize_phone("whatsapp:+5511999999999"), "+5511999999999")
+        self.assertEqual(normalize_phone("+55 (11) 99999-9999"), "+5511999999999")
+        self.assertEqual(normalize_phone("5511999999999"), "+5511999999999")
+
+    def test_parse_inbound_360dialog_text(self):
+        payload = self._load_fixture("360dialog_text.json")
+        request = self.factory.post("/whatsapp/webhook/", data=json.dumps(payload), content_type="application/json")
+        inbound = Dialog360Provider().parse_inbound(request)
+        self.assertEqual(inbound.from_number, "+5511999999999")
+        self.assertEqual(inbound.text, "Oi, tudo bem?")
+        self.assertEqual(inbound.provider_message_id, "wamid.test.text")
+        self.assertEqual(inbound.media, [])
+
+    def test_parse_inbound_360dialog_audio(self):
+        payload = self._load_fixture("360dialog_audio.json")
+        request = self.factory.post("/whatsapp/webhook/", data=json.dumps(payload), content_type="application/json")
+        inbound = Dialog360Provider().parse_inbound(request)
+        self.assertEqual(inbound.from_number, "+5511999999999")
+        self.assertEqual(inbound.message_type, "audio")
+        self.assertTrue(inbound.media)
+        self.assertEqual(inbound.media[0].media_id, "media-audio-123")
+
+    def test_idempotency_unique_provider_message(self):
+        WhatsAppMessage.objects.create(
+            provider="360dialog",
+            provider_message_id="wamid.dup",
+            direction="in",
+            from_number="+5511999999999",
+            to_number="+5511888888888",
+        )
+        with self.assertRaises(IntegrityError):
+            WhatsAppMessage.objects.create(
+                provider="360dialog",
+                provider_message_id="wamid.dup",
+                direction="in",
+                from_number="+5511999999999",
+                to_number="+5511888888888",
+            )

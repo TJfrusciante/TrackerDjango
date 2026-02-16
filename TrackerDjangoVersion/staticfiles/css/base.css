@@ -960,6 +960,48 @@ textarea:focus-visible {
     transform: translateY(-6px);
 }
 
+.bulk-actions__header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.bulk-actions__title {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.bulk-actions__meta {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.bulk-actions__hint {
+    max-width: 320px;
+}
+
+.bulk-actions__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.bulk-actions__buttons .btn {
+    min-width: 170px;
+}
+
+.bulk-actions__grid .form-text {
+    margin-top: 0.35rem;
+}
+
+.bulk-actions--tasks .bulk-actions__buttons {
+    justify-content: flex-end;
+}
+
 .alert-save {
     border-left: 4px solid var(--primary-color);
     position: relative;

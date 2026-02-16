@@ -46,7 +46,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-hero">
+<div class="page-hero" data-motion="reveal">
     <div class="page-hero__info">
         <p class="page-hero__eyebrow">Finan&ccedil;as</p>
         <h1 class="page-hero__title">Categorias</h1>
@@ -54,7 +54,7 @@
     </div>
 </div>
 <div class="categories-nav-bar">
-    <div class="categories-nav-grid">
+    <div class="categories-nav-grid" data-motion="reveal" data-stagger="1">
         <a class="btn btn-outline-light page-action-btn" href="#categorias-transacoes">
             <i class="fa-solid fa-coins me-2"></i>Categorias de transa&ccedil;&otilde;es
         </a>
@@ -72,7 +72,7 @@
 
 <div class="row g-3" id="categorias-transacoes">
     <div class="col-md-4">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-bold mb-0">Nova categoria (transa&ccedil;&otilde;es)</h6>
                 <span class="badge text-bg-success">Organize os imports</span>
@@ -112,7 +112,7 @@
         <div class="row g-3">
             {% for category in categories %}
                 <div class="col-md-6">
-                    <div class="glass-card p-3 h-100">
+                    <div class="glass-card p-3 h-100 itr-soft-border" data-motion="reveal">
                         <div class="d-flex align-items-start justify-content-between mb-2">
                             <div>
                                 <div class="fw-bold">{{ category.name }}</div>
@@ -142,12 +142,7 @@
                 </div>
             {% empty %}
                 <div class="col-12">
-                    <div class="glass-card p-4 text-secondary">
-                        <div class="mb-2">Nenhuma categoria cadastrada.</div>
-                        <a class="btn btn-sm btn-primary" href="#categorias-transacoes">
-                            <i class="fa-solid fa-plus me-2"></i>Criar primeira categoria
-                        </a>
-                    </div>
+                    {% include "includes/empty_state.html" with icon="fa-solid fa-tags" title="Nenhuma categoria cadastrada" description="Crie sua primeira categoria para organizar as transa&ccedil;&otilde;es." cta_url="#categorias-transacoes" cta_label="Criar categoria" %}
                 </div>
             {% endfor %}
         </div>
@@ -155,7 +150,7 @@
 </div>
 <div class="row g-3 mt-4" id="categorias-tarefas">
     <div class="col-md-4">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-bold mb-0">Nova categoria (tarefas)</h6>
                 <span class="badge text-bg-info">Organize tarefas</span>
@@ -195,7 +190,7 @@
         <div class="row g-3">
             {% for category in task_categories %}
                 <div class="col-md-6">
-                    <div class="glass-card p-3 h-100">
+                    <div class="glass-card p-3 h-100 itr-soft-border" data-motion="reveal">
                         <div class="d-flex align-items-start justify-content-between mb-2">
                             <div>
                                 <div class="fw-bold">{{ category.name }}</div>
@@ -225,12 +220,7 @@
                 </div>
             {% empty %}
                 <div class="col-12">
-                    <div class="glass-card p-4 text-secondary">
-                        <div class="mb-2">Nenhuma categoria de tarefa cadastrada.</div>
-                        <a class="btn btn-sm btn-primary" href="#categorias-tarefas">
-                            <i class="fa-solid fa-plus me-2"></i>Criar primeira categoria de tarefas
-                        </a>
-                    </div>
+                    {% include "includes/empty_state.html" with icon="fa-solid fa-list-check" title="Nenhuma categoria de tarefa cadastrada" description="Crie categorias de tarefa para facilitar filtros e relat&oacute;rios." cta_url="#categorias-tarefas" cta_label="Criar categoria de tarefas" %}
                 </div>
             {% endfor %}
         </div>
@@ -263,3 +253,4 @@
     })();
 </script>
 {% endblock %}
+

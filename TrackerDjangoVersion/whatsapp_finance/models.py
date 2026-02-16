@@ -61,9 +61,16 @@ class WhatsAppMessage(models.Model):
         ('in', 'Entrada'),
         ('out', 'Saida'),
     ]
+    PROVIDER_CHOICES = [
+        ("twilio", "Twilio"),
+        ("360dialog", "360dialog"),
+        ("meta", "Meta"),
+    ]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='whatsapp_messages')
     workspace = models.ForeignKey(Workspace, null=True, blank=True, on_delete=models.SET_NULL, related_name='whatsapp_messages')
     message_sid = models.CharField(max_length=120, blank=True, default='')
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default="twilio")
+    provider_message_id = models.CharField(max_length=120, blank=True, default="")
     direction = models.CharField(max_length=8, choices=DIRECTION_CHOICES, default='in')
     from_number = models.CharField(max_length=32, blank=True, default='')
     to_number = models.CharField(max_length=32, blank=True, default='')
@@ -75,6 +82,13 @@ class WhatsAppMessage(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=['message_sid', 'created_at'])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "provider_message_id"],
+                condition=models.Q(provider_message_id__isnull=False) & ~models.Q(provider_message_id=""),
+                name="whatsapp_provider_message_uniq",
+            )
+        ]
 
     def __str__(self):
         return f'{self.from_number} -> {self.to_number} ({self.direction})'

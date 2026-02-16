@@ -115,6 +115,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'tracker.context_processors.workspace_context',
+                'tracker.context_processors.ambient_context',
             ],
         },
     },
@@ -382,11 +383,18 @@ META_WA_VALIDATE_SIGNATURE = env_bool("META_WA_VALIDATE_SIGNATURE", True)
 META_WA_FETCH_MEDIA = env_bool("META_WA_FETCH_MEDIA", True)
 META_WA_DISPLAY_NUMBER = env("META_WA_DISPLAY_NUMBER", "")
 
+# 360dialog (Cloud API)
+D360_API_KEY = env("D360_API_KEY", "")
+D360_BASE_URL = env("D360_BASE_URL", "https://waba-v2.360dialog.io")
+D360_PHONE_NUMBER_ID = env("D360_PHONE_NUMBER_ID", "")
+WHATSAPP_WEBHOOK_SECRET = env("WHATSAPP_WEBHOOK_SECRET", "")
+
 # Twilio (legado)
 TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", "")
 TWILIO_WHATSAPP_NUMBER = env("TWILIO_WHATSAPP_NUMBER", "")
 WHATSAPP_VALIDATE_TWILIO = env_bool("WHATSAPP_VALIDATE_TWILIO", False)
+WHATSAPP_PROVIDER = env("WHATSAPP_PROVIDER", "twilio")
 WHATSAPP_FEATURE_ENABLED = env_bool("WHATSAPP_FEATURE_ENABLED", False)
 WHATSAPP_TRANSCRIBE_PROVIDER = env("WHATSAPP_TRANSCRIBE_PROVIDER", "none")  # none|whisper|google
 WHATSAPP_WHISPER_MODEL = env("WHATSAPP_WHISPER_MODEL", "base")

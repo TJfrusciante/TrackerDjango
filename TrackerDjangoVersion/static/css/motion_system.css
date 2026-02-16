@@ -1,0 +1,306 @@
+:root {
+    --itr-ms-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --itr-ms-enter-duration: 360ms;
+    --itr-ms-reveal-duration: 420ms;
+    --itr-ms-press-duration: 120ms;
+    --itr-ms-glow: 0 0 0 1px rgba(94, 234, 212, 0.3), 0 14px 30px rgba(15, 118, 110, 0.18);
+    --itr-ms-lift: translateY(-4px) scale(1.015);
+}
+
+body.itr-ms-ready .itr-page-surface {
+    animation: itr-ms-page-enter var(--itr-ms-enter-duration) var(--itr-ms-ease) both;
+}
+
+[data-motion="reveal"],
+.itr-reveal {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.98);
+    filter: saturate(0.94);
+    transition:
+        opacity var(--itr-ms-reveal-duration) var(--itr-ms-ease),
+        transform var(--itr-ms-reveal-duration) var(--itr-ms-ease),
+        filter var(--itr-ms-reveal-duration) var(--itr-ms-ease);
+    will-change: opacity, transform, filter;
+}
+
+[data-motion="reveal"].itr-ms-visible,
+.itr-reveal.itr-ms-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: saturate(1);
+}
+
+[data-stagger="1"] > * {
+    transition-delay: var(--itr-ms-stagger, 0ms);
+}
+
+.itr-hover-lift,
+.glass-card.itr-hover-lift,
+.list-group-item.itr-hover-lift {
+    transition:
+        transform 260ms var(--itr-ms-ease),
+        box-shadow 260ms var(--itr-ms-ease),
+        border-color 260ms var(--itr-ms-ease),
+        background-color 260ms var(--itr-ms-ease);
+}
+
+.itr-hover-lift:hover,
+.itr-hover-lift:focus-within {
+    transform: var(--itr-ms-lift);
+    box-shadow: 0 18px 38px rgba(2, 6, 23, 0.24);
+}
+
+.itr-hover-glow {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.itr-hover-glow::after {
+    content: "";
+    position: absolute;
+    inset: -35% -85%;
+    background: linear-gradient(112deg, transparent 34%, rgba(94, 234, 212, 0.22) 50%, transparent 66%);
+    transform: translateX(-60%) rotate(8deg);
+    opacity: 0;
+    transition: opacity 260ms ease, transform 720ms var(--itr-ms-ease);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.itr-hover-glow > * {
+    position: relative;
+    z-index: 1;
+}
+
+.itr-hover-glow:hover::after,
+.itr-hover-glow:focus-within::after {
+    opacity: 1;
+    transform: translateX(38%) rotate(8deg);
+}
+
+.itr-soft-border {
+    border-color: rgba(94, 234, 212, 0.24) !important;
+}
+
+.itr-soft-border:hover,
+.itr-soft-border:focus-within {
+    box-shadow: var(--itr-ms-glow);
+    border-color: rgba(94, 234, 212, 0.58) !important;
+}
+
+.itr-ripple {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.itr-ripple::before {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    left: var(--itr-ripple-x, 50%);
+    top: var(--itr-ripple-y, 50%);
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+    background: radial-gradient(circle, rgba(125, 211, 252, 0.45), rgba(56, 189, 248, 0.02) 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.itr-ripple.itr-ms-rippling::before {
+    animation: itr-ms-ripple 560ms var(--itr-ms-ease) both;
+}
+
+.itr-ripple > * {
+    position: relative;
+    z-index: 1;
+}
+
+.itr-pressing {
+    transform: translate3d(0, 1px, 0) scale(0.985) !important;
+    transition-duration: var(--itr-ms-press-duration) !important;
+}
+
+.itr-focus-ring:focus-visible,
+.itr-focus-ring .form-control:focus-visible,
+.itr-focus-ring .form-select:focus-visible,
+.itr-focus-ring .btn:focus-visible,
+.form-control.itr-focus-ring:focus-visible,
+.form-select.itr-focus-ring:focus-visible,
+.btn.itr-focus-ring:focus-visible,
+button.itr-focus-ring:focus-visible,
+a.itr-focus-ring:focus-visible {
+    outline: 2px solid rgba(125, 211, 252, 0.95);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.24);
+}
+
+.itr-active-highlight {
+    transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 220ms ease;
+}
+
+.itr-active-highlight.is-active,
+.itr-active-highlight[aria-current="page"],
+.itr-active-highlight.active {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(125, 211, 252, 0.55);
+    box-shadow: 0 8px 20px rgba(2, 132, 199, 0.18);
+}
+
+.itr-skeleton,
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    background: linear-gradient(130deg, rgba(15, 23, 42, 0.72), rgba(30, 41, 59, 0.7));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.itr-skeleton::after,
+.skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-110%);
+    background: linear-gradient(108deg, transparent 24%, rgba(125, 211, 252, 0.2) 49%, transparent 74%);
+    animation: itr-ms-skeleton-shimmer 1.4s linear infinite;
+}
+
+.itr-loading-shell {
+    position: relative;
+    transition: opacity 320ms var(--itr-ms-ease), filter 320ms var(--itr-ms-ease);
+}
+
+.itr-loading-shell.is-loaded .itr-skeleton,
+.itr-loading-shell.is-loaded .skeleton {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.itr-loading-shell.is-loaded .itr-skeleton::after,
+.itr-loading-shell.is-loaded .skeleton::after {
+    animation: none;
+}
+
+.itr-motion-empty {
+    border-radius: 20px;
+    border: 1px dashed rgba(125, 211, 252, 0.4);
+    background: linear-gradient(140deg, rgba(15, 23, 42, 0.62), rgba(30, 41, 59, 0.5));
+    padding: 1.1rem 1.2rem;
+}
+
+.itr-motion-empty .btn {
+    margin-top: 0.7rem;
+}
+
+@keyframes itr-ms-page-enter {
+    0% {
+        opacity: 0;
+        transform: translate3d(0, 14px, 0) scale(0.995);
+    }
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes itr-ms-ripple {
+    0% {
+        opacity: 0.6;
+        transform: translate(-50%, -50%) scale(0.25);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(22);
+    }
+}
+
+@keyframes itr-ms-skeleton-shimmer {
+    0% {
+        transform: translateX(-110%);
+    }
+    100% {
+        transform: translateX(120%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.itr-ms-ready .itr-page-surface,
+    [data-motion="reveal"],
+    .itr-reveal,
+    .itr-hover-lift,
+    .itr-hover-glow::after,
+    .itr-ripple::before,
+    .itr-skeleton::after,
+    .skeleton::after,
+    .itr-active-highlight {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+
+    [data-motion="reveal"],
+    .itr-reveal {
+        opacity: 1 !important;
+        filter: none !important;
+    }
+
+    .itr-ripple.itr-ms-rippling::before {
+        opacity: 0;
+    }
+}
+
+body[data-animations='off'].itr-ms-ready .itr-page-surface,
+body[data-animations='off'] [data-motion="reveal"],
+body[data-animations='off'] .itr-reveal,
+body[data-animations='off'] .itr-hover-lift,
+body[data-animations='off'] .itr-hover-glow::after,
+body[data-animations='off'] .itr-ripple::before,
+body[data-animations='off'] .itr-skeleton::after,
+body[data-animations='off'] .skeleton::after,
+body[data-animations='off'] .itr-active-highlight {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+}
+
+body[data-animations='off'] .itr-page-surface {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    visibility: visible !important;
+}
+
+body[data-animations='off'] [data-motion="reveal"],
+body[data-animations='off'] .itr-reveal {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    visibility: visible !important;
+}
+
+body[data-animations='off'] .main-shell,
+body[data-animations='off'] .main-shell > .container,
+body[data-animations='off'] .itr-loading-shell,
+body[data-animations='off'] .glass-card,
+body[data-animations='off'] .table-responsive,
+body[data-animations='off'] .tx-table-shell,
+body[data-animations='off'] .task-table-shell {
+    opacity: 1 !important;
+    visibility: visible !important;
+    filter: none !important;
+    transform: none !important;
+}
+
+body[data-animations='off'] .table-responsive.d-none {
+    display: block !important;
+}
+
+body[data-animations='off'] .itr-loading-shell .skeleton,
+body[data-animations='off'] .itr-loading-shell .itr-skeleton {
+    display: none !important;
+}

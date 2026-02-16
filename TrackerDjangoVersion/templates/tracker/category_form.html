@@ -3,7 +3,7 @@
 {% block title %}{{ category_title|default:"Editar categoria" }} | iTracker{% endblock %}
 
 {% block content %}
-<div class="page-hero">
+<div class="page-hero" data-motion="reveal">
     <div class="page-hero__info">
         <p class="page-hero__eyebrow">{{ category_label|default:"Finan&ccedil;as" }}</p>
         <h1 class="page-hero__title">{{ category_title|default:"Editar categoria" }}</h1>
@@ -17,12 +17,12 @@
 </div>
 <div class="row justify-content-center">
     <div class="col-lg-6">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 itr-soft-border" data-motion="reveal">
             <div class="section-title mb-2">Detalhes da categoria</div>
             {% if form.errors %}
                 <div class="alert alert-danger">Verifique os campos.</div>
             {% endif %}
-            <form method="post" class="row g-3">
+            <form method="post" class="row g-3 itr-focus-ring" data-motion="reveal" data-stagger="1">
                 {% csrf_token %}
                 <div class="col-12">
                     <label class="form-label">Nome</label>
@@ -74,3 +74,4 @@
     })();
 </script>
 {% endblock %}
+

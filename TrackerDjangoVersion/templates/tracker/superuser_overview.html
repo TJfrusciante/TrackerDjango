@@ -729,8 +729,9 @@
 <script id="aiFeatureTokens" type="application/json">{{ ai_feature_tokens_json|safe }}</script>
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    window.addEventListener('load', () => {
     const wsLabels = JSON.parse(document.getElementById('wsLabels')?.textContent || '[]');
     const wsIncome = JSON.parse(document.getElementById('wsIncome')?.textContent || '[]');
     const wsExpense = JSON.parse(document.getElementById('wsExpense')?.textContent || '[]');
@@ -806,6 +807,7 @@
         });
         if (aiFeatureSkeleton) aiFeatureSkeleton.classList.add('d-none');
     }
+    });
 </script>
 {% endblock %}
 {% endblock %}

@@ -326,6 +326,29 @@ body:not(.sidebar-collapsed) .sidebar-close-btn {
     width: 100%;
 }
 
+.sidebar-control {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.58);
+    border: 1px solid rgba(148, 163, 184, 0.34);
+    color: var(--text-color);
+}
+
+.sidebar-control:focus-visible {
+    border-color: rgba(94, 234, 212, 0.72);
+    box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.2);
+}
+
+[data-bs-theme="light"] .sidebar-control {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(71, 85, 105, 0.34);
+    color: #0f172a;
+}
+
+[data-bs-theme="light"] .sidebar-control:focus-visible {
+    border-color: rgba(15, 23, 42, 0.46);
+    box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.18);
+}
+
 .sidebar-profile .dropdown-toggle {
     justify-content: flex-start;
 }
@@ -500,7 +523,17 @@ body.sidebar-collapsed .sidebar-stack .dropdown-toggle::after {
 }
 
 body.sidebar-collapsed .sidebar-theme {
+    align-items: center;
     justify-content: center;
+}
+
+body.sidebar-collapsed .sidebar-theme-head {
+    justify-content: center;
+}
+
+body.sidebar-collapsed .sidebar-anim-toggle {
+    width: 64px !important;
+    padding: 0.55rem;
 }
 
 body.sidebar-collapsed .sidebar-workspace .dropdown-toggle {
@@ -569,14 +602,44 @@ body.sidebar-collapsed .sidebar-panel {
 
 .sidebar-theme {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
     position: relative;
     z-index: 2;
 }
 
+.sidebar-theme-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
 .theme-toggle {
     pointer-events: auto;
+}
+
+.sidebar-anim-toggle {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-color: rgba(148, 163, 184, 0.38);
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.sidebar-anim-toggle:hover,
+.sidebar-anim-toggle:focus-visible {
+    border-color: rgba(94, 234, 212, 0.72);
+    box-shadow: 0 0 0 0.18rem rgba(56, 189, 248, 0.18);
+}
+
+[data-bs-theme="light"] .sidebar-anim-toggle {
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f172a;
+    border-color: rgba(71, 85, 105, 0.34);
 }
 
 .sidebar-backdrop {

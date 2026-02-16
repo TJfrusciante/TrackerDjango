@@ -12,9 +12,9 @@ class WhatsAppProfileAdmin(admin.ModelAdmin):
 
 @admin.register(WhatsAppMessage)
 class WhatsAppMessageAdmin(admin.ModelAdmin):
-    list_display = ("id", "direction", "from_number", "to_number", "created_at")
-    list_filter = ("direction", "created_at")
-    search_fields = ("from_number", "to_number", "body", "message_sid")
+    list_display = ("id", "provider", "direction", "from_number", "to_number", "created_at")
+    list_filter = ("provider", "direction", "created_at")
+    search_fields = ("from_number", "to_number", "body", "message_sid", "provider_message_id")
 
 
 @admin.register(ParsedTransaction)

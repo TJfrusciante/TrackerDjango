@@ -142,3 +142,42 @@ def _sidebar_hover_expand(user):
         return True
     return bool(getattr(profile, "sidebar_hover_expand", True))
 
+
+def ambient_context(request):
+    mode = _ambient_mode_for_request(request)
+    mood = _session_value(request, "ambient_mood", "neutral")
+    score = _safe_score(_session_value(request, "ambient_score", 0))
+    profile = _session_value(request, "ambient_profile", "balanced")
+    if profile not in {"soft", "balanced", "bold"}:
+        profile = "balanced"
+    return {
+        "ambient_mode": mode,
+        "ambient_mood": mood if mood in {"positive", "neutral", "negative"} else "neutral",
+        "ambient_score": score,
+        "ambient_profile": profile,
+    }
+
+
+def _ambient_mode_for_request(request):
+    resolver = getattr(request, "resolver_match", None)
+    url_name = getattr(resolver, "url_name", "") or ""
+    lite_routes = {"auth_hub", "login", "register", "register_guest", "plan_quiz"}
+    if url_name in lite_routes:
+        return "lite"
+    return "full"
+
+
+def _session_value(request, key, default):
+    session = getattr(request, "session", None)
+    if not session:
+        return default
+    return session.get(key, default)
+
+
+def _safe_score(value):
+    try:
+        parsed = int(value)
+    except Exception:
+        parsed = 0
+    return max(-100, min(100, parsed))
+

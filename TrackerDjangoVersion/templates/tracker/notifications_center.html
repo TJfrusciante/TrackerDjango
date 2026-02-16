@@ -4,7 +4,7 @@
 {% block title %}Notifica&ccedil;&otilde;es | iTracker{% endblock %}
 
 {% block content %}
-<div class="page-hero">
+<div class="page-hero" data-motion="reveal">
     <div class="page-hero__info">
         <p class="page-hero__eyebrow">Centro de alertas</p>
         <h1 class="page-hero__title">Notifica&ccedil;&otilde;es</h1>
@@ -13,7 +13,7 @@
 </div>
 <div class="row g-4">
     <div class="col-lg-7">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 itr-soft-border" data-motion="reveal">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
                     <div class="section-title">Fila de notifica&ccedil;&otilde;es</div>
@@ -65,14 +65,16 @@
                     </div>
                 </div>
                 {% empty %}
-                <div class="text-secondary">Nenhuma notifica&ccedil;&atilde;o encontrada.</div>
+                <div class="itr-motion-empty text-secondary" data-motion="reveal">
+                    <i class="fa-solid fa-bell-slash me-2"></i>Nenhuma notifica&ccedil;&atilde;o encontrada.
+                </div>
                 {% endfor %}
             </div>
         </div>
     </div>
     <div class="col-lg-5">
         {% if admin_broadcast_form %}
-        <div class="glass-card p-4 mb-3">
+        <div class="glass-card p-4 mb-3 itr-soft-border" data-motion="reveal">
             <h2 class="h6 fw-bold mb-2">Enviar comunicado para todos</h2>
             <form method="post" action="{% url 'tracker:notifications_broadcast' %}" class="row g-2">
                 {% csrf_token %}
@@ -98,7 +100,7 @@
             </form>
         </div>
         {% endif %}
-        <div class="glass-card p-4 mb-3">
+        <div class="glass-card p-4 mb-3 itr-soft-border" data-motion="reveal">
             <h2 class="h6 fw-bold mb-2">Alertas financeiros</h2>
             {% if current_workspace and can_manage_finance %}
             <form method="post" action="{% url 'tracker:category_budget_create' %}" class="row g-2">
@@ -145,7 +147,7 @@
             {% endif %}
         </div>
 
-        <div class="glass-card p-4 mb-3">
+        <div class="glass-card p-4 mb-3 itr-soft-border" data-motion="reveal">
             <h2 class="h6 fw-bold mb-2">Metas de saldo</h2>
             {% if current_workspace and can_manage_finance %}
             <form method="post" action="{% url 'tracker:balance_goal_create' %}" class="row g-2">
@@ -192,7 +194,7 @@
             {% endif %}
         </div>
 
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 itr-soft-border" data-motion="reveal">
             <h2 class="h6 fw-bold mb-2">Notifica&ccedil;&otilde;es push</h2>
             <p class="text-secondary small">Ative o push para receber alertas no navegador. Dispon&iacute;vel quando chaves VAPID estiverem configuradas.</p>
             <button class="btn btn-outline-light btn-sm" id="pushToggleBtn" type="button">Ativar push</button>
@@ -300,3 +302,4 @@
     })();
 </script>
 {% endblock %}
+

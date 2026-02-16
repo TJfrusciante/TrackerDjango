@@ -17,9 +17,11 @@ Vars de ambiente: `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `OPENAI_API_KEY`
 - PDF: extratos com linhas `data` em uma linha e `hora descrição valor` na linha seguinte (PicPay) ou tudo na mesma linha. PDFs de imagem precisam ser convertidos para CSV/Excel.
 - Tela de importação mostra preview, permite remover/destacar e aplicar categorias sugeridas (IA/heurística).
 
-## WhatsApp Finance (Twilio)
-- Webhook: `POST /whatsapp/webhook/` (configure no console da Twilio).
-- Variáveis: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` (opcional), `WHATSAPP_VALIDATE_TWILIO=false`.
+## WhatsApp Finance (Providers)
+- Webhook: `POST /whatsapp/webhook/`.
+- Provider: `WHATSAPP_PROVIDER=360dialog` ou `twilio` (legado).
+- 360dialog: `D360_API_KEY`, `D360_BASE_URL` (default `https://waba-v2.360dialog.io`), `D360_PHONE_NUMBER_ID` (se necessário), `WHATSAPP_WEBHOOK_SECRET`.
+- Twilio (legado): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` (opcional), `WHATSAPP_VALIDATE_TWILIO=false`.
 - Perfil: crie um `WhatsAppProfile` no admin e informe o telefone no formato `+55...` e o workspace.
 - Comandos: `/resumo`, `/categorias`, `/extrato 01/01/2026 31/01/2026`.
 - Audio: `WHATSAPP_TRANSCRIBE_PROVIDER=whisper` (instalar `openai-whisper` + ffmpeg) ou `google` (instalar `google-cloud-speech`).

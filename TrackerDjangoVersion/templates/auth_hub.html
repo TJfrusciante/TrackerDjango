@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Acessar | iTracker{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/auth_hub.css' %}">
+<link rel="stylesheet" href="{% static 'css/public_mouse_field.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-hub-page js-mouse-field-root">
+    <div class="public-controls" role="group" aria-label="Controles visuais da página">
+        <button class="public-theme-toggle js-theme-toggle" type="button" aria-label="Alternar tema">
+            <i class="fa-solid fa-moon"></i>
+            <span>Tema</span>
+        </button>
+        <button class="public-fx-toggle js-public-fx-toggle" type="button" aria-label="Alternar intensidade do efeito">
+            Efeito: Médio
+        </button>
+    </div>
+    <div class="container brand-motion-surface">
+        <section class="auth-hub-header glass-card" data-motion="reveal">
+            <div class="auth-hub-header-main">
+                <div class="auth-hub-intro">
+                    <span class="auth-hub-badge"><i class="fa-solid fa-star"></i>iTracker</span>
+                    <h1 class="fw-bold h3 mb-2">Tudo em um lugar: finan&ccedil;as, tarefas e IA</h1>
+                    <p class="text-secondary mb-0">Entre ou crie sua conta para organizar o dia a dia com dashboards inteligentes, automa&ccedil;&otilde;es e controle por workspace.</p>
+                </div>
+            </div>
+            <div class="auth-feature-row">
+                <div class="auth-feature">
+                    <i class="fa-solid fa-bolt"></i>
+                    <div>
+                        <div class="fw-bold">Registro r&aacute;pido</div>
+                        <div class="small text-secondary">Crie um workspace em minutos e comece a lan&ccedil;ar.</div>
+                    </div>
+                </div>
+                <div class="auth-feature">
+                    <i class="fa-solid fa-brain"></i>
+                    <div>
+                        <div class="fw-bold">IA integrada</div>
+                        <div class="small text-secondary">Sugere categorias e responde sobre o seu contexto.</div>
+                    </div>
+                </div>
+                <div class="auth-feature">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <div>
+                        <div class="fw-bold">Workspaces isolados</div>
+                        <div class="small text-secondary">Permiss&otilde;es e dados separados por time.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="auth-hub-card auth-card glass-card motion-hover-target" id="authHub" data-active-panel="{{ active_panel|default:'login' }}" data-login-card="1" data-motion="reveal">
+                <div class="auth-hub-card-content">
+                <div class="auth-hub-tabs" role="tablist" aria-label="Trocar painel de autentica&ccedil;&atilde;o">
+                    <button type="button" class="auth-tab {% if active_panel == 'login' %}is-active{% endif %}" data-auth-switch="login" role="tab" aria-selected="{% if active_panel == 'login' %}true{% else %}false{% endif %}" aria-controls="authPanelLogin">Entrar</button>
+                    <button type="button" class="auth-tab {% if active_panel == 'register' %}is-active{% endif %}" data-auth-switch="register" role="tab" aria-selected="{% if active_panel == 'register' %}true{% else %}false{% endif %}" aria-controls="authPanelRegister">Criar conta</button>
+                    <button type="button" class="auth-tab {% if active_panel == 'guest' %}is-active{% endif %}" data-auth-switch="guest" role="tab" aria-selected="{% if active_panel == 'guest' %}true{% else %}false{% endif %}" aria-controls="authPanelGuest">Convidado</button>
+                </div>
+
+                <div class="auth-panels-viewport" id="authPanelsViewport">
+                    <div class="auth-panels-track" id="authPanelsTrack">
+                <div class="auth-panel {% if active_panel == 'login' %}is-active{% endif %}" id="authPanelLogin" data-auth-panel="login" role="tabpanel" aria-hidden="{% if active_panel == 'login' %}false{% else %}true{% endif %}">
+                    <div class="auth-panel-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="mb-0">Entrar</h2>
+                            <span class="text-secondary small">Acesse seus workspaces</span>
+                        </div>
+                        <div id="loginError" class="alert alert-danger py-2 small mb-3 d-none" aria-live="polite"></div>
+                        <div id="loginSuccess" class="alert alert-success py-2 small mb-3 d-none" aria-live="polite"></div>
+                        {% if login_form.non_field_errors %}
+                            <div class="alert alert-danger py-2 small mb-3" data-auto-dismiss="1">
+                                {{ login_form.non_field_errors|striptags }}
+                            </div>
+                        {% endif %}
+                        <form id="loginForm" method="post" action="{% url 'tracker:login' %}" novalidate data-no-transition="1" data-auth-form="login">
+                            {% csrf_token %}
+                            <input type="hidden" name="auth_hub" value="1">
+                            {% for field in login_form %}
+                                <div class="mb-3">
+                                    <label class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div class="d-grid">
+                                <button class="btn btn-primary" type="submit">Entrar</button>
+                            </div>
+                        </form>
+                        <p class="small mt-3 mb-0 text-secondary">Esqueceu a senha? <a href="{% url 'tracker:password_reset' %}">Recuperar acesso</a></p>
+                    </div>
+                </div>
+
+                <div class="auth-panel {% if active_panel == 'register' %}is-active{% endif %}" id="authPanelRegister" data-auth-panel="register" role="tabpanel" aria-hidden="{% if active_panel == 'register' %}false{% else %}true{% endif %}">
+                    <div class="auth-panel-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="mb-0">Criar conta</h2>
+                            <span class="text-secondary small">Plano + workspace</span>
+                        </div>
+                        {% if register_form.non_field_errors %}
+                            <div class="alert alert-danger py-2 small mb-3" data-auto-dismiss="1">
+                                {{ register_form.non_field_errors|striptags }}
+                            </div>
+                        {% endif %}
+                        <form method="post" novalidate enctype="multipart/form-data" class="row g-3" data-no-transition="1" data-auth-form="register">
+                            {% csrf_token %}
+                            <input type="hidden" name="auth_hub" value="1">
+                            {% for field in register_form %}
+                                {% if field.name == 'invite_code' %}
+                                    <div class="col-12 invite-highlight">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <label class="form-label">{{ field.label }}</label>
+                                            <span class="badge text-bg-success">Codigo de convite</span>
+                                        </div>
+                                        {{ field }}
+                                        <div class="form-text">Tem um codigo? Cole aqui para ativar a assinatura sem pagamento imediato.</div>
+                                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                                        {% if field.errors %}
+                                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                    </div>
+                                {% elif field.name == 'master_guest_limit' %}
+                                    <div class="col-12 d-none" data-master-guest>
+                                        <label class="form-label">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                                        {% if field.errors %}
+                                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <div class="col-12">
+                                        <label class="form-label">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                                        {% if field.name == 'email' %}
+                                            <div class="form-text">Use um e-mail valido para iniciar o pagamento da assinatura.</div>
+                                        {% endif %}
+                                        {% if field.errors %}
+                                            <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                        {% if field.name == 'password1' %}
+                                            <div class="password-rules" data-password-rules aria-live="polite">
+                                                <div class="small fw-semibold text-secondary mb-2">Sua senha precisa:</div>
+                                                <ul>
+                                                    <li data-rule="length"><span class="rule-dot"></span><span>Conter pelo menos 8 caracteres.</span></li>
+                                                    <li data-rule="similar"><span class="rule-dot"></span><span>Nao ser parecida com seus dados pessoais.</span></li>
+                                                    <li data-rule="common"><span class="rule-dot"></span><span>Nao ser uma senha comumente utilizada.</span></li>
+                                                    <li data-rule="numeric"><span class="rule-dot"></span><span>Nao ser inteiramente numerica.</span></li>
+                                                    <li data-rule="special"><span class="rule-dot"></span><span>Conter ao menos 1 caractere especial.</span></li>
+                                                    <li data-rule="match"><span class="rule-dot"></span><span>Confirmacao igual a senha.</span></li>
+                                                </ul>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                            <div class="col-12 d-grid">
+                                <button class="btn btn-primary" type="submit">Criar conta</button>
+                            </div>
+                        </form>
+                        <p class="small mt-3 mb-0 text-secondary">Seu cadastro fica pendente at&eacute; a aprova&ccedil;&atilde;o do administrador.</p>
+                    </div>
+                </div>
+
+                <div class="auth-panel {% if active_panel == 'guest' %}is-active{% endif %}" id="authPanelGuest" data-auth-panel="guest" role="tabpanel" aria-hidden="{% if active_panel == 'guest' %}false{% else %}true{% endif %}">
+                    <div class="auth-panel-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="mb-0">Conta convidado</h2>
+                            <span class="text-secondary small">Acesso controlado</span>
+                        </div>
+                        {% if guest_form.non_field_errors %}
+                            <div class="alert alert-danger py-2 small mb-3" data-auto-dismiss="1">
+                                {{ guest_form.non_field_errors|striptags }}
+                            </div>
+                        {% endif %}
+                        <form method="post" novalidate enctype="multipart/form-data" class="row g-3" data-no-transition="1" data-auth-form="guest" data-guest-warning="Conta de convidado pode lancar transacoes e ver tarefas, mas nao acessa dashboard, edicoes e IA.">
+                            {% csrf_token %}
+                            <input type="hidden" name="auth_hub" value="1">
+                            {% for field in guest_form %}
+                                <div class="col-12">
+                                    <label class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                                    {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                    {% endif %}
+                                    {% if field.name == 'password1' %}
+                                        <div class="password-rules" data-password-rules aria-live="polite">
+                                            <div class="small fw-semibold text-secondary mb-2">Sua senha precisa:</div>
+                                            <ul>
+                                                <li data-rule="length"><span class="rule-dot"></span><span>Conter pelo menos 8 caracteres.</span></li>
+                                                <li data-rule="similar"><span class="rule-dot"></span><span>Nao ser parecida com seus dados pessoais.</span></li>
+                                                <li data-rule="common"><span class="rule-dot"></span><span>Nao ser uma senha comumente utilizada.</span></li>
+                                                <li data-rule="numeric"><span class="rule-dot"></span><span>Nao ser inteiramente numerica.</span></li>
+                                                <li data-rule="special"><span class="rule-dot"></span><span>Conter ao menos 1 caractere especial.</span></li>
+                                                <li data-rule="match"><span class="rule-dot"></span><span>Confirmacao igual a senha.</span></li>
+                                            </ul>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div class="col-12 d-grid">
+                                <button class="btn btn-primary" type="submit">Criar conta convidado</button>
+                            </div>
+                        </form>
+                        <p class="small mt-3 mb-0 text-secondary">Use o slug do workspace para solicitar acesso ao owner.</p>
+                    </div>
+                </div>
+                    </div>
+                </div>
+
+                {% if social_instagram_url or social_facebook_url %}
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        {% if social_instagram_url %}
+                            <a class="btn btn-outline-light btn-sm" href="{{ social_instagram_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Instagram" aria-label="Instagram">
+                                <i class="fa-brands fa-instagram me-1"></i>Instagram
+                            </a>
+                        {% endif %}
+                        {% if social_facebook_url %}
+                            <a class="btn btn-outline-light btn-sm" href="{{ social_facebook_url }}" target="_blank" rel="noopener" data-bs-toggle="tooltip" title="Facebook" aria-label="Facebook">
+                                <i class="fa-brands fa-facebook me-1"></i>Facebook
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script defer src="{% static 'js/auth_hub.js' %}"></script>
+<script defer src="{% static 'js/mouse-field.js' %}"></script>
+{% endblock %}

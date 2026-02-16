@@ -1,4 +1,6 @@
 const html = document.documentElement;
+const ANIMATION_PREF_KEY = 'itrAnimationsPreference';
+const ANIMATION_PREFS = ['auto', 'on', 'off'];
 const THEMES = [
     'dark-teal',
     'dark-orange',
@@ -7,6 +9,54 @@ const THEMES = [
     'light-orange',
     'light-purple'
 ];
+
+function normalizeAnimationPreference(value) {
+    const normalized = String(value || '').toLowerCase();
+    if (normalized === 'on' || normalized === 'off') return normalized;
+    return 'auto';
+}
+
+function labelForAnimationPreference(value) {
+    const pref = normalizeAnimationPreference(value);
+    if (pref === 'on') return 'Ativar';
+    if (pref === 'off') return 'Desativar';
+    return 'Auto';
+}
+
+function nextAnimationPreference(value) {
+    const pref = normalizeAnimationPreference(value);
+    const idx = ANIMATION_PREFS.indexOf(pref);
+    return ANIMATION_PREFS[(idx + 1) % ANIMATION_PREFS.length];
+}
+
+function applyAnimationPreference(value, persist = true) {
+    const preference = normalizeAnimationPreference(value);
+    if (document.body) {
+        document.body.setAttribute('data-animations', preference);
+    }
+    if (persist) {
+        try {
+            localStorage.setItem(ANIMATION_PREF_KEY, preference);
+        } catch (err) {
+            // ignore storage failures
+        }
+    }
+    document.querySelectorAll('.js-animation-pref').forEach((control) => {
+        if (control.value !== preference) control.value = preference;
+    });
+    const labelText = labelForAnimationPreference(preference);
+    document.querySelectorAll('#animationPrefLabel').forEach((label) => {
+        label.textContent = labelText;
+    });
+    document.querySelectorAll('.js-animation-pref-toggle').forEach((button) => {
+        button.dataset.pref = preference;
+        const title = `Animações: ${labelText}`;
+        button.setAttribute('data-bs-title', title);
+        button.setAttribute('data-bs-original-title', title);
+        button.setAttribute('aria-label', title);
+    });
+    window.dispatchEvent(new CustomEvent('itr:animations-change', { detail: { preference } }));
+}
 
 function normalizeTheme(value) {
     if (!value) return 'light-teal';
@@ -74,8 +124,22 @@ window.iTrackerToggleTheme = toggleTheme;
 document.addEventListener('DOMContentLoaded', () => {
     const saved = normalizeTheme(localStorage.getItem('theme'));
     applyTheme(saved);
+    applyAnimationPreference(localStorage.getItem(ANIMATION_PREF_KEY) || 'auto', false);
     document.querySelectorAll('.js-theme-toggle').forEach(toggle => {
         toggle.addEventListener('click', toggleTheme);
+    });
+    document.querySelectorAll('.js-animation-pref').forEach((control) => {
+        control.addEventListener('change', () => {
+            applyAnimationPreference(control.value, true);
+        });
+    });
+    document.querySelectorAll('.js-animation-pref-toggle').forEach((button) => {
+        button.addEventListener('click', () => {
+            const current = normalizeAnimationPreference(
+                (document.body && document.body.getAttribute('data-animations')) || localStorage.getItem(ANIMATION_PREF_KEY) || 'auto'
+            );
+            applyAnimationPreference(nextAnimationPreference(current), true);
+        });
     });
 
     const sidebar = document.getElementById('sidebar');

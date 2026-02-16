@@ -8,6 +8,8 @@ app_name = 'tracker'
 
 urlpatterns = [
     path('', views.home, name='home'),
+    path('quiz/', views.plan_quiz, name='plan_quiz'),
+    path('auth/', views.auth_hub, name='auth_hub'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('register/', views.register_view, name='register'),

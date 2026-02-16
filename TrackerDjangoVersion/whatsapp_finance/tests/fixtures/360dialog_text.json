@@ -1,0 +1,27 @@
+{
+  "entry": [
+    {
+      "changes": [
+        {
+          "value": {
+            "metadata": {
+              "display_phone_number": "14155238886",
+              "phone_number_id": "1234567890"
+            },
+            "messages": [
+              {
+                "from": "5511999999999",
+                "id": "wamid.test.text",
+                "timestamp": "1700000000",
+                "type": "text",
+                "text": {
+                  "body": "Oi, tudo bem?"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

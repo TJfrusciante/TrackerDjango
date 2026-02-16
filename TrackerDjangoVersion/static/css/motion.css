@@ -1,0 +1,68 @@
+:root {
+    --itr-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --itr-motion-fast: 180ms;
+    --itr-motion-mid: 300ms;
+    --itr-motion-slow: 380ms;
+    --itr-lift-shadow: 0 22px 44px rgba(0, 0, 0, 0.28);
+}
+
+.itr-page-surface {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity var(--itr-motion-mid) var(--itr-motion-ease), transform var(--itr-motion-mid) var(--itr-motion-ease);
+    will-change: opacity, transform;
+}
+
+body.itr-page-enter-active .itr-page-surface {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.itr-reveal {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+    transition: opacity var(--itr-motion-slow) var(--itr-motion-ease), transform var(--itr-motion-slow) var(--itr-motion-ease);
+    will-change: opacity, transform;
+}
+
+.itr-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.itr-hover-lift {
+    transition: transform var(--itr-motion-fast) var(--itr-motion-ease), box-shadow var(--itr-motion-fast) var(--itr-motion-ease), border-color var(--itr-motion-fast) var(--itr-motion-ease);
+}
+
+.itr-hover-lift:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: var(--itr-lift-shadow);
+}
+
+.itr-hover-glow:hover {
+    border-color: rgba(94, 234, 212, 0.28) !important;
+    box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.18), 0 12px 24px rgba(15, 118, 110, 0.18);
+}
+
+.itr-focus-ring:focus-visible {
+    outline: 2px solid var(--primary-soft);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.16);
+}
+
+.itr-stagger > * {
+    transition-delay: var(--itr-stagger-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .itr-page-surface,
+    .itr-reveal,
+    .itr-hover-lift {
+        transition: none !important;
+        transform: none !important;
+    }
+    .itr-hover-lift:hover {
+        transform: none !important;
+        box-shadow: none !important;
+    }
+}

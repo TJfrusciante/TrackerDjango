@@ -1,0 +1,122 @@
+.mouse-field-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    width: 100vw;
+    height: 100vh;
+    opacity: var(--mouse-field-opacity, 0.82);
+    transition: opacity 220ms ease;
+}
+
+.js-mouse-field-root {
+    position: relative;
+    z-index: 1;
+}
+
+body.public-mouse-field-only .itr-ambient {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+body.public-mouse-field-only .itr-brand-motion {
+    display: none !important;
+}
+
+.public-controls {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    z-index: 1400;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    backdrop-filter: blur(8px);
+}
+
+.public-theme-toggle,
+.public-fx-toggle {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 999px;
+    padding: 0.55rem 0.95rem;
+    background: rgba(8, 15, 35, 0.72);
+    color: #e2e8f0;
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 2.25rem;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.public-fx-toggle {
+    min-width: 9.2rem;
+}
+
+.public-theme-toggle:hover,
+.public-fx-toggle:hover {
+    transform: translateY(-1px);
+    border-color: rgba(56, 189, 248, 0.6);
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25), 0 10px 20px rgba(15, 23, 42, 0.25);
+}
+
+.public-theme-toggle:focus-visible,
+.public-fx-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
+    border-color: rgba(56, 189, 248, 0.75);
+}
+
+.public-fx-toggle[data-fx='off'] {
+    border-color: rgba(248, 113, 113, 0.6);
+}
+
+body[data-bs-theme='light'] .public-theme-toggle,
+body[data-bs-theme='light'] .public-fx-toggle {
+    background: rgba(248, 250, 252, 0.9);
+    color: #0f172a;
+    border-color: rgba(71, 85, 105, 0.35);
+}
+
+body[data-bs-theme='light'] .public-theme-toggle:hover,
+body[data-bs-theme='light'] .public-fx-toggle:hover {
+    border-color: rgba(2, 132, 199, 0.55);
+    box-shadow: 0 0 0 1px rgba(14, 116, 144, 0.2), 0 10px 20px rgba(15, 23, 42, 0.15);
+}
+
+@media (max-width: 992px), (pointer: coarse) {
+    .public-controls {
+        top: max(8px, env(safe-area-inset-top));
+        right: max(8px, env(safe-area-inset-right));
+    }
+
+    .public-theme-toggle,
+    .public-fx-toggle {
+        font-size: 0.8rem;
+        min-height: 2.05rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .public-fx-toggle {
+        min-width: 8.4rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mouse-field-canvas {
+        opacity: 0.35;
+        transition: none;
+    }
+
+    body.public-mouse-field-only .itr-ambient {
+        opacity: 0 !important;
+    }
+
+    .public-theme-toggle,
+    .public-fx-toggle {
+        transition: none;
+    }
+}

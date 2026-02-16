@@ -3,10 +3,126 @@
 
 {% block title %}Dashboard | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    .latest-tx-shell .table-responsive {
+        overflow-x: auto;
+        overflow-y: auto;
+    }
+    #latestTxTable {
+        min-width: 1020px;
+    }
+    #latestTxTable th:first-child,
+    #latestTxTable td:first-child {
+        width: 72px;
+        min-width: 72px;
+        text-align: center;
+    }
+    [data-bs-theme='dark'] #incomeCard,
+    [data-bs-theme='dark'] #expenseCard,
+    [data-bs-theme='dark'] #balanceCard,
+    [data-bs-theme='dark'] #tasksCard,
+    [data-bs-theme='dark'] #txCountCard,
+    [data-bs-theme='dark'] #net30Card,
+    [data-bs-theme='dark'] #avgExpenseCard,
+    [data-bs-theme='dark'] #tasksProgressCard,
+    [data-bs-theme='dark'] #topIncomeCard,
+    [data-bs-theme='dark'] #topExpenseCard,
+    [data-bs-theme='dark'] #topNetCard {
+        background: linear-gradient(145deg, rgba(8, 18, 36, 0.95), rgba(8, 21, 42, 0.9));
+        border-color: rgba(148, 163, 184, 0.34);
+        box-shadow: 0 18px 36px rgba(2, 6, 23, 0.34);
+    }
+    [data-bs-theme='dark'] #incomeCard p.text-secondary,
+    [data-bs-theme='dark'] #expenseCard p.text-secondary,
+    [data-bs-theme='dark'] #balanceCard p.text-secondary,
+    [data-bs-theme='dark'] #tasksCard p.text-secondary,
+    [data-bs-theme='dark'] #txCountCard p.text-secondary,
+    [data-bs-theme='dark'] #net30Card p.text-secondary,
+    [data-bs-theme='dark'] #avgExpenseCard p.text-secondary,
+    [data-bs-theme='dark'] #tasksProgressCard p.text-secondary,
+    [data-bs-theme='dark'] #topIncomeCard p.text-secondary,
+    [data-bs-theme='dark'] #topExpenseCard p.text-secondary,
+    [data-bs-theme='dark'] #topNetCard p.text-secondary {
+        color: rgba(226, 232, 240, 0.86) !important;
+    }
+    [data-bs-theme='dark'] #incomeCard .js-interval-label,
+    [data-bs-theme='dark'] #expenseCard .js-interval-label,
+    [data-bs-theme='dark'] #balanceCard .js-interval-label,
+    [data-bs-theme='dark'] #tasksCard .js-interval-label,
+    [data-bs-theme='dark'] #txCountCard .js-interval-label,
+    [data-bs-theme='dark'] #net30Card .js-interval-label,
+    [data-bs-theme='dark'] #avgExpenseCard .js-interval-label,
+    [data-bs-theme='dark'] #tasksProgressCard .js-interval-label,
+    [data-bs-theme='dark'] #topIncomeCard .js-interval-label,
+    [data-bs-theme='dark'] #topExpenseCard .js-interval-label,
+    [data-bs-theme='dark'] #topNetCard .js-interval-label {
+        color: rgba(203, 213, 225, 0.9) !important;
+    }
+    [data-bs-theme='dark'] #tasksOverdueValue {
+        color: #fbbf24 !important;
+    }
+    [data-bs-theme='light'] #incomeCard,
+    [data-bs-theme='light'] #expenseCard,
+    [data-bs-theme='light'] #balanceCard,
+    [data-bs-theme='light'] #tasksCard,
+    [data-bs-theme='light'] #txCountCard,
+    [data-bs-theme='light'] #net30Card,
+    [data-bs-theme='light'] #avgExpenseCard,
+    [data-bs-theme='light'] #tasksProgressCard,
+    [data-bs-theme='light'] #topIncomeCard,
+    [data-bs-theme='light'] #topExpenseCard,
+    [data-bs-theme='light'] #topNetCard {
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 252, 0.97));
+        border-color: rgba(71, 85, 105, 0.24);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
+    }
+    [data-bs-theme='light'] #incomeCard p.text-secondary,
+    [data-bs-theme='light'] #expenseCard p.text-secondary,
+    [data-bs-theme='light'] #balanceCard p.text-secondary,
+    [data-bs-theme='light'] #tasksCard p.text-secondary,
+    [data-bs-theme='light'] #txCountCard p.text-secondary,
+    [data-bs-theme='light'] #net30Card p.text-secondary,
+    [data-bs-theme='light'] #avgExpenseCard p.text-secondary,
+    [data-bs-theme='light'] #tasksProgressCard p.text-secondary,
+    [data-bs-theme='light'] #topIncomeCard p.text-secondary,
+    [data-bs-theme='light'] #topExpenseCard p.text-secondary,
+    [data-bs-theme='light'] #topNetCard p.text-secondary {
+        color: rgba(30, 41, 59, 0.84) !important;
+    }
+    [data-bs-theme='light'] #incomeCard .js-interval-label,
+    [data-bs-theme='light'] #expenseCard .js-interval-label,
+    [data-bs-theme='light'] #balanceCard .js-interval-label,
+    [data-bs-theme='light'] #tasksCard .js-interval-label,
+    [data-bs-theme='light'] #txCountCard .js-interval-label,
+    [data-bs-theme='light'] #net30Card .js-interval-label,
+    [data-bs-theme='light'] #avgExpenseCard .js-interval-label,
+    [data-bs-theme='light'] #tasksProgressCard .js-interval-label,
+    [data-bs-theme='light'] #topIncomeCard .js-interval-label,
+    [data-bs-theme='light'] #topExpenseCard .js-interval-label,
+    [data-bs-theme='light'] #topNetCard .js-interval-label {
+        color: rgba(51, 65, 85, 0.86) !important;
+    }
+    [data-bs-theme='light'] #clearFilters {
+        color: rgba(15, 23, 42, 0.92);
+        border-color: rgba(30, 41, 59, 0.38);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(241, 245, 249, 0.92));
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    }
+    [data-bs-theme='light'] #clearFilters:hover,
+    [data-bs-theme='light'] #clearFilters:focus-visible {
+        color: rgba(15, 23, 42, 0.98);
+        border-color: rgba(30, 41, 59, 0.56);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.99), rgba(226, 232, 240, 0.95));
+        box-shadow: 0 12px 22px rgba(15, 23, 42, 0.13);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row gy-4">
     <div class="col-12">
-        <div class="page-hero">
+        <div class="page-hero" data-motion="reveal">
             <div class="page-hero__info">
                 <p class="page-hero__eyebrow">Dashboard</p>
                 <h1 class="page-hero__title">Controle de finan&ccedil;as e tarefas</h1>
@@ -55,7 +171,7 @@
 
     {% if onboarding.show %}
     <div class="col-12">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 itr-soft-border" data-motion="reveal">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
                 <div>
                     <h5 class="mb-0">Checklist inicial</h5>
@@ -112,9 +228,9 @@
     </div>
 
     <div class="col-12">
-        <div class="row g-3">
+        <div class="row g-3" data-motion="reveal" data-stagger="1">
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-secondary {% if income_total > 0 %}kpi-positive{% endif %}" id="incomeCard">
+                <div class="glass-card p-3 h-100 kpi-secondary itr-soft-border {% if income_total > 0 %}kpi-positive{% endif %}" id="incomeCard">
                     <p class="text-secondary small mb-1">Entradas</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if income_total > 0 %}value-positive{% else %}text-secondary{% endif %}" id="incomeValue">R$ {{ income_total|floatformat:2 }}</h3>
@@ -124,7 +240,7 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-secondary {% if expense_total > 0 %}kpi-negative{% endif %}" id="expenseCard">
+                <div class="glass-card p-3 h-100 kpi-secondary itr-soft-border {% if expense_total > 0 %}kpi-negative{% endif %}" id="expenseCard">
                 <p class="text-secondary small mb-1">Sa&iacute;das</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if expense_total > 0 %}value-negative{% else %}text-secondary{% endif %}" id="expenseValue">R$ {{ expense_total|floatformat:2 }}</h3>
@@ -134,7 +250,7 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-main {% if balance_total >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="balanceCard">
+                <div class="glass-card p-3 h-100 kpi-main itr-soft-border {% if balance_total >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="balanceCard">
                 <p class="text-secondary small mb-1">Saldo</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if balance_total >= 0 %}value-positive{% else %}value-negative{% endif %}" id="balanceValue">R$ {{ balance_total|floatformat:2 }}</h3>
@@ -144,7 +260,7 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-secondary {% if tasks_overdue > 0 %}kpi-negative{% elif tasks_done > 0 %}kpi-positive{% endif %}" id="tasksCard">
+                <div class="glass-card p-3 h-100 kpi-secondary itr-soft-border {% if tasks_overdue > 0 %}kpi-negative{% elif tasks_done > 0 %}kpi-positive{% endif %}" id="tasksCard">
                 <p class="text-secondary small mb-1">Tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 {% if tasks_overdue > 0 %}text-warning{% else %}text-info{% endif %}" id="tasksOpenValue">{{ tasks_open }} abertas</h3>
@@ -158,30 +274,30 @@
     </div>
 
     <div class="col-12">
-        <div class="row g-3">
+        <div class="row g-3" data-motion="reveal" data-stagger="1">
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-secondary {% if tx_count_period > 0 %}kpi-positive{% endif %}" id="txCountCard">
+                <div class="glass-card p-3 h-100 kpi-secondary itr-soft-border {% if tx_count_period > 0 %}kpi-positive{% endif %}" id="txCountCard">
                 <p class="text-secondary small mb-1">Movimenta&#231;&#245;es no per&#237;odo</p>
                     <h4 class="mb-0 {% if tx_count_period > 0 %}text-success{% else %}text-secondary{% endif %}" id="txCountValue">{{ tx_count_period }}</h4>
                     <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-secondary {% if net_30 >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="net30Card">
+                <div class="glass-card p-3 h-100 kpi-secondary itr-soft-border {% if net_30 >= 0 %}kpi-positive{% else %}kpi-negative{% endif %}" id="net30Card">
                 <p class="text-secondary small mb-1">Saldo &#250;ltimos 30 dias</p>
                     <h4 class="mb-0 {% if net_30 >= 0 %}value-positive{% else %}value-negative{% endif %}" id="net30Value">R$ {{ net_30|floatformat:2 }}</h4>
                     <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-secondary {% if avg_daily_expense > 0 %}kpi-negative{% endif %}" id="avgExpenseCard">
+                <div class="glass-card p-3 h-100 kpi-secondary itr-soft-border {% if avg_daily_expense > 0 %}kpi-negative{% endif %}" id="avgExpenseCard">
                 <p class="text-secondary small mb-1">Despesa m&#233;dia (30d)</p>
                     <h4 class="mb-0 {% if avg_daily_expense > 0 %}value-negative{% else %}text-secondary{% endif %}" id="avgExpenseValue">R$ {{ avg_daily_expense|floatformat:2 }}/dia</h4>
                     <div class="small text-secondary mt-2 js-interval-label"></div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="glass-card p-3 h-100 kpi-secondary {% if tasks_progress_pct >= 70 %}kpi-positive{% elif tasks_progress_pct < 40 %}kpi-negative{% endif %}" id="tasksProgressCard">
+                <div class="glass-card p-3 h-100 kpi-secondary itr-soft-border {% if tasks_progress_pct >= 70 %}kpi-positive{% elif tasks_progress_pct < 40 %}kpi-negative{% endif %}" id="tasksProgressCard">
                 <p class="text-secondary small mb-1">Progresso tarefas</p>
                     <div class="d-flex align-items-center justify-content-between">
                         <h4 class="mb-0 {% if tasks_progress_pct >= 70 %}value-positive{% elif tasks_progress_pct >= 40 %}text-warning{% else %}value-negative{% endif %}" id="tasksProgressValue">{{ tasks_progress_pct }}%</h4>
@@ -194,7 +310,7 @@
     </div>
 
     <div class="col-12">
-        <div class="row g-3">
+        <div class="row g-3" data-motion="reveal" data-stagger="1">
             <div class="col-md-4">
                 <div class="glass-card p-3 h-100 {% if insights.top_income_value %}kpi-positive{% endif %}" id="topIncomeCard">
                     <p class="text-secondary small mb-1">Maior receita</p>
@@ -238,7 +354,7 @@
     </div>
 
     <div class="col-lg-7">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
             <form id="rangeForm" method="get" class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3" data-tour="dashboard-filters" data-no-transition="1">
                 <div>
                     <h5 class="mb-0">Distribui&#231;&#227;o por categoria</h5>
@@ -315,7 +431,7 @@
     </div>
 
     <div class="col-lg-5">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Entradas vs Sa&#237;das</h5>
             </div>
@@ -334,9 +450,9 @@
     </div>
 
     <div class="col-12">
-        <div class="row g-3">
+        <div class="row g-3" data-motion="reveal" data-stagger="1">
             <div class="col-lg-6">
-                <div class="glass-card p-4 h-100">
+                <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Despesas por categoria</h5>
                         <span class="text-secondary small js-interval-label"></span>
@@ -348,7 +464,7 @@
                 </div>
             </div>
             <div class="col-lg-6">
-                <div class="glass-card p-4 h-100">
+                <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Entradas por categoria</h5>
                         <span class="text-secondary small js-interval-label"></span>
@@ -363,9 +479,9 @@
     </div>
 
     <div class="col-12">
-        <div class="row g-3">
+        <div class="row g-3" data-motion="reveal" data-stagger="1">
             <div class="col-lg-6">
-                <div class="glass-card p-4 h-100">
+                <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
                     <div class="d-flex align-items-start justify-content-between mb-2">
                         <h5 class="mb-0">Avalia&ccedil;&atilde;o do agente</h5>
                         <span class="badge bg-primary-subtle text-primary px-3">Finan&ccedil;as</span>
@@ -391,7 +507,7 @@
                 </div>
             </div>
             <div class="col-lg-6">
-                <div class="glass-card p-4 h-100">
+                <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
                     <div class="d-flex align-items-start justify-content-between mb-2">
                         <h5 class="mb-0">Avalia&ccedil;&atilde;o do agente</h5>
                         <span class="badge bg-warning-subtle text-warning px-3">Tarefas</span>
@@ -420,7 +536,7 @@
     </div>
 
     <div class="col-12">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 itr-soft-border latest-tx-shell" data-motion="reveal">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">&Uacute;ltimas transa&ccedil;&otilde;es</h5>
                 <a class="btn btn-sm btn-outline-light" href="{% url 'tracker:transactions_list' %}">Ver todas</a>
@@ -472,10 +588,12 @@
                         {% empty %}
                             <tr>
                                 <td colspan="{% if show_responsible_column %}7{% else %}6{% endif %}">
+                                    <div class="itr-motion-empty" data-motion="reveal">
                                     <div class="text-secondary mb-2">Sem transa&ccedil;&otilde;es por enquanto.</div>
-                                    <a class="btn btn-sm btn-primary" href="{% url 'tracker:transaction_create' %}">
+                                    <a class="btn btn-sm btn-primary itr-ripple" href="{% url 'tracker:transaction_create' %}">
                                         <i class="fa-solid fa-plus me-2"></i>Criar primeira transa&ccedil;&atilde;o
                                     </a>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -486,7 +604,7 @@
     </div>
 
     <div class="col-12">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
                 <div>
                     <h5 class="mb-0">Saldo mensal</h5>
@@ -502,7 +620,7 @@
     </div>
 
     <div class="col-12">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
                 <div>
                     <h5 class="mb-0">Evolu&#231;&#227;o di&#225;ria</h5>
@@ -518,7 +636,7 @@
     </div>
 
     <div class="col-12">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start gap-3 mb-3">
                 <div>
                     <h5 class="mb-0">Saldo acumulado</h5>
@@ -534,13 +652,13 @@
     </div>
 
     <div class="col-12">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 itr-soft-border" data-motion="reveal">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center align-items-start mb-3 gap-2">
                 <h5 class="mb-0">Maiores categorias (per&#237;odo)</h5>
                 <span class="text-secondary small">Baseado no filtro selecionado</span>
             </div>
             <div class="small text-secondary mb-3 js-interval-label"></div>
-            <div class="row g-3">
+            <div class="row g-3" data-motion="reveal" data-stagger="1">
                 <div class="col-md-6">
                     <h6 class="fw-bold mb-2 text-success">Top Receitas</h6>
                     <ul class="list-group list-group-flush" id="topIncomeList">
@@ -572,7 +690,7 @@
     </div>
 
     <div class="col-lg-12">
-    <div class="glass-card p-4 h-100">
+    <div class="glass-card p-4 h-100 itr-soft-border" data-motion="reveal">
         <h5 class="mb-3">&Uacute;ltimas tarefas</h5>
         <div id="latestTasksSkeleton" class="skeleton table-skeleton mb-3"></div>
         <div class="list-group list-group-flush">
@@ -591,10 +709,12 @@
                         </span>
                     </div>
                 {% empty %}
+                    <div class="itr-motion-empty" data-motion="reveal">
                     <div class="text-secondary mb-2">Nenhuma tarefa encontrada.</div>
-                    <a class="btn btn-sm btn-primary" href="{% url 'tracker:task_create' %}">
+                    <a class="btn btn-sm btn-primary itr-ripple" href="{% url 'tracker:task_create' %}">
                         <i class="fa-solid fa-plus me-2"></i>Criar primeira tarefa
                     </a>
+                    </div>
                 {% endfor %}
             </div>
         </div>
@@ -610,9 +730,10 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" data-chartjs="1"></script>
 <script src="{% static 'js/onboarding.js' %}"></script>
 <script>
+    window.addEventListener('load', () => {
     const ctx = document.getElementById('categoryChart');
     const typeCtx = document.getElementById('typeChart');
     const monthlyCtx = document.getElementById('monthlyChart');
@@ -758,7 +879,7 @@
     const filterCountBadge = document.getElementById('filterCountBadge');
     const intervalLabels = document.querySelectorAll('.js-interval-label');
     const intervalCurrent = document.getElementById('intervalCurrent');
-    const quickButtons = document.querySelectorAll('[data-period]');
+    var quickButtons = document.querySelectorAll('[data-period]');
     let activeCategoryColor = '';
 
     const getPeriodLabel = () => {
@@ -893,8 +1014,16 @@
     };
 
     function requestChartLoad() {
+        if (chartsLoaded) return;
         chartsLoaded = true;
-        loadChart();
+        if (window.Chart) {
+            loadChart();
+            return;
+        }
+        const chartScript = document.querySelector('script[data-chartjs="1"]');
+        if (chartScript) {
+            chartScript.addEventListener('load', () => loadChart(), { once: true });
+        }
     }
 
     const cssRoot = getComputedStyle(document.documentElement);
@@ -1544,6 +1673,19 @@
                 )).join('');
             }
         }
+        const bodyMood = (document.body && document.body.dataset && document.body.dataset.ambientMood) ? document.body.dataset.ambientMood : 'neutral';
+        const bodyScore = (document.body && document.body.dataset && document.body.dataset.ambientScore) ? Number(document.body.dataset.ambientScore) : 0;
+        const nextAmbient = {
+            mode: 'full',
+            mood: data.ambient?.mood || bodyMood || 'neutral',
+            score: Number.isFinite(Number(data.ambient?.score)) ? Number(data.ambient.score) : (Number.isFinite(bodyScore) ? bodyScore : 0),
+            source: 'dashboard-ajax',
+        };
+        if (typeof window.itrSetAmbientMood === 'function') {
+            window.itrSetAmbientMood(nextAmbient);
+        } else {
+            window.__itrAmbientPendingMood = nextAmbient;
+        }
 
         if (emptyMsg) {
             const isEmpty = !data.labels || data.labels.length === 0;
@@ -1561,77 +1703,76 @@
         hideSkeleton(incomeCategorySkeleton);
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        updateCategoryFilterInfo();
-        renderFilterChips();
-        const chartAnchor = ctx || categorySkeleton || document.querySelector('.chart-box');
-        if ('IntersectionObserver' in window && chartAnchor) {
-            const observer = new IntersectionObserver((entries, obs) => {
-                if (entries.some(entry => entry.isIntersecting)) {
-                    requestChartLoad();
-                    obs.disconnect();
+    updateCategoryFilterInfo();
+    renderFilterChips();
+    const chartAnchor = ctx || categorySkeleton || document.querySelector('.chart-box');
+    if ('IntersectionObserver' in window && chartAnchor) {
+        const observer = new IntersectionObserver((entries, obs) => {
+            if (entries.some(entry => entry.isIntersecting)) {
+                requestChartLoad();
+                obs.disconnect();
+            }
+        }, { rootMargin: '120px' });
+        observer.observe(chartAnchor);
+    } else {
+        requestChartLoad();
+    }
+    hideSkeleton(latestTxSkeleton);
+    hideSkeleton(latestTasksSkeleton);
+    const latestTxTable = document.getElementById('latestTxTable');
+    if (latestTxTable) {
+        const tbody = latestTxTable.querySelector('tbody');
+        const headers = Array.from(latestTxTable.querySelectorAll('thead th[data-sort]'));
+        const indexMap = {};
+        headers.forEach((th, idx) => {
+            indexMap[th.dataset.sort] = idx;
+            th.style.cursor = 'pointer';
+        });
+        const parseMoney = (value) => {
+            const cleaned = String(value || '').replace(/[^0-9,-]/g, '').replace(/\./g, '').replace(',', '.');
+            const num = parseFloat(cleaned);
+            return Number.isFinite(num) ? num : 0;
+        };
+        const parseDate = (value) => {
+            const parts = String(value || '').trim().split('/');
+            if (parts.length !== 3) return 0;
+            return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime() || 0;
+        };
+        let sortState = { key: '', dir: 'asc' };
+        const getCellText = (row, key) => {
+            const idx = indexMap[key];
+            const cell = row.children[idx];
+            return cell ? cell.textContent.trim() : '';
+        };
+        const sortRows = (key) => {
+            if (!tbody) return;
+            const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => row.querySelectorAll('td').length);
+            if (!rows.length) return;
+            sortState.dir = (sortState.key === key && sortState.dir === 'asc') ? 'desc' : 'asc';
+            sortState.key = key;
+            rows.sort((a, b) => {
+                let aVal = getCellText(a, key);
+                let bVal = getCellText(b, key);
+                if (key === 'value') {
+                    aVal = parseMoney(aVal);
+                    bVal = parseMoney(bVal);
+                } else if (key === 'date') {
+                    aVal = parseDate(aVal);
+                    bVal = parseDate(bVal);
+                } else {
+                    aVal = String(aVal).toLowerCase();
+                    bVal = String(bVal).toLowerCase();
                 }
-            }, { rootMargin: '120px' });
-            observer.observe(chartAnchor);
-        } else {
-            requestChartLoad();
-        }
-        hideSkeleton(latestTxSkeleton);
-        hideSkeleton(latestTasksSkeleton);
-        const latestTxTable = document.getElementById('latestTxTable');
-        if (latestTxTable) {
-            const tbody = latestTxTable.querySelector('tbody');
-            const headers = Array.from(latestTxTable.querySelectorAll('thead th[data-sort]'));
-            const indexMap = {};
-            headers.forEach((th, idx) => {
-                indexMap[th.dataset.sort] = idx;
-                th.style.cursor = 'pointer';
+                if (aVal < bVal) return sortState.dir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortState.dir === 'asc' ? 1 : -1;
+                return 0;
             });
-            const parseMoney = (value) => {
-                const cleaned = String(value || '').replace(/[^0-9,-]/g, '').replace(/\./g, '').replace(',', '.');
-                const num = parseFloat(cleaned);
-                return Number.isFinite(num) ? num : 0;
-            };
-            const parseDate = (value) => {
-                const parts = String(value || '').trim().split('/');
-                if (parts.length !== 3) return 0;
-                return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime() || 0;
-            };
-            let sortState = { key: '', dir: 'asc' };
-            const getCellText = (row, key) => {
-                const idx = indexMap[key];
-                const cell = row.children[idx];
-                return cell ? cell.textContent.trim() : '';
-            };
-            const sortRows = (key) => {
-                if (!tbody) return;
-                const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => row.querySelectorAll('td').length);
-                if (!rows.length) return;
-                sortState.dir = (sortState.key === key && sortState.dir === 'asc') ? 'desc' : 'asc';
-                sortState.key = key;
-                rows.sort((a, b) => {
-                    let aVal = getCellText(a, key);
-                    let bVal = getCellText(b, key);
-                    if (key === 'value') {
-                        aVal = parseMoney(aVal);
-                        bVal = parseMoney(bVal);
-                    } else if (key === 'date') {
-                        aVal = parseDate(aVal);
-                        bVal = parseDate(bVal);
-                    } else {
-                        aVal = String(aVal).toLowerCase();
-                        bVal = String(bVal).toLowerCase();
-                    }
-                    if (aVal < bVal) return sortState.dir === 'asc' ? -1 : 1;
-                    if (aVal > bVal) return sortState.dir === 'asc' ? 1 : -1;
-                    return 0;
-                });
-                rows.forEach(row => tbody.appendChild(row));
-            };
-            headers.forEach(th => {
-                th.addEventListener('click', () => sortRows(th.dataset.sort));
-            });
-        }
+            rows.forEach(row => tbody.appendChild(row));
+        };
+        headers.forEach(th => {
+            th.addEventListener('click', () => sortRows(th.dataset.sort));
+        });
+    }
         if (clearFiltersBtn) {
                 clearFiltersBtn.addEventListener('click', () => {
                     activeType = '';
@@ -1777,7 +1918,6 @@
                 applyDashboardFiltersDebounced();
             });
         }
-        const quickButtons = document.querySelectorAll('[data-period]');
         if (quickButtons && quickButtons.length) {
             quickButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -1873,6 +2013,8 @@
     });
 </script>
 {% endblock %}
+
+
 
 
 

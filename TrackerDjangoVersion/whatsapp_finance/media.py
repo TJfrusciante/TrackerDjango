@@ -5,11 +5,35 @@ import os
 import tempfile
 import urllib.request
 import base64
+import json
 
 from django.conf import settings
 
 
-def _download_media(url: str) -> bytes | None:
+def _resolve_360dialog_media_url(media_id: str) -> str | None:
+    if not media_id:
+        return None
+    api_key = getattr(settings, "D360_API_KEY", "")
+    base_url = getattr(settings, "D360_BASE_URL", "").rstrip("/")
+    if not api_key or not base_url:
+        return None
+    for path in (f"/{media_id}", f"/media/{media_id}"):
+        try:
+            req = urllib.request.Request(f"{base_url}{path}")
+            req.add_header("D360-API-KEY", api_key)
+            with urllib.request.urlopen(req, timeout=15) as response:
+                payload = json.loads(response.read().decode("utf-8") or "{}")
+            url = payload.get("url") or payload.get("media", {}).get("url")
+            if url:
+                return url
+        except Exception:
+            continue
+    return None
+
+
+def _download_media(url: str, media_id: str = "") -> bytes | None:
+    if not url and media_id:
+        url = _resolve_360dialog_media_url(media_id) or ""
     if not url:
         return None
     req = urllib.request.Request(url)
@@ -23,6 +47,9 @@ def _download_media(url: str) -> bytes | None:
             auth = f"{account_sid}:{auth_token}".encode("utf-8")
             auth_header = base64.b64encode(auth).decode("utf-8")
             req.add_header("Authorization", f"Basic {auth_header}")
+        d360_key = getattr(settings, "D360_API_KEY", "")
+        if d360_key:
+            req.add_header("D360-API-KEY", d360_key)
     try:
         with urllib.request.urlopen(req, timeout=15) as response:
             return response.read()
@@ -30,11 +57,11 @@ def _download_media(url: str) -> bytes | None:
         return None
 
 
-def transcribe_audio(url: str, content_type: str) -> str | None:
+def transcribe_audio(url: str, content_type: str, media_id: str = "") -> str | None:
     provider = getattr(settings, "WHATSAPP_TRANSCRIBE_PROVIDER", "none")
     if provider == "none":
         return None
-    blob = _download_media(url)
+    blob = _download_media(url, media_id=media_id)
     if not blob:
         return None
     suffix = ".ogg" if "ogg" in content_type else ".mp3"
@@ -103,10 +130,10 @@ def transcribe_audio(url: str, content_type: str) -> str | None:
     return None
 
 
-def ocr_image(url: str) -> str | None:
+def ocr_image(url: str, media_id: str = "") -> str | None:
     if not getattr(settings, "WHATSAPP_OCR_ENABLED", True):
         return None
-    blob = _download_media(url)
+    blob = _download_media(url, media_id=media_id)
     if not blob:
         return None
     try:

@@ -1,9 +1,9 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transa&ccedil;&atilde;o | iTracker{% endblock %}
 
 {% block content %}
-<div class="page-hero">
+<div class="page-hero" data-motion="reveal">
     <div class="page-hero__info">
         <p class="page-hero__eyebrow">Finan&ccedil;as</p>
         <h1 class="page-hero__title">{% if is_detail %}Detalhes{% elif is_edit %}Editar{% else %}Nova{% endif %} transa&ccedil;&atilde;o</h1>
@@ -17,12 +17,12 @@
 </div>
 <div class="row justify-content-center">
     <div class="col-lg-8">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 itr-soft-border" data-motion="reveal">
             {% if form.errors %}
                 <div class="alert alert-danger">Confira os campos destacados.</div>
             {% endif %}
 
-            <form method="post" class="row g-3">
+            <form method="post" class="row g-3 itr-focus-ring" data-motion="reveal" data-stagger="1">
                 {% csrf_token %}
                 <div class="col-12">
                     <label class="form-label">Descri&ccedil;&atilde;o</label>
@@ -859,4 +859,5 @@
 </script>
 {% endif %}
 {% endblock %}
+
 

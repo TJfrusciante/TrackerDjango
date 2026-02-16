@@ -642,6 +642,10 @@ def home(request):
     return render(request, 'landing.html', context)
 
 
+def plan_quiz(request):
+    return render(request, 'quiz.html')
+
+
 def help_page(request):
     quick_links = [
         {"id": "transacoes", "label": "Transa\u00e7\u00f5es", "icon": "fa-solid fa-coins"},
@@ -736,6 +740,82 @@ def _parse_date_input(value):
         except ValueError:
             continue
     return None
+
+
+def _clamp_ambient_score(value):
+    try:
+        parsed = int(round(float(value)))
+    except Exception:
+        parsed = 0
+    return max(-100, min(100, parsed))
+
+
+def _score_to_mood(score):
+    if score >= 20:
+        return 'positive'
+    if score <= -20:
+        return 'negative'
+    return 'neutral'
+
+
+def _store_ambient_state(request, mood, score):
+    session = getattr(request, 'session', None)
+    if session is None:
+        return
+    safe_score = _clamp_ambient_score(score)
+    safe_mood = mood if mood in {'positive', 'neutral', 'negative'} else 'neutral'
+    session['ambient_mood'] = safe_mood
+    session['ambient_score'] = safe_score
+
+
+def _ambient_from_dashboard_metrics(net_period, tasks_total, tasks_done, tasks_overdue):
+    score = 0
+    if net_period > 0:
+        score += 50
+    elif net_period < 0:
+        score -= 50
+
+    if tasks_total:
+        overdue_ratio = tasks_overdue / tasks_total
+        done_ratio = tasks_done / tasks_total
+        if overdue_ratio >= 0.5:
+            score -= 40
+        elif overdue_ratio > 0:
+            score -= 20
+        if done_ratio >= 0.7:
+            score += 25
+        elif done_ratio >= 0.4:
+            score += 10
+
+    score = _clamp_ambient_score(score)
+    return _score_to_mood(score), score
+
+
+def _ambient_from_balance(balance_total):
+    try:
+        value = float(balance_total or 0)
+    except Exception:
+        value = 0.0
+    if value == 0:
+        return 'neutral', 0
+    polarity = 1 if value > 0 else -1
+    magnitude = min(60, max(18, int(abs(value) / 500)))
+    score = _clamp_ambient_score(polarity * magnitude)
+    return _score_to_mood(score), score
+
+
+def _ambient_from_tasks_counts(open_count, done_count, overdue_count):
+    score = 0
+    if overdue_count > 0:
+        score -= min(60, 20 + overdue_count * 6)
+    if overdue_count == 0 and done_count >= open_count and done_count > 0:
+        score += 35
+    elif done_count > 0:
+        score += 10
+    if open_count > done_count and overdue_count == 0:
+        score -= 10
+    score = _clamp_ambient_score(score)
+    return _score_to_mood(score), score
 
 
 # -------- Dashboard --------
@@ -1177,6 +1257,14 @@ def dashboard(request):
         },
     ]
 
+    ambient_mood, ambient_score = _ambient_from_dashboard_metrics(
+        net_period=net_period,
+        tasks_total=tasks_period_total,
+        tasks_done=tasks_period_done,
+        tasks_overdue=tasks_period_overdue,
+    )
+    _store_ambient_state(request, ambient_mood, ambient_score)
+
     all_period_start, all_period_end = range_from_period('all')
     if not all_period_start or not all_period_end:
         all_period_start, all_period_end = start_date, end_date
@@ -1225,6 +1313,9 @@ def dashboard(request):
             'finance': {**finance_eval, 'items': finance_items},
             'tasks': {**task_eval, 'items': task_items},
         },
+        'ambient_mood': ambient_mood,
+        'ambient_score': ambient_score,
+        'ambient_mode': 'full',
         'category_count': category_count,
         'trial': {
             'active': trial_active,
@@ -1465,12 +1556,16 @@ def transactions_list(request):
         reverse=True,
     )
 
+    balance_total = income_total - expense_total
+    ambient_mood, ambient_score = _ambient_from_balance(balance_total)
+    _store_ambient_state(request, ambient_mood, ambient_score)
+
     context = {
         'transactions_page': page_obj,
         'transactions_total': paginator.count,
         'income_total': income_total,
         'expense_total': expense_total,
-        'balance_total': income_total - expense_total,
+        'balance_total': balance_total,
         'categories': Category.objects.filter(workspace=workspace) if workspace else Category.objects.all(),
         'bulk_form': TransactionBulkUpdateForm(workspace=workspace),
         'query_string': query_string,
@@ -1499,6 +1594,9 @@ def transactions_list(request):
         'sort_param': sort_param,
         'sort_dir': sort_dir,
         'sort_urls': sort_urls,
+        'ambient_mood': ambient_mood,
+        'ambient_score': ambient_score,
+        'ambient_mode': 'full',
     }
     return render(request, 'tracker/transactions_list.html', context)
 
@@ -2548,6 +2646,15 @@ def tasks_list(request):
         reverse=True,
     )
 
+    open_count = tasks_qs.filter(status='ongoing').count()
+    done_count = tasks_qs.filter(status='done').count()
+    ambient_mood, ambient_score = _ambient_from_tasks_counts(
+        open_count=open_count,
+        done_count=done_count,
+        overdue_count=overdue_count,
+    )
+    _store_ambient_state(request, ambient_mood, ambient_score)
+
     def build_sort_url(field, default_dir='asc'):
         params = request.GET.copy()
         params.pop('page', None)
@@ -2572,8 +2679,8 @@ def tasks_list(request):
     context = {
         'tasks_page': page_obj,
         'tasks_total': paginator.count,
-        'open_count': tasks_qs.filter(status='ongoing').count(),
-        'done_count': tasks_qs.filter(status='done').count(),
+        'open_count': open_count,
+        'done_count': done_count,
         'overdue_count': overdue_count,
         'today': today,
         'soon_threshold': soon_threshold,
@@ -2602,6 +2709,9 @@ def tasks_list(request):
         'sort_param': sort_param,
         'sort_dir': sort_dir,
         'sort_urls': sort_urls,
+        'ambient_mood': ambient_mood,
+        'ambient_score': ambient_score,
+        'ambient_mode': 'full',
     }
     return render(request, 'tracker/tasks_list.html', context)
 
@@ -3550,13 +3660,42 @@ def chart_data(request):
     cache_key = None
     if start_date and end_date:
         cache_key = (
-            f"chart:{request.user.id}:{workspace.id if workspace else 'global'}:"
+            f"chart:v3:{request.user.id}:{workspace.id if workspace else 'global'}:"
             f"{start_date.isoformat()}:{end_date.isoformat()}:{period}:{year_param}:"
             f"{type_filter}:{selected_only}:{category_id}:{responsible_id}"
         )
         cached_payload = cache.get(cache_key)
         if cached_payload:
-            return JsonResponse(cached_payload)
+            payload = dict(cached_payload)
+            ambient = payload.get('ambient')
+            if not isinstance(ambient, dict) or 'mood' not in ambient or 'score' not in ambient:
+                net_period_cached = float(payload.get('net_period', (payload.get('income_total') or 0) - (payload.get('expense_total') or 0)) or 0)
+                tasks_open_cached = int(payload.get('tasks_open') or 0)
+                tasks_done_cached = int(payload.get('tasks_done') or 0)
+                tasks_overdue_cached = int(payload.get('tasks_overdue') or 0)
+                tasks_total_cached = max(tasks_open_cached + tasks_done_cached, tasks_done_cached + tasks_overdue_cached)
+                ambient_mood_cached, ambient_score_cached = _ambient_from_dashboard_metrics(
+                    net_period=net_period_cached,
+                    tasks_total=tasks_total_cached,
+                    tasks_done=tasks_done_cached,
+                    tasks_overdue=tasks_overdue_cached,
+                )
+                payload['ambient'] = {
+                    'mood': ambient_mood_cached,
+                    'score': ambient_score_cached,
+                }
+                safe_mood = ambient_mood_cached
+                safe_score = ambient_score_cached
+            else:
+                safe_mood = ambient.get('mood') if ambient.get('mood') in {'positive', 'neutral', 'negative'} else 'neutral'
+                safe_score = _clamp_ambient_score(ambient.get('score') or 0)
+                payload['ambient'] = {
+                    'mood': safe_mood,
+                    'score': safe_score,
+                }
+            _store_ambient_state(request, safe_mood, safe_score)
+            cache.set(cache_key, payload, chart_ttl)
+            return JsonResponse(payload)
 
     can_finance = _user_can_view_finance(request, workspace)
 
@@ -3826,6 +3965,14 @@ def chart_data(request):
         },
     ]
 
+    ambient_mood, ambient_score = _ambient_from_dashboard_metrics(
+        net_period=net_period,
+        tasks_total=tasks_period_total,
+        tasks_done=tasks_period_done,
+        tasks_overdue=tasks_period_overdue,
+    )
+    _store_ambient_state(request, ambient_mood, ambient_score)
+
     payload = {
         'labels': labels,
         'values': values,
@@ -3860,6 +4007,10 @@ def chart_data(request):
         'agent_eval': {
             'finance': {**finance_eval, 'items': finance_items},
             'tasks': {**task_eval, 'items': task_items},
+        },
+        'ambient': {
+            'mood': ambient_mood,
+            'score': ambient_score,
         },
         'daily_labels': daily_labels,
         'daily_values': daily_values,
@@ -3927,6 +4078,37 @@ def _export_tasks_csv(queryset):
 
 # -------- Auth & workspaces --------
 
+def _resolve_plan_choice(plan_value: str | None) -> str | None:
+    if not plan_value:
+        return None
+    value = plan_value.strip().lower()
+    if value in {'essential', 'pro', 'master'}:
+        return f"monthly:{value}"
+    if value in {'monthly:essential', 'monthly:pro', 'monthly:master', 'annual:essential', 'annual:pro', 'annual:master'}:
+        return value
+    return None
+
+
+def _render_auth_hub(request, active_panel='login', login_form=None, register_form=None, guest_form=None, status=200):
+    plan_choice = _resolve_plan_choice(request.GET.get('plan'))
+    register_initial = {'plan_choice': plan_choice} if plan_choice else None
+    context = {
+        'login_form': login_form or LoginForm(request),
+        'register_form': register_form or SignupForm(initial=register_initial),
+        'guest_form': guest_form or GuestSignupForm(),
+        'active_panel': active_panel,
+    }
+    return render(request, 'auth_hub.html', context, status=status)
+
+
+def auth_hub(request):
+    if request.user.is_authenticated:
+        return redirect('tracker:dashboard')
+    panel = (request.GET.get('panel') or 'login').strip().lower()
+    if panel not in {'login', 'register', 'guest'}:
+        panel = 'login'
+    return _render_auth_hub(request, active_panel=panel)
+
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -3938,7 +4120,7 @@ def login_view(request):
             record_metric('login_blocked', metadata={'ip': request.META.get('REMOTE_ADDR')})
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'ok': False, 'error': 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'}, status=429)
-            return render(request, 'tracker/auth_login.html', {'form': form})
+            return _render_auth_hub(request, active_panel='login', login_form=form, status=429)
         if form.is_valid():
             user = form.get_user()
             profile = getattr(user, 'profile', None)
@@ -3951,7 +4133,7 @@ def login_view(request):
                     record_metric('login_failed', user=user, metadata={'reason': 'email_not_verified'})
                     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                         return JsonResponse({'ok': False, 'error': 'Confirme seu e-mail antes de entrar.'}, status=403)
-                    return render(request, 'tracker/auth_login.html', {'form': form})
+                    return _render_auth_hub(request, active_panel='login', login_form=form, status=403)
             login(request, user)
             _clear_login_failures(request)
             record_metric('login_success', user=user, metadata={'ip': request.META.get('REMOTE_ADDR')})
@@ -3996,7 +4178,7 @@ def login_view(request):
             if not error_msg:
                 error_msg = 'N\u00e3o foi poss\u00edvel entrar. Verifique os dados.'
             return JsonResponse({'ok': False, 'error': error_msg}, status=400)
-    return render(request, 'tracker/auth_login.html', {'form': form})
+    return _render_auth_hub(request, active_panel='login', login_form=form)
 
 
 def logout_view(request):
@@ -4106,7 +4288,11 @@ def register_view(request):
             notify_new_account(user)
             messages.success(request, 'Cadastro enviado. Aguarde aprova\u00e7\u00e3o do administrador.')
         return redirect('tracker:login')
-    return render(request, 'tracker/auth_register.html', {'form': form})
+    return _render_auth_hub(
+        request,
+        active_panel='register',
+        register_form=form if request.method == 'POST' else None
+    )
 
 
 def register_guest_view(request):
@@ -4128,7 +4314,11 @@ def register_guest_view(request):
         login(request, user)
         messages.success(request, 'Conta de convidado criada. Pe\u00e7a acesso a um workspace.')
         return redirect('tracker:workspace_select')
-    return render(request, 'tracker/auth_register_guest.html', {'form': form})
+    return _render_auth_hub(
+        request,
+        active_panel='guest',
+        guest_form=form if request.method == 'POST' else None
+    )
 
 
 def verify_email(request, uidb64, token):

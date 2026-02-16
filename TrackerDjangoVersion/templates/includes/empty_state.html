@@ -1,0 +1,14 @@
+<div class="empty-state fade-in">
+    {% if icon %}
+        <div class="empty-state__icon"><i class="{{ icon }}"></i></div>
+    {% endif %}
+    <h5 class="empty-state__title">{{ title }}</h5>
+    {% if description %}
+        <p class="text-secondary mb-0">{{ description }}</p>
+    {% endif %}
+    {% if cta_url and cta_label %}
+        <div class="empty-state__cta">
+            <a class="btn btn-primary" href="{{ cta_url }}">{{ cta_label }}</a>
+        </div>
+    {% endif %}
+</div>

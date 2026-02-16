@@ -17,17 +17,73 @@
         hideTransition();
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const autoAlerts = document.querySelectorAll('.alert[data-auto-dismiss]');
-        autoAlerts.forEach((alert) => {
-            const timeout = parseInt(alert.dataset.autoDismiss || '4000', 10);
-            setTimeout(() => {
-                alert.classList.add('is-hidden');
-                setTimeout(() => {
-                    if (alert.parentNode) alert.parentNode.removeChild(alert);
-                }, 300);
-            }, timeout);
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    };
+
+    const initTooltips = () => {
+        if (!window.bootstrap || !bootstrap.Tooltip) return;
+        document.querySelectorAll('[data-bs-toggle="tooltip"], .js-tooltip').forEach((el) => {
+            if (el.dataset.tooltipReady === '1') return;
+            new bootstrap.Tooltip(el);
+            el.dataset.tooltipReady = '1';
         });
+    };
+
+    const initUndoToasts = () => {
+        if (!window.bootstrap || !bootstrap.Toast) return;
+        const csrfToken = getCookie('csrftoken');
+        document.querySelectorAll('.undo-toast').forEach((el) => {
+            if (el.dataset.toastReady === '1') return;
+            const toast = new bootstrap.Toast(el, { delay: 6000 });
+            el.addEventListener('hidden.bs.toast', () => {
+                const url = el.dataset.clearUrl;
+                if (!url) return;
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                });
+            });
+            toast.show();
+            el.dataset.toastReady = '1';
+        });
+    };
+
+    const initRevealOnScroll = () => {
+        const targets = Array.from(document.querySelectorAll('[data-reveal], .reveal-on-scroll'));
+        if (!targets.length) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            targets.forEach((el) => el.classList.add('is-visible'));
+            return;
+        }
+        const observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    obs.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.2 });
+        targets.forEach((el) => observer.observe(el));
+    };
+
+    const initPanelFade = () => {
+        document.querySelectorAll('.glass-card').forEach((el, idx) => {
+            if (el.dataset.fadeReady === '1') return;
+            el.classList.add('fade-in-panel');
+            el.style.animationDelay = `${Math.min(idx * 0.03, 0.2)}s`;
+            el.dataset.fadeReady = '1';
+        });
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initTooltips();
+        initUndoToasts();
+        initRevealOnScroll();
+        initPanelFade();
     });
 
     const isInternalLink = (url) => {
@@ -122,20 +178,13 @@
 
     document.addEventListener('DOMContentLoaded', setupSuperuserWorkspaceSearch);
 
-    const getCookie = (name) => {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-        return '';
-    };
-
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             if (loginForm.dataset.submitting === '1') return;
             loginForm.dataset.submitting = '1';
-            const card = document.getElementById('loginCard') || loginForm.closest('.auth-card') || loginForm;
+            const card = document.getElementById('loginCard') || document.querySelector('[data-login-card]') || loginForm.closest('.auth-card') || loginForm;
             const showError = (message) => {
                 if (errorBox) {
                     errorBox.textContent = message;
