@@ -7,10 +7,15 @@
 }
 
 .itr-page-surface {
-    opacity: 0;
-    transform: translateY(12px);
+    opacity: 1;
+    transform: none;
     transition: opacity var(--itr-motion-mid) var(--itr-motion-ease), transform var(--itr-motion-mid) var(--itr-motion-ease);
     will-change: opacity, transform;
+}
+
+body.itr-motion-legacy-active .itr-page-surface {
+    opacity: 0;
+    transform: translateY(12px);
 }
 
 body.itr-page-enter-active .itr-page-surface {
@@ -19,10 +24,15 @@ body.itr-page-enter-active .itr-page-surface {
 }
 
 .itr-reveal {
-    opacity: 0;
-    transform: translateY(14px) scale(0.985);
+    opacity: 1;
+    transform: none;
     transition: opacity var(--itr-motion-slow) var(--itr-motion-ease), transform var(--itr-motion-slow) var(--itr-motion-ease);
     will-change: opacity, transform;
+}
+
+body.itr-motion-legacy-active .itr-reveal {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
 }
 
 .itr-reveal.is-visible {

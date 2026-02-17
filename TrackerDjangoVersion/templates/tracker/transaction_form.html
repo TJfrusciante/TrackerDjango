@@ -17,7 +17,7 @@
 </div>
 <div class="row justify-content-center">
     <div class="col-lg-8">
-        <div class="glass-card p-4 itr-soft-border" data-motion="reveal">
+        <div class="glass-card p-4 itr-soft-border overflow-visible" data-motion="reveal">
             {% if form.errors %}
                 <div class="alert alert-danger">Confira os campos destacados.</div>
             {% endif %}
@@ -580,9 +580,23 @@
             return 'all';
         };
 
+        const getSelectedIconOption = () => {
+            if (!iconSelect) return null;
+            if (iconSelect.selectedOptions && iconSelect.selectedOptions.length) {
+                return iconSelect.selectedOptions[0];
+            }
+            if (typeof iconSelect.selectedIndex === 'number' && iconSelect.selectedIndex >= 0) {
+                return iconSelect.options[iconSelect.selectedIndex] || null;
+            }
+            if (iconSelect.value) {
+                return findOptionByValue(iconSelect.value);
+            }
+            return null;
+        };
+
         const updateIconPreview = () => {
             if (!iconSelect) return;
-            const option = iconSelect.selectedOptions ? iconSelect.selectedOptions[0] : null;
+            const option = getSelectedIconOption();
             const value = option ? option.value : '';
             const label = option ? option.textContent.trim() : '';
             const resolvedLabel = label || 'Selecionar ícone';
@@ -624,7 +638,7 @@
                 btn.innerHTML = `<i class="${value}"></i>`;
                 btn.addEventListener('click', () => {
                     iconSelect.value = value;
-                    updateIconPreview();
+                    iconSelect.dispatchEvent(new Event('change', { bubbles: true }));
                 });
                 iconFavorites.appendChild(btn);
                 count += 1;
@@ -654,8 +668,7 @@
                 }
                 btn.addEventListener('click', () => {
                     iconSelect.value = opt.value;
-                    updateIconPreview();
-                    addIconFavorite(opt.value);
+                    iconSelect.dispatchEvent(new Event('change', { bubbles: true }));
                     toggleIconPicker(false);
                 });
                 iconGrid.appendChild(btn);

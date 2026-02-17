@@ -2,17 +2,25 @@
     if (window.__itrMotionSystemInitialized) return;
     window.__itrMotionSystemInitialized = true;
 
-    const reduceMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const reduceMotionMedia = typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null;
     let revealObserver = null;
 
-    const reduceMotion = () => reduceMotionMedia.matches;
+    const reduceMotion = () => !!(reduceMotionMedia && reduceMotionMedia.matches);
     const animationsPref = () => ((document.body && document.body.getAttribute('data-animations')) || 'auto').toLowerCase();
     const animationsOff = () => animationsPref() === 'off';
 
     const revealTargets = () => Array.from(document.querySelectorAll('[data-motion="reveal"], .itr-reveal'));
 
+    const syncAnimatedClass = () => {
+        if (!document.body) return;
+        document.body.classList.toggle('itr-ms-animated', !reduceMotion() && !animationsOff());
+    };
+
     const markPageReady = () => {
         document.body.classList.add('itr-ms-ready');
+        syncAnimatedClass();
     };
 
     const forceVisibleWhenOff = () => {
@@ -67,6 +75,10 @@
 
         clearForcedVisibleStyles();
         disconnectRevealObserver();
+        if (typeof window.IntersectionObserver !== 'function') {
+            targets.forEach((target) => target.classList.add('itr-ms-visible'));
+            return;
+        }
         revealObserver = new IntersectionObserver((entries, obs) => {
             entries.forEach((entry) => {
                 if (!entry.isIntersecting) return;
@@ -148,6 +160,7 @@
     };
 
     const syncForAnimationsPreference = () => {
+        syncAnimatedClass();
         if (animationsOff()) {
             document.body.classList.add('itr-ms-off');
             forceVisibleWhenOff();
@@ -165,7 +178,7 @@
     }
 
     window.addEventListener('itr:animations-change', syncForAnimationsPreference);
-    if (typeof reduceMotionMedia.addEventListener === 'function') {
+    if (reduceMotionMedia && typeof reduceMotionMedia.addEventListener === 'function') {
         reduceMotionMedia.addEventListener('change', syncForAnimationsPreference);
     }
 })();

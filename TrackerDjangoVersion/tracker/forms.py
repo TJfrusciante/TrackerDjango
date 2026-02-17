@@ -125,8 +125,6 @@ class TransactionForm(BaseStyledForm):
             'id': 'id_date',
         })
         if workspace:
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
             member_ids = set(
                 WorkspaceMembership.objects.filter(workspace=workspace)
                 .values_list('user_id', flat=True)

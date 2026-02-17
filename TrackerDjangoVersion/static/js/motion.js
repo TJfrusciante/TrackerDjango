@@ -4,8 +4,15 @@
     window.__itrMotionInitialized = true;
 
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animationsOff = () => ((document.body && document.body.getAttribute('data-animations')) || 'auto').toLowerCase() === 'off';
 
     const initPageEnter = () => {
+        const canAnimate = !prefersReduced && !animationsOff();
+        document.body.classList.toggle('itr-motion-legacy-active', canAnimate);
+        if (!canAnimate) {
+            document.body.classList.add('itr-page-enter-active');
+            return;
+        }
         document.body.classList.add('itr-page-enter');
         requestAnimationFrame(() => {
             document.body.classList.add('itr-page-enter-active');
@@ -30,7 +37,12 @@
             applyStagger(el);
         });
 
-        if (prefersReduced) {
+        if (prefersReduced || animationsOff()) {
+            targets.forEach((el) => el.classList.add('is-visible'));
+            return;
+        }
+
+        if (typeof window.IntersectionObserver !== 'function') {
             targets.forEach((el) => el.classList.add('is-visible'));
             return;
         }
@@ -52,7 +64,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         initPageEnter();
         initReveal();
-        if (!prefersReduced) {
+        if (!prefersReduced && !animationsOff()) {
             document.querySelectorAll('.glass-card, .task-mini-card, .tx-mini-card, .tx-kpi-card, .page-hero, .task-hero, .tx-hero').forEach((el) => {
                 el.classList.add('itr-hover-lift');
             });
@@ -61,5 +73,12 @@
             });
         }
         document.querySelectorAll('a.btn, button.btn, .btn, .auth-tab').forEach((el) => el.classList.add('itr-focus-ring'));
+    });
+
+    window.addEventListener('itr:animations-change', () => {
+        if (animationsOff()) {
+            document.body.classList.remove('itr-motion-legacy-active');
+            document.querySelectorAll('.itr-reveal').forEach((el) => el.classList.add('is-visible'));
+        }
     });
 })();

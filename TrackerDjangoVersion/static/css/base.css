@@ -1251,7 +1251,7 @@ textarea:focus-visible {
     left: 0;
     right: 0;
     top: calc(100% + 0.5rem);
-    z-index: 20;
+    z-index: 1080;
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
 }
 
@@ -1298,8 +1298,19 @@ textarea:focus-visible {
     display: grid;
     place-items: center;
     background: rgba(15, 23, 42, 0.2);
-    color: inherit;
+    color: var(--text-color);
     transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-chip i,
+.icon-pill i {
+    display: inline-block;
+    line-height: 1;
+    font-size: 1rem;
+}
+
+[data-bs-theme='light'] .icon-chip {
+    color: #0f172a;
 }
 
 .icon-chip:hover {

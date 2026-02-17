@@ -81,6 +81,12 @@
         fxButton.setAttribute('aria-label', title);
     };
 
+    const syncPublicFxState = () => {
+        if (!document.body) return;
+        document.body.setAttribute('data-public-fx', effectiveMode);
+        document.body.classList.toggle('public-fx-off', effectiveMode === 'off');
+    };
+
     const persistPreference = () => {
         try {
             localStorage.setItem(PREF_KEY, preference);
@@ -324,6 +330,7 @@
         effectiveMode = getEffectiveMode(preference);
         if (persist) persistPreference();
         updateControlLabel();
+        syncPublicFxState();
 
         if (!supportsCanvas || !ensureCanvas()) return;
 
@@ -416,6 +423,7 @@
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
 
     updateControlLabel();
+    syncPublicFxState();
 
     if (supportsCanvas && ensureCanvas()) {
         resize();

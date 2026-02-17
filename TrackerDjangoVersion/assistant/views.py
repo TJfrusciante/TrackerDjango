@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import unicodedata
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -15,7 +16,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_exempt
 
-from tracker.models import Category, Transaction, Task, TaskStep
+from tracker.models import Category, Transaction, Task, TaskStep, TaskCategory, WorkspaceMembership, Workspace
 from tracker.metrics import record_metric
 from .models import ChatMessage, AiUsage
 from .limits import get_ai_quota
@@ -44,6 +45,302 @@ def _normalize_text(value: str) -> str:
         ch for ch in unicodedata.normalize('NFD', value.lower())
         if unicodedata.category(ch) != 'Mn'
     )
+
+
+def _resolve_workspace_for_write(request, workspace):
+    if workspace:
+        return workspace
+    if not request.user.is_superuser:
+        return None
+    slug = request.session.get('workspace_slug')
+    if not slug:
+        return None
+    return Workspace.objects.filter(slug=slug, is_active=True).first()
+
+
+def _assistant_can_create_transaction(request, workspace) -> bool:
+    if not workspace:
+        return request.user.is_superuser
+    if request.user.is_superuser:
+        return True
+    if getattr(request, "subscription_grace", False):
+        return False
+    profile = getattr(request.user, "profile", None)
+    if profile and profile.is_guest:
+        return True
+    if workspace.owner_id == request.user.id:
+        return True
+    return getattr(request, "workspace_role", None) == 'owner'
+
+
+def _assistant_can_create_task(request, workspace) -> bool:
+    if not workspace:
+        return request.user.is_superuser
+    if request.user.is_superuser:
+        return True
+    if workspace.owner_id == request.user.id:
+        return True
+    membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
+    if membership and not membership.can_edit_tasks:
+        return False
+    return bool(membership)
+
+
+def _parse_date_from_text(message: str):
+    msg_norm = _normalize_text(message or '')
+    today = timezone.localdate()
+    if 'amanha' in msg_norm:
+        return today + datetime.timedelta(days=1)
+    if 'ontem' in msg_norm:
+        return today - datetime.timedelta(days=1)
+    if 'hoje' in msg_norm:
+        return today
+
+    match = re.search(r'(?<!\d)(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?!\d)', msg_norm)
+    if match:
+        day = int(match.group(1))
+        month = int(match.group(2))
+        year = int(match.group(3))
+        year = year + 2000 if year < 100 else year
+        try:
+            return datetime.date(year, month, day)
+        except ValueError:
+            return None
+
+    match_iso = re.search(r'(?<!\d)(20\d{2})[/-](\d{1,2})[/-](\d{1,2})(?!\d)', msg_norm)
+    if match_iso:
+        year = int(match_iso.group(1))
+        month = int(match_iso.group(2))
+        day = int(match_iso.group(3))
+        try:
+            return datetime.date(year, month, day)
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_decimal_token(token: str):
+    if not token:
+        return None
+    cleaned = str(token).lower().replace('r$', '').replace(' ', '')
+    if not cleaned:
+        return None
+    if cleaned.count(',') == 1 and cleaned.count('.') >= 1 and cleaned.rfind(',') > cleaned.rfind('.'):
+        cleaned = cleaned.replace('.', '').replace(',', '.')
+    elif cleaned.count(',') == 1 and cleaned.count('.') == 0:
+        cleaned = cleaned.replace(',', '.')
+    else:
+        cleaned = cleaned.replace(',', '')
+    try:
+        return Decimal(cleaned)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _extract_amount_from_text(message: str):
+    if not message:
+        return None
+    matches = re.findall(
+        r'(?<![\d/])(?:r\$\s*)?(-?\d{1,3}(?:[.\s]\d{3})*(?:,\d{1,2})|-?\d+(?:[.,]\d{1,2})?)(?![\d/])',
+        _normalize_text(message),
+    )
+    for raw in matches:
+        value = _parse_decimal_token(raw)
+        if value is not None and value != 0:
+            return value
+    return None
+
+
+def _guess_transaction_type(*texts: str):
+    merged = ' '.join(_normalize_text(t or '') for t in texts)
+    if any(token in merged for token in ['saida', 'despesa', 'gasto', 'expense']):
+        return 'expense'
+    if any(token in merged for token in ['entrada', 'receita', 'ganho', 'income']):
+        return 'income'
+    return None
+
+
+def _match_category_by_text(categories, hint: str):
+    hint_norm = _normalize_text(hint or '').strip()
+    if not hint_norm:
+        return None
+    for cat in categories:
+        cat_norm = _normalize_text(cat.name)
+        if cat_norm == hint_norm:
+            return cat
+    for cat in categories:
+        cat_norm = _normalize_text(cat.name)
+        if hint_norm in cat_norm or cat_norm in hint_norm:
+            return cat
+    return None
+
+
+def _resolve_transaction_category(request, workspace, description: str, category_hint: str | None):
+    qs = Category.objects.filter(workspace=workspace) if workspace else Category.objects.filter(workspace__isnull=True)
+    categories = list(qs.order_by('name'))
+
+    for probe in [category_hint, description]:
+        matched = _match_category_by_text(categories, probe or '')
+        if matched:
+            return matched
+
+    fallback = _match_category_by_text(categories, 'sem categoria') or _match_category_by_text(categories, 'outros')
+    if fallback:
+        return fallback
+    return Category.objects.get_or_create(name='Sem categoria', workspace=workspace)[0]
+
+
+def _resolve_task_category(workspace, hint: str | None):
+    if not hint:
+        return None
+    categories = list(TaskCategory.objects.filter(workspace=workspace).order_by('name'))
+    return _match_category_by_text(categories, hint or '')
+
+
+def _extract_transaction_payload(message: str):
+    original_message = (message or '').strip()
+    body = re.sub(
+        r'^\s*(insira|insere|adicione|adicionar|lance|lan[çc]ar|registre|registrar|crie|criar)\s+(uma\s+)?transa(?:ç|c)(?:ã|a)o[\s:,-]*',
+        '',
+        original_message,
+        flags=re.IGNORECASE,
+    ).strip()
+    body_norm = _normalize_text(body)
+    parts = [part.strip() for part in body.split(',') if part.strip()]
+    parts_norm = [part.strip() for part in body_norm.split(',') if part.strip()]
+    description = parts[0] if parts else body
+    type_text = parts_norm[1] if len(parts_norm) > 1 else body_norm
+    value_text = parts[2] if len(parts) > 2 else body
+    date_text = parts[3] if len(parts) > 3 else body
+
+    category_hint = None
+    for piece in parts:
+        match = re.search(r'categoria\s*(?:[:=]|\s)\s*([\w\s\-/]+)', piece)
+        if match:
+            category_hint = match.group(1).strip()
+            break
+
+    tx_type = _guess_transaction_type(type_text, body_norm)
+    value = _parse_decimal_token(value_text) or _extract_amount_from_text(body)
+    tx_date = _parse_date_from_text(date_text) or _parse_date_from_text(body) or timezone.localdate()
+
+    return {
+        'description': (description or '').strip()[:180],
+        'type': tx_type,
+        'value': abs(value) if value is not None else None,
+        'date': tx_date,
+        'category_hint': category_hint,
+    }
+
+
+def _extract_task_payload(message: str):
+    original_message = (message or '').strip()
+    body = re.sub(
+        r'^\s*(insira|insere|adicione|adicionar|lance|lan[çc]ar|registre|registrar|crie|criar)\s+(uma\s+)?tarefa[\s:,-]*',
+        '',
+        original_message,
+        flags=re.IGNORECASE,
+    ).strip()
+    parts = [part.strip() for part in body.split(',') if part.strip()]
+    title = parts[0] if parts else body
+    due_date = _parse_date_from_text(body) or timezone.localdate()
+    msg_norm = _normalize_text(body)
+    status = 'done' if any(token in msg_norm for token in ['concluida', 'finalizada', 'feita', 'resolvida']) else 'ongoing'
+
+    category_hint = None
+    for piece in parts:
+        match = re.search(r'categoria\s*(?:[:=]|\s)\s*([\w\s\-/]+)', piece)
+        if match:
+            category_hint = match.group(1).strip()
+            break
+
+    cleaned_title = re.sub(r'\bdia\s+\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b', '', title).strip(" .,-")
+    return {
+        'title': cleaned_title[:180],
+        'due_date': due_date,
+        'status': status,
+        'category_hint': category_hint,
+    }
+
+
+def _create_transaction_from_message(message: str, workspace, request):
+    if not workspace:
+        return "Selecione um workspace antes de lançar transações pelo agente."
+    if not _assistant_can_create_transaction(request, workspace):
+        return "Você não tem permissão para lançar transações neste workspace."
+
+    payload = _extract_transaction_payload(message)
+    if not payload['description'] or not payload['type'] or payload['value'] is None:
+        return (
+            "Não consegui identificar todos os campos da transação. "
+            "Use: Insira a transação descrição, entrada|saída, valor, dia DD/MM/AAAA."
+        )
+
+    category = _resolve_transaction_category(
+        request=request,
+        workspace=workspace,
+        description=payload['description'],
+        category_hint=payload.get('category_hint'),
+    )
+    responsible_user = workspace.owner if workspace and workspace.owner_id else request.user
+    icon = 'fa-solid fa-hand-holding-dollar' if payload['type'] == 'income' else 'fa-solid fa-wallet'
+    tx = Transaction.objects.create(
+        description=payload['description'],
+        type=payload['type'],
+        value=payload['value'],
+        date=payload['date'],
+        category=category,
+        workspace=workspace,
+        responsible=responsible_user,
+        icon=icon,
+    )
+    value_label = f"R$ {tx.value:.2f}"
+    type_label = tx.get_type_display()
+    return (
+        f"Transação criada no workspace {workspace.name}: "
+        f"{tx.description} ({type_label}) {value_label} em {tx.date:%d/%m/%Y}."
+    )
+
+
+def _create_task_from_message(message: str, workspace, request):
+    if not workspace:
+        return "Selecione um workspace antes de criar tarefas pelo agente."
+    if not _assistant_can_create_task(request, workspace):
+        return "Você não tem permissão para criar tarefas neste workspace."
+
+    payload = _extract_task_payload(message)
+    if not payload['title']:
+        return "Não consegui identificar o título da tarefa. Exemplo: Crie tarefa pagar condomínio dia 10/02/2026."
+
+    task_category = _resolve_task_category(workspace, payload.get('category_hint'))
+    responsible_user = workspace.owner if workspace and workspace.owner_id else request.user
+    icon = 'fa-solid fa-calendar-check' if payload['status'] == 'ongoing' else 'fa-solid fa-circle-check'
+    task = Task.objects.create(
+        title=payload['title'],
+        due_date=payload['due_date'],
+        status=payload['status'],
+        workspace=workspace,
+        responsible_user=responsible_user,
+        icon=icon,
+        task_category=task_category,
+    )
+    return (
+        f"Tarefa criada no workspace {workspace.name}: "
+        f"{task.title} (prazo {task.due_date:%d/%m/%Y}, status {task.get_status_display()})."
+    )
+
+
+def _assistant_try_create_entity(message: str, workspace, request):
+    msg_norm = _normalize_text(message or '')
+    tx_intent = re.search(r'^\s*(por favor\s+)?(insira|insere|adicione|adicionar|lance|lancar|registre|registrar|crie|criar)\b.*\btransacao\b', msg_norm)
+    task_intent = re.search(r'^\s*(por favor\s+)?(insira|insere|adicione|adicionar|lance|lancar|registre|registrar|crie|criar)\b.*\btarefa\b', msg_norm)
+    if not tx_intent and not task_intent:
+        return None
+
+    write_workspace = _resolve_workspace_for_write(request, workspace)
+    if tx_intent:
+        return _create_transaction_from_message(message, write_workspace, request)
+    return _create_task_from_message(message, write_workspace, request)
 
 
 def _parse_month_range(message: str):
@@ -359,6 +656,9 @@ def _help_response(message: str) -> str | None:
         return (
             "O agente de IA responde com base no workspace atual. "
             "Use perguntas como 'saldo', 'tarefas em andamento' ou 'top categorias'. "
+            "Você pode pedir criação direta, por exemplo: "
+            "'Insira a transação condomínio, saída, 350, dia 10/02/2026' "
+            "ou 'Crie tarefa pagar condomínio dia 10/02/2026'. "
             "Você pode ativar o modo 'resumo local' se quiser evitar chamadas externas."
         )
 
@@ -457,6 +757,10 @@ def _assistant_reply(message, workspace, request, local_only: bool = False, fall
     Usa LLM se configurado; fallback para resumo baseado em regras.
     Retorna (reply, usage, model_name).
     """
+    create_reply = _assistant_try_create_entity(message, workspace, request)
+    if create_reply:
+        return create_reply, None, None
+
     msg_norm = _normalize_text(message or '')
     cache_key = None
     if msg_norm:

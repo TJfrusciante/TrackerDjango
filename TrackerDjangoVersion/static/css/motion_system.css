@@ -11,8 +11,8 @@ body.itr-ms-ready .itr-page-surface {
     animation: itr-ms-page-enter var(--itr-ms-enter-duration) var(--itr-ms-ease) both;
 }
 
-[data-motion="reveal"],
-.itr-reveal {
+body.itr-ms-animated [data-motion="reveal"],
+body.itr-ms-animated .itr-reveal {
     opacity: 0;
     transform: translate3d(0, 18px, 0) scale(0.98);
     filter: saturate(0.94);
@@ -23,8 +23,8 @@ body.itr-ms-ready .itr-page-surface {
     will-change: opacity, transform, filter;
 }
 
-[data-motion="reveal"].itr-ms-visible,
-.itr-reveal.itr-ms-visible {
+body.itr-ms-animated [data-motion="reveal"].itr-ms-visible,
+body.itr-ms-animated .itr-reveal.itr-ms-visible {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
     filter: saturate(1);
