@@ -10,7 +10,7 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Vars de ambiente: `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `OPENAI_API_KEY` (opcional para IA), `OPENAI_MODEL` (opcional).
+Vars de ambiente: `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `OPENAI_API_KEY` (opcional para IA), `AI_MODEL` (opcional; fallback legado: `OPENAI_MODEL`).
 
 ## Importação (CSV/PDF)
 - CSV: colunas `data`, `descrição`, `valor`, `tipo (income/expense opcional)`, `categoria opcional`; delimitador `,` ou `;`.

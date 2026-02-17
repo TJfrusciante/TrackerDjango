@@ -598,7 +598,25 @@ def _wants_task_details(message: str) -> bool:
     msg = (message or '').lower()
     if not msg:
         return False
-    return 'tarefa' in msg or 'tarefas' in msg
+    asks_capability = any(token in msg for token in ['consegue', 'consigo', 'pode', 'capaz', 'capacidade'])
+    asks_howto = any(token in msg for token in ['como', 'ajuda', 'onde', 'faço', 'faco', 'fazer', 'inserir', 'adicionar', 'criar'])
+    if ('tarefa' in msg or 'tarefas' in msg) and (asks_capability or asks_howto):
+        return False
+
+    if msg.strip() in {'tarefa', 'tarefas'}:
+        return True
+
+    detail_intents = [
+        'minhas tarefas',
+        'quais tarefas',
+        'listar tarefas',
+        'liste tarefas',
+        'mostre tarefas',
+        'tarefas em andamento',
+        'tarefas conclu',
+        'detalhe da tarefa',
+    ]
+    return any(intent in msg for intent in detail_intents)
 
 
 def _help_response(message: str) -> str | None:
@@ -609,9 +627,25 @@ def _help_response(message: str) -> str | None:
     def has_any(values: list[str]) -> bool:
         return any(v in msg for v in values)
 
-    wants_howto = has_any(['como', 'ajuda', 'onde', 'posso', 'faço', 'fazer', 'adicionar', 'lançar', 'lancar'])
+    wants_howto = has_any([
+        'como', 'ajuda', 'onde', 'posso', 'faço', 'fazer', 'adicionar', 'lançar', 'lancar',
+        'consegue', 'consigo', 'pode', 'capaz', 'inserir', 'criar',
+    ])
     if not wants_howto:
         return None
+
+    if has_any(['consegue', 'consigo', 'pode', 'capaz']) and has_any(['tarefa', 'tarefas']):
+        return (
+            "Sim. Eu consigo criar tarefas no workspace atual quando você pedir em linguagem natural. "
+            "Exemplo: \"Insira a tarefa pagar condomínio para 10/02/2026\". "
+            "Se quiser, também adiciono categoria e etapas."
+        )
+
+    if has_any(['consegue', 'consigo', 'pode', 'capaz']) and has_any(['transa', 'entrada', 'saída', 'saida']):
+        return (
+            "Sim. Eu consigo lançar transações no workspace atual. "
+            "Exemplo: \"Insira a transação condomínio, saída, 350, dia 10/02/2026\"."
+        )
 
     if has_any(['transa', 'lançar', 'lancar', 'lanc', 'entrada', 'saída', 'saida', 'despesa', 'receita']):
         return (

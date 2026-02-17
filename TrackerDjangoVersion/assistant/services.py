@@ -59,7 +59,7 @@ def llm_complete(system_prompt: str, user_message: str) -> Tuple[Optional[str], 
     Retorna (reply, usage, model) ou (None, None, None) se falhar.
     """
     api_key = os.getenv("OPENAI_API_KEY")
-    model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+    model = os.getenv("AI_MODEL") or os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
     if not api_key:
         return None, None, None
 
