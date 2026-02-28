@@ -2,6 +2,90 @@
 
 {% block title %}Convites de assinatura | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    @media (max-width: 991.98px) {
+        .subscription-panel {
+            border-radius: 14px;
+            padding: 1rem !important;
+        }
+        .subscription-panel h2 {
+            font-size: 1rem;
+        }
+        .page-hero__actions {
+            width: 100%;
+        }
+        .page-hero__actions .btn,
+        .page-hero__actions a {
+            flex: 1 1 calc(50% - 0.5rem);
+            justify-content: center;
+            text-align: center;
+        }
+        .subscription-invites-table {
+            width: 100%;
+        }
+        .subscription-invites-table thead {
+            display: none;
+        }
+        .subscription-invites-table,
+        .subscription-invites-table tbody,
+        .subscription-invites-table tr,
+        .subscription-invites-table td {
+            display: block;
+            width: 100%;
+        }
+        .subscription-invites-table tbody tr {
+            margin-bottom: 0.8rem;
+            padding: 0.9rem;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(15, 23, 42, 0.65);
+        }
+        .subscription-invites-table td {
+            border: 0;
+            padding: 0.34rem 0;
+            text-align: left !important;
+        }
+        .subscription-invites-table td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 0.18rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .subscription-invite-actions {
+            justify-content: flex-start !important;
+        }
+        .subscription-invite-actions > * {
+            flex: 1 1 calc(50% - 0.5rem);
+        }
+        .subscription-invite-actions .btn {
+            width: 100%;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .page-hero__actions .btn,
+        .page-hero__actions a,
+        .subscription-invite-actions > * {
+            flex-basis: 100%;
+        }
+        .subscription-invites-table tbody tr {
+            padding: 0.85rem;
+        }
+    }
+    @media (max-width: 991.98px) {
+        [data-bs-theme="light"] .subscription-invites-table tbody tr {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.93));
+            border-color: rgba(71, 85, 105, 0.22);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-hero">
     <div class="page-hero__info">
@@ -17,7 +101,7 @@
 
 <div class="row g-3">
     <div class="col-lg-4">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 subscription-panel">
             <h2 class="h6 fw-bold mb-3">Novo convite</h2>
             <form method="post">
                 {% csrf_token %}
@@ -34,14 +118,14 @@
         </div>
     </div>
     <div class="col-lg-8">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 subscription-panel">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="h6 fw-bold mb-0">Convites ativos</h2>
                 <span class="badge text-bg-secondary">{{ invites|length }}</span>
             </div>
             <div id="subscriptionInvitesSkeleton" class="skeleton table-skeleton mb-3"></div>
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle mb-0 subscription-invites-table">
                     <thead>
                         <tr class="text-secondary">
                             <th>C&oacute;digo</th>
@@ -55,22 +139,22 @@
                     <tbody>
                         {% for invite in invites %}
                             <tr>
-                                <td>
+                                <td data-label="Código">
                                     <div class="fw-semibold">{{ invite.code }}</div>
                                     <div class="small text-secondary">Criado em {{ invite.created_at|date:"d/m/Y" }}</div>
                                 </td>
-                                <td>{{ invite.get_plan_cycle_display }} / {{ invite.get_plan_tier_display }}</td>
-                                <td>{{ invite.used_count }}/{{ invite.max_uses }}</td>
-                                <td>
+                                <td data-label="Plano">{{ invite.get_plan_cycle_display }} / {{ invite.get_plan_tier_display }}</td>
+                                <td data-label="Usos">{{ invite.used_count }}/{{ invite.max_uses }}</td>
+                                <td data-label="Status">
                                     {% if invite.is_active %}
                                         <span class="badge bg-success-subtle text-success">Ativo</span>
                                     {% else %}
                                         <span class="badge bg-secondary-subtle text-secondary">Inativo</span>
                                     {% endif %}
                                 </td>
-                                <td>{% if invite.expires_at %}{{ invite.expires_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
-                                <td class="text-end">
-                                    <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                <td data-label="Expira">{% if invite.expires_at %}{{ invite.expires_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                                <td class="text-end" data-label="Ações">
+                                    <div class="d-flex flex-wrap gap-2 justify-content-end subscription-invite-actions">
                                         <button class="btn btn-sm btn-outline-light copy-btn" type="button" data-code="{{ invite.code }}">Copiar</button>
                                         <form method="post" action="{% url 'tracker:subscription_invite_action' invite.id 'toggle' %}">
                                             {% csrf_token %}

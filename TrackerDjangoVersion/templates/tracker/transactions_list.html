@@ -243,6 +243,130 @@
     [data-bs-theme="light"] .tx-filter-card .form-text {
         color: #334155 !important;
     }
+    @media (max-width: 991.98px) {
+        .tx-hero,
+        .tx-filter-card,
+        .tx-table-shell {
+            border-radius: 16px;
+        }
+        .tx-actions {
+            width: 100%;
+        }
+        .tx-actions > a,
+        .tx-actions > form {
+            flex: 1 1 calc(50% - 0.5rem);
+            min-width: 0;
+        }
+        .tx-actions .btn {
+            width: 100%;
+            justify-content: center;
+        }
+        .tx-mini-summary {
+            grid-template-columns: 1fr;
+        }
+        .tx-table-shell {
+            padding: 1rem !important;
+        }
+        .tx-table-shell .table-responsive {
+            overflow: visible;
+        }
+        #tx-table {
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 0.75rem;
+        }
+        #tx-table thead {
+            display: none;
+        }
+        #tx-table,
+        #tx-table tbody,
+        #tx-table tr,
+        #tx-table td {
+            display: block;
+            width: 100%;
+        }
+        #tx-table tbody tr {
+            position: relative;
+            margin: 0;
+            padding: 0.9rem 0.9rem 0.75rem;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(15, 23, 42, 0.65);
+            transform: none !important;
+        }
+        #tx-table tbody tr:hover {
+            background: rgba(30, 41, 59, 0.76);
+            transform: none;
+        }
+        #tx-table td {
+            border: 0;
+            padding: 0.34rem 0;
+            text-align: left !important;
+            min-width: 0 !important;
+        }
+        #tx-table td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 0.18rem;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        #tx-table td.tx-select-col {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        #tx-table td.tx-select-col::before {
+            margin-bottom: 0;
+        }
+        #tx-table td[data-label="Ações"] {
+            margin-top: 0.35rem;
+            padding-top: 0.6rem;
+            border-top: 1px dashed rgba(148, 163, 184, 0.28);
+        }
+        #tx-table td[data-label="Ícone"] {
+            position: absolute;
+            top: 0.85rem;
+            right: 0.9rem;
+            width: auto;
+            padding: 0;
+        }
+        #tx-table td[data-label="Ícone"]::before {
+            display: none;
+        }
+        .tx-row-actions {
+            justify-content: flex-start !important;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+        .tx-table-shell .d-flex.justify-content-between.align-items-center.mt-3 {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 0.6rem;
+        }
+        .tx-table-shell .pagination {
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .tx-actions > a,
+        .tx-actions > form {
+            flex-basis: 100%;
+        }
+    }
+    @media (max-width: 991.98px) {
+        [data-bs-theme="light"] #tx-table tbody tr {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.93));
+            border-color: rgba(71, 85, 105, 0.22);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+        [data-bs-theme="light"] #tx-table tbody tr:hover {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(226, 232, 240, 0.95));
+        }
+    }
 </style>
 {% endblock %}
 
@@ -599,27 +723,27 @@
             <tbody>
                 {% for tx in transactions_page %}
                     <tr class="{% if tx.selected %}due-warning{% endif %}">
-                        <td class="text-center tx-select-col">
+                        <td class="text-center tx-select-col" data-label="Selecionar">
                             <input class="form-check-input tx-select" type="checkbox" value="{{ tx.id }}" aria-label="Selecionar transa&ccedil;&atilde;o">
                         </td>
-                        <td class="fw-semibold">{{ tx.description }}</td>
-                        <td><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
-                        <td class="text-secondary">
+                        <td class="fw-semibold" data-label="Descrição">{{ tx.description }}</td>
+                        <td data-label="Categoria"><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
+                        <td class="text-secondary" data-label="Responsável">
                             {% if tx.responsible %}
                                 {{ tx.responsible.get_full_name|default:tx.responsible.username }}
                             {% else %}
                                 -
                             {% endif %}
                         </td>
-                        <td class="text-secondary">{{ tx.date|date:"d/m/Y" }}</td>
-                        <td class="text-end {% if tx.type == 'income' %}text-success{% else %}text-danger{% endif %}">R$ {{ tx.value|floatformat:2 }}</td>
-                        <td class="text-center">
+                        <td class="text-secondary" data-label="Data">{{ tx.date|date:"d/m/Y" }}</td>
+                        <td class="text-end {% if tx.type == 'income' %}text-success{% else %}text-danger{% endif %}" data-label="Valor">R$ {{ tx.value|floatformat:2 }}</td>
+                        <td class="text-center" data-label="Tipo">
                             <span class="badge {% if tx.type == 'income' %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %} px-3">
                                 {{ tx.get_type_display }}
                             </span>
                         </td>
-                        <td class="text-end">
-                            <div class="d-flex justify-content-end gap-2">
+                        <td class="text-end" data-label="Ações">
+                            <div class="d-flex justify-content-end gap-2 tx-row-actions">
                                 <form method="post" action="{% url 'tracker:transaction_toggle_type' tx.id %}" data-no-transition="1">
                                     {% csrf_token %}
                                     <button class="btn btn-sm tx-action-btn btn-outline-info" type="submit" aria-label="Alternar tipo" data-bs-toggle="tooltip" title="Converter entrada/sa&iacute;da">
@@ -646,7 +770,7 @@
                                 </form>
                             </div>
                         </td>
-                        <td class="text-center">
+                        <td class="text-center" data-label="Ícone">
                             {% if tx.icon %}
                                 <i class="{{ tx.icon }}"></i>
                             {% else %}

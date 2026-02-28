@@ -40,3 +40,4 @@ Vars de ambiente: `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `OPENAI_API_KEY`
 - Dashboard: filtro por responsável (membro) e cores de categorias preservadas quando filtra gráficos por categoria.
 - Tarefas: campo responsável (membro do workspace) disponível no formulário e nas ações em massa.
 - Transações: ação em massa permite selecionar todos os itens do filtro (não só a página atual).
+- Tour guiado: o modal de sugestão do onboarding faz cleanup forçado de `modal-backdrop`/`modal-open` antes de iniciar o tour, evitando travamento da interface quando o usuário aceita ou fecha a sugestão.

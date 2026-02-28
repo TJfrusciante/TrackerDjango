@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="pt-br" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}IStore - Sistema Multi-Lojas{% endblock %}</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+
+         .navbar-avatar, .header-avatar, .profile-avatar {
+            width: 40px !important;
+            height: 40px !important;
+            object-fit: cover !important;
+            border-radius: 50% !important;
+        }
+        
+        /* Para imagens maiores em páginas de perfil */
+        .avatar-preview img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+        }
+        :root {
+            --primary-color: #ff8c3a;
+            --primary-dark: #ff6b1f;
+            --primary-light: #ffb477;
+            --primary-gradient: linear-gradient(135deg, #ffb56b 0%, #ff7a2f 45%, #ff5f1f 100%);
+            --secondary-color: #2c3e50;
+            --text-color: #000000;
+            --text-muted: #000000;
+            --bg-color: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --border-color: #dee2e6;
+            --header-bg: #ffffff;
+            --footer-bg: #2c3e50;
+            --nav-link-color: #333;
+            --card-bg: #ffffff;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+        }
+
+        [data-bs-theme="dark"] {
+            --primary-color: #ff9c4f;
+            --primary-dark: #ff6b1f;
+            --primary-light: #ffcc9a;
+            --primary-gradient: linear-gradient(135deg, #ffb56b 0%, #ff7a2f 50%, #ff5f1f 100%);
+            --secondary-color: #1a2530;
+            --text-color: #f8f9fa;
+            --text-muted: #adb5bd;
+            --bg-color: #212529;
+            --bg-secondary: #2c3034;
+            --border-color: #495057;
+            --header-bg: #212529;
+            --footer-bg: #1a2530;
+            --nav-link-color: #f8f9fa;
+            --card-bg: #2c3034;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styles */
+        .navbar {
+            background-color: var(--header-bg) !important;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem 0;
+        }
+
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: var(--primary-color) !important;
+            letter-spacing: -0.5px;
+        }
+
+        .navbar-brand span {
+            color: var(--secondary-color);
+        }
+
+        [data-bs-theme="dark"] .navbar-brand span {
+            color: var(--text-color);
+        }
+
+        .nav-link {
+            color: var(--nav-link-color) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            color: var(--primary-color) !important;
+            background-color: rgba(255, 107, 53, 0.1);
+        }
+
+        /* User Dropdown - Modernizado */
+        .user-dropdown {
+            position: relative;
+        }
+
+        .user-dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0.5rem 1rem;
+            background: none;
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background-color: var(--bg-secondary);
+        }
+
+        .user-dropdown-toggle:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(255, 107, 53, 0.1);
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary-color);
+            transition: all 0.3s ease;
+        }
+
+        .user-dropdown .user-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            max-width: 140px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            flex-shrink: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-color);
+            line-height: 1.2;
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-role {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .user-dropdown-toggle .fa-chevron-down {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            transition: transform 0.3s ease;
+        }
+
+        .user-dropdown-toggle.show .fa-chevron-down {
+            transform: rotate(180deg);
+        }
+
+        /* Dropdown Menu Moderno */
+        .dropdown-menu {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem 0;
+            min-width: 280px;
+            margin-top: 10px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            overflow: hidden;
+        }
+
+        [data-bs-theme="dark"] .dropdown-menu {
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .dropdown-header {
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            border-bottom: none;
+        }
+
+        .dropdown-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            margin-right: 15px;
+        }
+
+        .dropdown-user-info h6 {
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            color: white;
+        }
+
+        .dropdown-user-info small {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.85rem;
+        }
+
+        /* Garantir tamanho consistente do avatar no header/nav mesmo em telas com CSS customizado */
+        .user-dropdown-toggle img,
+        .user-dropdown-toggle .navbar-avatar,
+        .navbar-avatar {
+            width: 40px !important;
+            height: 40px !important;
+            object-fit: cover !important;
+            border-radius: 50% !important;
+            flex-shrink: 0;
+        }
+
+        .dropdown-divider {
+            margin: 0.5rem 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .dropdown-item {
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.2s ease;
+            color: var(--text-color);
+        }
+
+        .dropdown-item:hover {
+            background-color: rgba(255, 107, 53, 0.1);
+            color: var(--primary-color);
+            padding-left: 1.5rem;
+        }
+
+        .dropdown-item i {
+            width: 20px;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+
+        .dropdown-item.text-danger:hover {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: var(--danger-color);
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            background: none;
+            border: 2px solid var(--border-color);
+            color: var(--text-color);
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+            transform: rotate(15deg);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        .text-primary { color: var(--primary-color) !important; }
+        .bg-primary { background-color: var(--primary-color) !important; border-color: var(--primary-color) !important; }
+        .border-primary { border-color: var(--primary-color) !important; }
+
+        /* Cards */
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        /* Footer */
+        footer {
+            background: linear-gradient(135deg, #0f172a 0%, #1f2937 50%, #0f172a 100%);
+            color: #e5e7eb;
+            margin-top: auto;
+        }
+
+        footer a {
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+
+        footer a:hover {
+            color: #ff8c5a;
+            transform: translateX(2px);
+        }
+
+        footer .text-light {
+            color: #cbd5e1 !important;
+        }
+
+        /* Mobile Menu */
+        @media (max-width: 992px) {
+            .navbar-collapse {
+                background-color: var(--header-bg);
+                padding: 1rem;
+                border-radius: 10px;
+                margin-top: 1rem;
+                border: 1px solid var(--border-color);
+            }
+            
+            .user-dropdown-toggle {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .dropdown-menu {
+                position: static !important;
+                transform: none !important;
+                width: 100%;
+                margin-top: 0.5rem;
+                box-shadow: none;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Header/Navigation -->
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-light">
+            <div class="container">
+                <!-- Logo -->
+                <a class="navbar-brand d-flex align-items-center" href="{% url 'store:home' %}">
+                    <i class="fas fa-warehouse me-2"></i>
+                    <span class="text-primary">I</span>Store
+                </a>
+
+                <!-- Mobile Toggle -->
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                
+                <!-- Navigation Items -->
+                <div class="collapse navbar-collapse" id="navbarContent">
+                    <ul class="navbar-nav mx-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/home' %}active{% endif %}" href="{% url 'store:home' %}">
+                                <i class="fas fa-home me-1"></i> Início
+                            </a>
+                        </li>
+                        
+                        {% if user.is_staff or user.is_superuser %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'usuarios' in request.path or 'users' in request.path %}active{% endif %}" href="{% url 'users_list' %}">
+                                <i class="fas fa-users me-1"></i> Usuários
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:superuser_store_list' %}">
+                                <i class="fa-solid fa-store"></i> Lojas
+                            </a>
+                        </li>
+                        <!-- Link de Configurações da Loja (apenas se tiver store no contexto) -->
+                        {% if store and store.slug %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:store_settings' store.slug %}">
+                                <i class="fas fa-cog me-2"></i>Configurações
+                            </a>
+                        </li>
+                        {% elif user.is_superuser %}
+                        <!-- Link para configurações do sistema para superusuários -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:superuser_dashboard' %}">
+                                <i class="fas fa-chart-line me-2"></i>Dashboard
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% endif %}
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:help' %}">
+                                <i class="fas fa-question-circle me-1"></i> Ajuda
+                            </a>
+                        </li>
+                        {% if user.is_authenticated and user.is_superuser %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:agent_global' %}">
+                                <i class="fas fa-robot me-1"></i> Agente IA (global)
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if request.store %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:store_dashboard' request.store.slug %}"><i class="fas fa-tachometer-alt me-1"></i> Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:product_list' request.store.slug %}"><i class="fas fa-box me-1"></i> Produtos</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:sale_list' request.store.slug %}"><i class="fas fa-receipt me-1"></i> Vendas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'store:agent_store' request.store.slug %}"><i class="fas fa-robot me-1"></i> Agente IA</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+
+                    <!-- Right Side Items -->
+                    <div class="d-flex align-items-center gap-3">
+                        <!-- Theme Toggle -->
+                        <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema">
+                            <i class="fas fa-sun"></i>
+                        </button>
+
+                        <!-- User Account -->
+                        {% if user.is_authenticated %}
+                            <div class="dropdown user-dropdown">
+                                <button class="btn user-dropdown-toggle dropdown-toggle d-flex align-items-center" 
+                                        type="button" id="userDropdown" data-bs-toggle="dropdown" 
+                                        aria-expanded="false">
+                                    
+                                    <!-- Avatar do Usuário - CORRIGIDO: usando profile.profile_picture do edit_profile.html -->
+                                    {% if user.profile.profile_picture %}
+                                        <img src="{{ user.profile.get_profile_picture_url }}" alt="Avatar" class="navbar-avatar" width="40" height="40" style="width:40px;height:40px;">
+                                    {% else %}
+                                        <div class="navbar-avatar d-flex align-items-center justify-content-center" 
+                                             style="background-color: var(--primary-color); color: white; width:40px; height:40px;">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <!-- Info do Usuário -->
+                                    <div class="user-info d-none d-md-flex">
+                                        <span class="user-name">
+                                            {% if user.first_name %}
+                                                {{ user.first_name|truncatechars:15 }}
+                                            {% else %}
+                                                {{ user.username|truncatechars:15 }}
+                                            {% endif %}
+                                        </span>
+                                        <span class="user-role">
+                                            {% if user.is_superuser %}
+                                                Super Admin
+                                            {% elif user.is_staff %}
+                                                Staff
+                                            {% else %}
+                                                Usuário
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    
+                                    <!-- Seta do dropdown -->
+                                    <i class="fas fa-chevron-down ms-2"></i>
+                                </button>
+                                
+                                <!-- Dropdown Menu -->
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                    <!-- Header com Avatar - CORRIGIDO: usando profile.profile_picture do edit_profile.html -->
+                                    <li class="dropdown-header">
+                                        <div class="d-flex align-items-center">
+                                            {% if user.profile.profile_picture %}
+                                                <img src="{{ user.profile.get_profile_picture_url }}" alt="Avatar" class="dropdown-avatar" width="48" height="48" style="width:48px;height:48px;">
+                                            {% else %}
+                                                <div class="dropdown-avatar d-flex align-items-center justify-content-center" 
+                                                     style="background-color: rgba(255, 255, 255, 0.2); color: white; width:48px; height:48px;">
+                                                    <i class="fas fa-user fa-2x"></i>
+                                                </div>
+                                            {% endif %}
+                                            <div class="dropdown-user-info">
+                                                <h6>
+                                                    {% if user.first_name %}
+                                                        {{ user.first_name }} {{ user.last_name }}
+                                                    {% else %}
+                                                        {{ user.username }}
+                                                    {% endif %}
+                                                </h6>
+                                                <small>{{ user.email }}</small>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    
+                                    <li><hr class="dropdown-divider"></li>
+                                    
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'user_profile' %}">
+                                            <i class="fas fa-user me-2"></i> Meu Perfil
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'edit_profile' %}">
+                                            <i class="fas fa-edit me-2"></i> Editar Perfil
+                                        </a>
+                                    </li>
+                                    
+                                    {% if user.is_staff or user.is_superuser %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'admin:index' %}">
+                                            <i class="fas fa-cog me-2"></i> Painel Admin
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" href="{% url 'logout' %}">
+                                            <i class="fas fa-sign-out-alt me-2"></i> Sair
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        {% else %}
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'login' %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-sign-in-alt me-1"></i> Entrar
+                                </a>
+                                <a href="{% url 'register' %}" class="btn btn-primary">
+                                    <i class="fas fa-user-plus me-1"></i> Cadastrar
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow-1">
+        {% block messages %}
+        <div class="container mt-3">
+            {% if messages %}
+                <div id="global-messages">
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show mb-2" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        {% endblock messages %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    
+    <footer class="py-5">
+        <div class="container">
+            <div class="row gy-4">
+                <div class="col-lg-4">
+                    <h3 class="h4 fw-bold mb-2"><i class="fas fa-warehouse me-2"></i>IStore</h3>
+                    <p class="text-light mb-3">Plataforma multi-lojas para produtos, vendas e relatórios.</p>
+                    <div class="d-flex gap-3">
+                        <a href="#"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <h5 class="fw-bold mb-3">Navegaçãoo</h5>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2"><a href="{% url 'store:home' %}">Início</a></li>
+                        <li class="mb-2"><a href="{% url 'store:superuser_dashboard' %}">Dashboard</a></li>
+                        <li class="mb-2"><a href="{% url 'users_list' %}">Usuários</a></li>
+                        <li class="mb-2"><a href="{% url 'store:superuser_store_list' %}">Lojas</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <h5 class="fw-bold mb-3">Minha Conta</h5>
+                    <ul class="list-unstyled mb-0">
+                        {% if user.is_authenticated %}
+                            <li class="mb-2"><a href="{% url 'user_profile' %}">Meu Perfil</a></li>
+                            <li class="mb-2"><a href="{% url 'edit_profile' %}">Editar Perfil</a></li>
+                            <li class="mb-2"><a href="{% url 'logout' %}">Sair</a></li>
+                        {% else %}
+                            <li class="mb-2"><a href="{% url 'login' %}">Login</a></li>
+                            <li class="mb-2"><a href="{% url 'register' %}">Cadastrar</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="col-lg-2">
+                    <h5 class="fw-bold mb-3">Contato</h5>
+                    <ul class="list-unstyled text-light mb-0">
+                        <li class="mb-2"><i class="fas fa-phone me-2"></i> (11) 99999-9999</li>
+                        <li class="mb-2"><i class="fas fa-envelope me-2"></i> suporte@istore.com</li>
+                        <li><i class="fas fa-clock me-2"></i> Seg-Sex: 8h-18h</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="row pt-4 mt-3 border-top border-light border-opacity-25">
+                <div class="col text-center text-light">
+                    &copy; {% now "Y" %} IStore - Feito para operações multi-lojas.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('themeToggle');
+            const themeIcon = themeToggle.querySelector('i');
+            const html = document.documentElement;
+            
+            // Check for saved theme preference or default to light
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            html.setAttribute('data-bs-theme', savedTheme);
+            
+            // Update icon based on current theme
+            updateThemeIcon(savedTheme);
+            
+            // Toggle theme
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = html.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                // Apply new theme
+                html.setAttribute('data-bs-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                
+                // Update icon
+                updateThemeIcon(newTheme);
+            });
+            
+            function updateThemeIcon(theme) {
+                if (theme === 'dark') {
+                    themeIcon.className = 'fas fa-moon';
+                    themeIcon.title = 'Mudar para modo claro';
+                } else {
+                    themeIcon.className = 'fas fa-sun';
+                    themeIcon.title = 'Mudar para modo escuro';
+                }
+            }
+            
+            // Add active class to current page in navigation
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath || 
+                    (link.getAttribute('href') !== '/' && currentPath.includes(link.getAttribute('href').replace('/', '')))) {
+                    link.classList.add('active');
+                }
+            });
+            
+            // Dropdown animation
+            const dropdownToggle = document.querySelector('.user-dropdown-toggle');
+            const dropdownMenu = document.querySelector('.dropdown-menu');
+            
+            if (dropdownToggle && dropdownMenu) {
+                dropdownToggle.addEventListener('shown.bs.dropdown', function () {
+                    dropdownMenu.style.opacity = '0';
+                    dropdownMenu.style.transform = 'translateY(-10px)';
+                    
+                    setTimeout(() => {
+                        dropdownMenu.style.transition = 'all 0.3s ease';
+                        dropdownMenu.style.opacity = '1';
+                        dropdownMenu.style.transform = 'translateY(0)';
+                    }, 10);
+                });
+            }
+        });
+    </script>
+    <script>
+        // Auto-fecha alerts globais após 2s (semelhante à tela de login)
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('#global-messages .alert');
+            if (alerts.length) {
+                setTimeout(() => {
+                    alerts.forEach(a => {
+                        const bsAlert = bootstrap.Alert.getOrCreateInstance(a);
+                        bsAlert.close();
+                    });
+                }, 2000);
+            }
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -2,6 +2,82 @@
 
 {% block title %}Membros | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    @media (max-width: 991.98px) {
+        .glass-card {
+            border-radius: 14px;
+            padding: 1rem !important;
+        }
+        #memberFilters {
+            padding: 0.7rem;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.28);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+        #memberFilters .form-label.small {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        #memberFilters .btn {
+            min-height: 42px;
+        }
+        .page-hero__actions {
+            width: 100%;
+        }
+        .page-hero__actions > a,
+        .page-hero__actions > form {
+            flex: 1 1 calc(50% - 0.5rem);
+            min-width: 0;
+        }
+        .page-hero__actions .btn {
+            width: 100%;
+            justify-content: center;
+            text-align: center;
+        }
+        .workspace-members-panel .list-group-item {
+            flex-direction: column;
+            align-items: stretch !important;
+            gap: 0.75rem;
+            border-radius: 12px;
+            margin-bottom: 0.55rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+        .workspace-member-actions {
+            width: 100%;
+            align-items: stretch !important;
+        }
+        .workspace-member-actions form {
+            width: 100%;
+        }
+        .workspace-member-actions .btn {
+            width: 100%;
+        }
+        .workspace-request-actions {
+            width: 100%;
+            justify-content: stretch !important;
+        }
+        .workspace-request-actions form {
+            flex: 1 1 0;
+        }
+        .workspace-request-actions .btn {
+            width: 100%;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .workspace-members-panel,
+        .workspace-members-panel .glass-card {
+            border-radius: 14px;
+        }
+        .page-hero__actions > a,
+        .page-hero__actions > form {
+            flex-basis: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-hero">
     <div class="page-hero__info">
@@ -36,7 +112,7 @@
 
 <div class="row gy-4">
     <div class="col-lg-6">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 workspace-members-panel">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div class="d-flex align-items-center gap-2">
                     <span class="badge text-bg-dark">Membros</span>
@@ -91,7 +167,7 @@
                         </div>
                         {% if can_manage %}
                             {% if user.is_superuser or member.user_id != user.id %}
-                            <div class="d-flex flex-column gap-2 align-items-end">
+                            <div class="d-flex flex-column gap-2 align-items-end workspace-member-actions">
                                 <form method="post" action="{% url 'tracker:workspace_member_update' workspace.slug member.id %}">
                                     {% csrf_token %}
                                     <div class="input-group input-group-sm">
@@ -124,7 +200,7 @@
     </div>
     {% if can_manage %}
     <div class="col-lg-6">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 workspace-members-panel">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h3 class="h6 fw-bold mb-0">Convidar membro</h3>
                 <span class="badge text-bg-success">Convite r&aacute;pido</span>
@@ -211,7 +287,7 @@
                                 <div class="fw-semibold">{{ req.user.username }}</div>
                                 <div class="small text-secondary">{{ req.user.email }}</div>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 workspace-request-actions">
                                 <form method="post" action="{% url 'tracker:workspace_request_action' workspace.slug req.id 'approve' %}">
                                     {% csrf_token %}
                                     <button class="btn btn-sm btn-success" type="submit">Aprovar</button>
@@ -231,7 +307,7 @@
     </div>
     {% else %}
     <div class="col-lg-6">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 workspace-members-panel">
             <h3 class="h6 fw-bold mb-2">Permiss&otilde;es</h3>
             <p class="text-secondary mb-0">Voc&ecirc; pode visualizar os membros deste workspace, mas somente o owner pode convidar ou alterar permiss&otilde;es.</p>
         </div>
@@ -252,6 +328,7 @@
     })();
 </script>
 {% endblock %}
+
 
 
 

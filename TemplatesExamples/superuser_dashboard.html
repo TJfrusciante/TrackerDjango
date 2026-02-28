@@ -1,0 +1,973 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Dashboard Admin - IStore{% endblock %}
+
+{% block extra_css %}
+<style>
+    .superuser-dashboard {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+
+    :root {
+        --su-orange: #ffb56b;
+        --su-orange-dark: #ff6b1f;
+    }
+
+    .page-header {
+        margin-bottom: 2rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, var(--su-orange) 0%, var(--su-orange-dark) 100%);
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+    }
+
+    .page-header h1 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 1.1rem;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    /* Estatísticas */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1.25rem 1.25rem 1.15rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, var(--su-orange), var(--su-orange-dark));
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover::before { height: 6px; }
+
+    .stat-number {
+        font-size: 2.2rem;
+        font-weight: 850;
+        color: var(--su-orange);
+        margin-bottom: 0.25rem;
+        line-height: 1.1;
+    }
+
+    .stat-label {
+        font-size: 0.92rem;
+        color: var(--text-muted);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+    }
+
+    .stat-sub {
+        margin-top: 0.4rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .stat-row {
+        margin-top: 0.8rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    /* Cards de Conteúdo */
+    .content-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .content-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+
+    .content-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, var(--su-orange) 0%, var(--su-orange-dark) 100%);
+        color: white;
+        padding: 1.1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card-header h3 {
+        font-size: 1.15rem;
+        font-weight: 750;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .card-body { padding: 1.25rem; }
+
+    /* Lista de Itens */
+    .item-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .item-list li {
+        padding: 0.95rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: background-color 0.3s ease;
+        gap: 1rem;
+    }
+
+    .item-list li:last-child { border-bottom: none; }
+    .item-list li:hover { background-color: var(--bg-secondary); }
+
+    .item-info { flex: 1; min-width: 0; }
+    .item-title { font-weight: 750; color: var(--text-color); margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-meta { font-size: 0.8rem; color: var(--text-muted); }
+
+    /* Badges */
+    .badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 750;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        white-space: nowrap;
+    }
+
+    .badge-success { background-color: rgba(46, 204, 113, 0.2); color: #27ae60; }
+    .badge-warning { background-color: rgba(241, 196, 15, 0.2); color: #f39c12; }
+    .badge-danger  { background-color: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+    .badge-info    { background-color: rgba(255, 139, 60, 0.18); color: #ff6b1f; }
+    .badge-neutral { background-color: rgba(149, 165, 166, 0.18); color: #7f8c8d; }
+
+    /* Ações Rápidas */
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 0.9rem;
+        margin-top: 1rem;
+    }
+
+    .quick-action-btn {
+        background-color: var(--card-bg);
+        border: 2px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0.95rem;
+        text-align: center;
+        color: var(--text-color);
+        text-decoration: none;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .quick-action-btn:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+
+    .quick-action-btn i { font-size: 1.9rem; }
+
+    /* Estado Vazio */
+    .empty-state {
+        text-align: center;
+        padding: 2.75rem 1rem;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 3.2rem;
+        margin-bottom: 0.9rem;
+        opacity: 0.55;
+    }
+
+    .empty-state h4 { font-size: 1.2rem; margin-bottom: 0.5rem; font-weight: 750; }
+    .empty-state p { margin-bottom: 0; max-width: 420px; margin-left: auto; margin-right: auto; }
+
+    /* Charts */
+    .chart-wrap {
+        padding: 0.9rem;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background: var(--bg-secondary);
+    }
+
+    .chart-canvas {
+        width: 100% !important;
+        height: 320px !important;
+        max-height: 320px;
+    }
+
+    /* Tabela */
+    .table-wrap {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--card-bg);
+    }
+
+    .table thead th {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 750;
+        color: var(--text-color);
+        white-space: nowrap;
+    }
+
+    .table tbody td {
+        border-top: 1px solid var(--border-color);
+        vertical-align: middle;
+    }
+
+    .muted-small { font-size: 0.9rem; color: var(--text-muted); }
+
+    /* Responsividade */
+    @media (max-width: 992px) {
+        .content-grid { grid-template-columns: 1fr; }
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        .quick-actions { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+        .stats-grid { grid-template-columns: 1fr; }
+        .quick-actions { grid-template-columns: 1fr; }
+        .item-list li { flex-direction: column; align-items: flex-start; }
+        .chart-canvas { height: 280px !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container superuser-dashboard">
+    <!-- Cabeçalho -->
+    <div class="page-header">
+        <h1>Dashboard Administrativo</h1>
+        <p class="subtitle">
+            Visão global do IStore: lojas, planos, faturamento, vendas, catálogo e saúde da operação.
+        </p>
+    </div>
+
+    <!-- KPIs -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ total_stores|default:0 }}">{{ total_stores|default:0 }}</div>
+            <div class="stat-label">Total de Lojas</div>
+            <div class="stat-sub">Base cadastrada</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ active_stores|default:0 }}">{{ active_stores|default:0 }}</div>
+            <div class="stat-label">Lojas Ativas</div>
+            <div class="stat-sub">Operacionais</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ suspended_stores|default:0 }}">{{ suspended_stores|default:0 }}</div>
+            <div class="stat-label">Suspensas</div>
+            <div class="stat-sub">Bloqueadas/pausadas</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ overdue_stores_count|default:0 }}">{{ overdue_stores_count|default:0 }}</div>
+            <div class="stat-label">Pagamentos Atrasados</div>
+            <div class="stat-sub">Ações de cobrança</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-money" data-value="{{ monthly_revenue|default:0 }}">{{ monthly_revenue|default:0 }}</div>
+            <div class="stat-label">Receita Mensal (Planos)</div>
+            <div class="stat-sub">Soma de mensalidades</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ new_stores_month|default:0 }}">{{ new_stores_month|default:0 }}</div>
+            <div class="stat-label">Novas Lojas (mês)</div>
+            <div class="stat-sub">Aquisição</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ kpis.total_sales|default:0 }}">{{ kpis.total_sales|default:0 }}</div>
+            <div class="stat-label">Vendas (Total)</div>
+            <div class="stat-sub">Sistema inteiro</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ kpis.total_products|default:0 }}">{{ kpis.total_products|default:0 }}</div>
+            <div class="stat-label">Produtos (Total)</div>
+            <div class="stat-sub">Catálogo</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-int" data-value="{{ kpis.total_customers|default:0 }}">{{ kpis.total_customers|default:0 }}</div>
+            <div class="stat-label">Clientes (Total)</div>
+            <div class="stat-sub">Cadastros</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number js-animate-money" data-value="{{ kpis.period_sales_value|default:0 }}">{{ kpis.period_sales_value|default:0 }}</div>
+            <div class="stat-label">Receita ({{ kpis.period_label|default:period|default:"Período" }})</div>
+            <div class="stat-sub">Vendas: {{ kpis.period_sales|default:0 }}</div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="content-grid">
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-line"></i> Vendas (Últimos 14 dias)</h3>
+            </div>
+            <div class="card-body">
+                {% if sales_series_labels_json and sales_series_values_json %}
+                    <div class="chart-wrap">
+                        <canvas id="salesTrendChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="muted-small mt-2">
+                        Série diária enviada pelo backend em <code>sales_series</code>.
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-chart-area"></i>
+                        <h4>Sem dados suficientes</h4>
+                        <p>Envie <code>sales_series</code> (labels/values) no contexto para exibir este gráfico.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-layer-group"></i> Distribuição por Plano</h3>
+            </div>
+            <div class="card-body">
+                {% if plan_labels_json and plan_values_json %}
+                    <div class="chart-wrap">
+                        <canvas id="planChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="muted-small mt-2">
+                        Quantidade de lojas por plano (backend: <code>plan_distribution</code>).
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-chart-pie"></i>
+                        <h4>Sem dados de plano</h4>
+                        <p>Envie <code>plan_distribution</code> (labels/values) para habilitar este gráfico.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-signal"></i> Status das Lojas</h3>
+            </div>
+            <div class="card-body">
+                {% if store_status_labels_json and store_status_values_json %}
+                    <div class="chart-wrap">
+                        <canvas id="storeStatusChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="muted-small mt-2">
+                        Ex.: Ativa / Suspensa / Inadimplente etc (backend: <code>store_status_distribution</code>).
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-chart-bar"></i>
+                        <h4>Sem distribuição de status</h4>
+                        <p>Envie <code>store_status_distribution</code> (labels/values) para exibir este gráfico.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Operação: cobranças e renovações -->
+    <div class="content-grid">
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Lojas com Pagamento Atrasado</h3>
+            </div>
+            <div class="card-body">
+                {% if overdue_stores %}
+                    <ul class="item-list">
+                        {% for store in overdue_stores %}
+                            <li>
+                                <div class="item-info">
+                                    <div class="item-title">{{ store.name }}</div>
+                                    <div class="item-subtitle">{{ store.owner.get_full_name|default:store.owner.username }}</div>
+                                    <div class="item-meta">
+                                        Vencimento: {{ store.next_payment_date|date:"d/m/Y" }}
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge badge-danger">
+                                        <i class="fas fa-clock"></i>
+                                        R$ {{ store.monthly_fee|floatformat:2 }}
+                                    </span>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="muted-small mt-2">
+                        Mostrando até 10 lojas. Ajuste no view se quiser paginação ou exportação.
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle"></i>
+                        <h4>Todas em dia</h4>
+                        <p>Nenhuma loja com pagamento atrasado.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-calendar-alt"></i> Próximas Renovações (7 dias)</h3>
+            </div>
+            <div class="card-body">
+                {% if upcoming_renewals %}
+                    <ul class="item-list">
+                        {% for store in upcoming_renewals %}
+                            <li>
+                                <div class="item-info">
+                                    <div class="item-title">{{ store.name }}</div>
+                                    <div class="item-subtitle">{{ store.get_plan_display|default:"Plano" }}</div>
+                                    <div class="item-meta">Renova em: {{ store.next_payment_date|date:"d/m/Y" }}</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge badge-info">
+                                        <i class="fas fa-receipt"></i>
+                                        R$ {{ store.monthly_fee|floatformat:2 }}
+                                    </span>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-check"></i>
+                        <h4>Nenhuma renovação</h4>
+                        <p>Nenhuma renovação prevista para os próximos 7 dias.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Rankings e Tabelas -->
+    <div class="content-grid">
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-trophy"></i> Top Lojas por Receita (mês)</h3>
+            </div>
+            <div class="card-body">
+                {% if top_stores_by_revenue %}
+                    <ul class="item-list">
+                        {% for row in top_stores_by_revenue %}
+                            <li>
+                                <div class="item-info">
+                                    <div class="item-title">
+                                        <a href="{% url 'store:store_dashboard' row.slug %}" class="text-decoration-none">{{ row.name }}</a>
+                                    </div>
+                                    <div class="item-subtitle">
+                                        Proprietário: {{ row.owner.get_full_name|default:row.owner.username|default:"-" }}
+                                    </div>
+                                    <div class="item-meta">Vendas no mês: {{ row.month_sales|default:0 }}</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge badge-success">
+                                        <i class="fas fa-coins"></i>
+                                        R$ {{ row.month_revenue|default:0|floatformat:2 }}
+                                    </span>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-award"></i>
+                        <h4>Sem ranking ainda</h4>
+                        <p>Envie <code>top_stores_by_revenue</code> no contexto para habilitar este bloco.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-receipt"></i> Últimas Vendas (global)</h3>
+            </div>
+            <div class="card-body">
+                <form method="get" class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Loja</label>
+                        <select class="form-select" name="sales_store">
+                            <option value="">Todas</option>
+                            {% for s in stores_for_actions %}
+                                <option value="{{ s.slug }}" {% if sales_store_filter == s.slug %}selected{% endif %}>{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Forma de pagamento</label>
+                        <select class="form-select" name="sales_payment">
+                            <option value="">Todas</option>
+                            {% for code,label in payment_choices %}
+                                <option value="{{ code }}" {% if sales_payment_filter == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Período</label>
+                        <select class="form-select" name="sales_period">
+                            <option value="">Todos</option>
+                            <option value="7d" {% if sales_period_filter == '7d' %}selected{% endif %}>Últimos 7 dias</option>
+                            <option value="30d" {% if sales_period_filter == '30d' %}selected{% endif %}>Últimos 30 dias</option>
+                            <option value="90d" {% if sales_period_filter == '90d' %}selected{% endif %}>Últimos 90 dias</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex gap-2 mt-2">
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                        <a class="btn btn-outline-secondary btn-sm" href="{% url 'store:superuser_dashboard' %}"><i class="fas fa-undo me-1"></i>Limpar</a>
+                    </div>
+                </form>
+
+                {% if recent_sales %}
+                    <div class="table-wrap">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Loja</th>
+                                    <th>Cliente</th>
+                                    <th class="text-end">Total</th>
+                                    <th class="text-end">Pagamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in recent_sales %}
+                                    <tr>
+                                        <td class="text-nowrap">{{ s.sale_date|date:"d/m/Y" }}</td>
+                                        <td class="text-nowrap"><a class="text-decoration-none" href="{% url 'store:store_dashboard' s.store.slug %}">{{ s.store.name }}</a></td>
+                                        <td class="text-nowrap">{{ s.customer.name|default:"-" }}</td>
+                                        <td class="text-end text-nowrap"><a class="text-decoration-none" href="{% url 'store:sale_detail' s.store.slug s.id %}">R$ {{ s.total|floatformat:2 }}</a></td>
+                                        <td class="text-end text-nowrap">{{ s.get_payment_method_display }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if recent_sales.has_other_pages %}
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div class="text-muted small">
+                            Página {{ recent_sales.number }} de {{ recent_sales.paginator.num_pages }}
+                        </div>
+                        <div class="btn-group">
+                            {% if recent_sales.has_previous %}
+                                <a class="btn btn-sm btn-outline-secondary" href="?page={{ recent_sales.previous_page_number }}{% if sales_store_filter %}&sales_store={{ sales_store_filter }}{% endif %}{% if sales_payment_filter %}&sales_payment={{ sales_payment_filter }}{% endif %}{% if sales_period_filter %}&sales_period={{ sales_period_filter }}{% endif %}">&laquo; Anterior</a>
+                            {% endif %}
+                            {% if recent_sales.has_next %}
+                                <a class="btn btn-sm btn-outline-secondary" href="?page={{ recent_sales.next_page_number }}{% if sales_store_filter %}&sales_store={{ sales_store_filter }}{% endif %}{% if sales_payment_filter %}&sales_payment={{ sales_payment_filter }}{% endif %}{% if sales_period_filter %}&sales_period={{ sales_period_filter }}{% endif %}">Próxima &raquo;</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="muted-small mt-2">
+                        Filtros aplicados por loja, período e forma de pagamento.
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <h4>Sem vendas recentes</h4>
+                        <p>Quando o view enviar <code>recent_sales</code>, esta tabela será preenchida.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Acoes rapidas + destaque -->
+    <div class="content-grid">
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-bolt"></i> Acoes Rapidas</h3>
+            </div>
+            <div class="card-body">
+                <div class="quick-actions">
+                    <a href="{% url 'users_list' %}" class="quick-action-btn">
+                        <i class="fas fa-users" style="color:#ff6b1f;"></i>
+                        <span>Gerenciar Usuarios</span>
+                    </a>
+                    <a href="/admin/" class="quick-action-btn">
+                        <i class="fas fa-tools text-warning"></i>
+                        <span>Django Admin</span>
+                    </a>
+                    <a href="{% url 'store:financial_report' %}" class="quick-action-btn">
+                        <i class="fas fa-file-invoice-dollar text-success"></i>
+                        <span>Relatorio Financeiro</span>
+                    </a>
+                    <a href="{% url 'store:financial_report_export' %}?format=excel" class="quick-action-btn">
+                        <i class="fas fa-file-excel text-danger"></i>
+                        <span>Exportar Excel</span>
+                    </a>
+                    <a href="{% url 'store:superuser_store_list' %}" class="quick-action-btn">
+                        <i class="fas fa-store" style="color:#ff6b1f;"></i>
+                        <span>Lojas</span>
+                    </a>
+                    <a href="{% url 'store:agent_global' %}" class="quick-action-btn">
+                        <i class="fas fa-robot" style="color:#ff6b1f;"></i>
+                        <span>Agente IA (global)</span>
+                    </a>
+                </div>
+
+                <div class="row g-3 mt-3">
+                    <div class="col-lg-6">
+                        <label class="form-label fw-semibold">Ver loja</label>
+                        <div class="d-flex gap-2">
+                            <select id="viewStoreSelect" class="form-select">
+                                {% for s in stores_for_actions %}
+                                    <option value="{{ s.slug }}">{{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <a href="#" id="viewStoreBtn" class="btn btn-outline-primary">Abrir</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <form method="post" action="{% url 'store:superuser_toggle_store_status' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'store:superuser_dashboard' %}">
+                            <label class="form-label fw-semibold">Suspender/Reativar</label>
+                            <div class="d-flex gap-2">
+                                <select name="store_id" class="form-select">
+                                    {% for s in stores_for_actions %}
+                                        <option value="{{ s.id }}">{{ s.name }} ({{ s.get_status_display }})</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-warning" type="submit">Aplicar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-3">
+                    <div class="col-lg-6">
+                        <form method="post" action="{% url 'store:superuser_recalculate_store_billing' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'store:superuser_dashboard' %}">
+                            <label class="form-label fw-semibold">Recalcular cobranca (+30 dias)</label>
+                            <div class="d-flex gap-2">
+                                <select name="store_id" class="form-select">
+                                    {% for s in stores_for_actions %}
+                                        <option value="{{ s.id }}">{{ s.name }} (prox: {{ s.next_payment_date|default:"-"|date:"d/m/Y" }})</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-success" type="submit">Recalcular</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="muted-small mt-4">
+                            Atalhos rapidos para fluxos administrativos.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-card">
+            <div class="card-header">
+                <h3><i class="fas fa-star"></i> Loja Destaque (volume de vendas)</h3>
+            </div>
+            <div class="card-body">
+                {% if top_store_sales %}
+                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+                        <div>
+                            <div class="item-title" style="font-size:1.15rem;">{{ top_store_sales.name }}</div>
+                            <div class="item-subtitle">
+                                Proprietário: {{ top_store_sales.owner.get_full_name|default:top_store_sales.owner.username }}
+                            </div>
+                            <div class="item-meta">
+                                Vendas realizadas: <strong>{{ top_store_sales.total_sales|default:0 }}</strong>
+                            </div>
+                        </div>
+                        <div class="stat-row">
+                            <span class="badge badge-info"><i class="fas fa-store"></i> Destaque</span>
+                            {% if top_store_sales.next_payment_date %}
+                                <span class="badge badge-neutral"><i class="fas fa-calendar"></i> Renova: {{ top_store_sales.next_payment_date|date:"d/m/Y" }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-star-half-alt"></i>
+                        <h4>Sem destaque</h4>
+                        <p>Quando existirem vendas suficientes, o destaque aparece aqui.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{# JSON escondido para os gráficos (evita problemas com aspas) #}
+{% if sales_series_labels_json and sales_series_values_json %}
+<script type="application/json" id="salesSeriesLabelsJson">{{ sales_series_labels_json|safe }}</script>
+<script type="application/json" id="salesSeriesValuesJson">{{ sales_series_values_json|safe }}</script>
+{% endif %}
+
+{% if plan_labels_json and plan_values_json %}
+<script type="application/json" id="planLabelsJson">{{ plan_labels_json|safe }}</script>
+<script type="application/json" id="planValuesJson">{{ plan_values_json|safe }}</script>
+{% endif %}
+
+{% if store_status_labels_json and store_status_values_json %}
+<script type="application/json" id="storeStatusLabelsJson">{{ store_status_labels_json|safe }}</script>
+<script type="application/json" id="storeStatusValuesJson">{{ store_status_values_json|safe }}</script>
+{% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // ---------- Ações rápidas ----------
+        const viewBtn = document.getElementById('viewStoreBtn');
+        const viewSelect = document.getElementById('viewStoreSelect');
+        if (viewBtn && viewSelect) {
+            viewBtn.addEventListener('click', function(ev) {
+                ev.preventDefault();
+                const slug = viewSelect.value;
+                if (slug) {
+                    window.location.href = `/store/${slug}/dashboard/`;
+                }
+            });
+        }
+
+        // ---------- Helpers: pt-BR parsing/formatting ----------
+        function parsePtBrNumber(rawText) {
+            if (rawText === null || rawText === undefined) return null;
+            let s = String(rawText).trim();
+
+            // Remove currency symbols and spaces
+            s = s.replace(/\s+/g, '');
+            s = s.replace(/^R\$/i, '');
+            s = s.replace(/[^\d.,-]/g, '');
+
+            if (!s) return null;
+
+            // If has comma, treat comma as decimal separator; dots as thousand separators
+            if (s.includes(',')) {
+                // remove all dots as thousand separators
+                s = s.replace(/\./g, '');
+                // convert comma decimal to dot
+                s = s.replace(',', '.');
+                const v = Number(s);
+                return Number.isFinite(v) ? v : null;
+            }
+
+            // If no comma:
+            // If more than one dot -> treat dots as thousand separators
+            const dotCount = (s.match(/\./g) || []).length;
+            if (dotCount > 1) {
+                s = s.replace(/\./g, '');
+                const v = Number(s);
+                return Number.isFinite(v) ? v : null;
+            }
+
+            // One dot or none: assume dot is decimal (or integer)
+            const v = Number(s);
+            return Number.isFinite(v) ? v : null;
+        }
+
+        function formatMoneyBR(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+        }
+
+        function formatIntBR(value) {
+            return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(value);
+        }
+
+        // ---------- Animations ----------
+        function animateValue(el, finalValue, formatter, steps = 24, intervalMs = 35) {
+            let i = 0;
+            let current = 0;
+            const inc = finalValue / steps;
+
+            const timer = setInterval(() => {
+                i++;
+                current += inc;
+                if (i >= steps) {
+                    current = finalValue;
+                    clearInterval(timer);
+                }
+                el.textContent = formatter(current);
+            }, intervalMs);
+        }
+
+        // Animate integers
+        document.querySelectorAll('.js-animate-int').forEach(el => {
+            const v = parsePtBrNumber(el.getAttribute('data-value') ?? el.textContent);
+            if (v === null) return;
+            // only integers here
+            const finalInt = Math.round(v);
+            animateValue(el, finalInt, (x) => formatIntBR(Math.round(x)));
+        });
+
+        // Animate money
+        document.querySelectorAll('.js-animate-money').forEach(el => {
+            const v = parsePtBrNumber(el.getAttribute('data-value') ?? el.textContent);
+            if (v === null) return;
+            animateValue(el, v, (x) => formatMoneyBR(x));
+        });
+
+        // ---------- Charts ----------
+        if (window.Chart) {
+            // Sales trend
+            try {
+                const labels = JSON.parse(document.getElementById('salesSeriesLabelsJson')?.textContent || 'null');
+                const values = JSON.parse(document.getElementById('salesSeriesValuesJson')?.textContent || 'null');
+                if (labels && values) {
+                    const ctx = document.getElementById('salesTrendChart');
+                    if (ctx) {
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Vendas',
+                                    data: values,
+                                    tension: 0.35,
+                                    fill: true,
+                                    borderColor: '#ff6b1f',
+                                    backgroundColor: 'rgba(255, 181, 107, 0.2)',
+                                    pointRadius: 3,
+                                    pointBackgroundColor: '#ff6b1f'
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: true } },
+                                scales: {
+                                    x: { ticks: { maxRotation: 0, autoSkip: true } }
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch (e) {}
+
+            // Plans distribution
+            try {
+                const pLabels = JSON.parse(document.getElementById('planLabelsJson')?.textContent || 'null');
+                const pValues = JSON.parse(document.getElementById('planValuesJson')?.textContent || 'null');
+                if (pLabels && pValues) {
+                    const ctx2 = document.getElementById('planChart');
+                    if (ctx2) {
+                        new Chart(ctx2, {
+                            type: 'doughnut',
+                            data: {
+                                labels: pLabels,
+                                datasets: [{
+                                    label: 'Lojas',
+                                    data: pValues,
+                                    backgroundColor: ['#ffb56b', '#ff9a62', '#ff7a2f', '#ffd9b8'],
+                                    borderWidth: 0
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: true } }
+                            }
+                        });
+                    }
+                }
+            } catch (e) {}
+
+            // Store status distribution
+            try {
+                const sLabels = JSON.parse(document.getElementById('storeStatusLabelsJson')?.textContent || 'null');
+                const sValues = JSON.parse(document.getElementById('storeStatusValuesJson')?.textContent || 'null');
+                if (sLabels && sValues) {
+                    const ctx3 = document.getElementById('storeStatusChart');
+                    if (ctx3) {
+                        new Chart(ctx3, {
+                            type: 'bar',
+                            data: {
+                                labels: sLabels,
+                                datasets: [{
+                                    label: 'Lojas',
+                                    data: sValues,
+                                    backgroundColor: '#ff6b1f'
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    x: { ticks: { maxRotation: 0, autoSkip: true } },
+                                    y: { beginAtZero: true }
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch (e) {}
+        }
+    });
+</script>
+{% endblock %}

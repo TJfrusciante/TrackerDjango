@@ -2,6 +2,37 @@
 
 {% block title %}Convidar | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    @media (max-width: 991.98px) {
+        .workspace-invite-card {
+            border-radius: 14px;
+            padding: 1rem !important;
+        }
+        .page-hero__actions {
+            width: 100%;
+        }
+        .page-hero__actions .btn,
+        .page-hero__actions a {
+            flex: 1 1 calc(50% - 0.5rem);
+            justify-content: center;
+            text-align: center;
+        }
+        .workspace-invite-list .list-group-item {
+            border-radius: 12px;
+            margin-bottom: 0.45rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+    }
+    @media (max-width: 575.98px) {
+        .page-hero__actions .btn,
+        .page-hero__actions a {
+            flex-basis: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-hero">
     <div class="page-hero__info">
@@ -17,7 +48,7 @@
 
 <div class="row g-4">
     <div class="col-lg-5">
-        <div class="glass-card p-4 h-100">
+        <div class="glass-card p-4 h-100 workspace-invite-card">
             <h2 class="h6 fw-bold mb-3">Enviar convite por username</h2>
             <form method="post" class="row g-3">
                 {% csrf_token %}
@@ -37,7 +68,7 @@
         </div>
     </div>
     <div class="col-lg-7">
-        <div class="glass-card p-4">
+        <div class="glass-card p-4 workspace-invite-card workspace-invite-list">
             <h2 class="h6 fw-bold mb-3">Convites pendentes</h2>
             <div id="workspaceInviteSkeleton" class="skeleton table-skeleton mb-3"></div>
             {% if pending_invites %}

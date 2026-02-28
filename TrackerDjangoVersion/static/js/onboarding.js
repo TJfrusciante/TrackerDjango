@@ -87,6 +87,24 @@
     let activeSteps = [];
     let tooltip;
     let highlighted;
+    let resizeHandler;
+    let scrollHandler;
+    let keyHandler;
+
+    function removeTourListeners() {
+        if (resizeHandler) {
+            window.removeEventListener('resize', resizeHandler);
+            resizeHandler = null;
+        }
+        if (scrollHandler) {
+            window.removeEventListener('scroll', scrollHandler);
+            scrollHandler = null;
+        }
+        if (keyHandler) {
+            document.removeEventListener('keydown', keyHandler);
+            keyHandler = null;
+        }
+    }
 
     function ensureTooltip() {
         if (tooltip) return tooltip;
@@ -236,12 +254,14 @@
     function finishTour(storeKey) {
         clearHighlight();
         if (tooltip) tooltip.classList.remove('show');
+        removeTourListeners();
         if (storeKey) localStorage.setItem(storeKey, 'done');
     }
 
     function startTour(storeKey) {
         activeSteps = steps.filter(step => document.querySelector(step.selector));
         if (!activeSteps.length) return;
+        removeTourListeners();
         showStep(0);
 
         const tip = ensureTooltip();
@@ -254,11 +274,14 @@
             showStep(current + 1);
         };
         tip.querySelector('.tour-close').onclick = () => finishTour(storeKey);
-        window.addEventListener('resize', () => positionTooltip(highlighted, activeSteps[current]));
-        window.addEventListener('scroll', () => positionTooltip(highlighted, activeSteps[current]), { passive: true });
-        document.addEventListener('keydown', (event) => {
+        resizeHandler = () => positionTooltip(highlighted, activeSteps[current]);
+        scrollHandler = () => positionTooltip(highlighted, activeSteps[current]);
+        keyHandler = (event) => {
             if (event.key === 'Escape') finishTour(storeKey);
-        }, { once: true });
+        };
+        window.addEventListener('resize', resizeHandler);
+        window.addEventListener('scroll', scrollHandler, { passive: true });
+        document.addEventListener('keydown', keyHandler);
     }
 
     window.iTrackerTour = {

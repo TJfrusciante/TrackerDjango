@@ -98,6 +98,7 @@ Atualizacoes recentes
 - Planejamento Mercado Pago (somente docs): ver comentario em `TrackerDjangoVersion/requirements.txt`.
 - Guia de rotinas AWS: `guia_rotinas_notificacoes.txt` com cron para Ubuntu + nginx + gunicorn.
 - Dashboard: periodo padrao agora usa "Tudo" para evitar graficos vazios ao entrar.
+- Dashboard: corrigido travamento eventual do modal "Quer fazer um tour guiado?" com cleanup defensivo de backdrop/modal-open e inicio do tour somente apos o hidden do modal.
 - Tarefas: concluida apos o prazo mostra "Concluida com atraso" na lista e no bloco de ultimas tarefas.
 - Superuser: "Workspaces recentes" agora usa subqueries para evitar somas infladas por joins.
 - Workspaces: nova tela de convite por username em `/workspaces/<slug>/convites/`.

@@ -52,6 +52,101 @@
     .admin-actions .dropdown-item {
         font-size: .9rem;
     }
+    @media (max-width: 991.98px) {
+        .admin-filter-card {
+            padding: 0.9rem 0.9rem 1rem;
+            border-radius: 14px;
+        }
+        #userAdminFilters .form-label.small {
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .page-hero__actions {
+            width: 100%;
+        }
+        .page-hero__actions .btn,
+        .page-hero__actions a {
+            flex: 1 1 calc(50% - 0.5rem);
+            justify-content: center;
+            text-align: center;
+        }
+        .admin-user-table-wrap {
+            max-height: none;
+            overflow: visible;
+        }
+        .admin-user-table-wrap .table-responsive {
+            overflow: visible;
+        }
+        .admin-user-table {
+            width: 100%;
+        }
+        .admin-user-table thead {
+            display: none;
+        }
+        .admin-user-table,
+        .admin-user-table tbody,
+        .admin-user-table tr,
+        .admin-user-table td {
+            display: block;
+            width: 100%;
+        }
+        .admin-user-table tbody tr {
+            margin-bottom: 0.8rem;
+            padding: 0.9rem;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(15, 23, 42, 0.65);
+        }
+        .admin-user-table td {
+            border: 0;
+            padding: 0.34rem 0;
+            text-align: left !important;
+        }
+        .admin-user-table td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 0.18rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .admin-row-actions .dropdown {
+            width: 100%;
+        }
+        .admin-row-actions .dropdown .btn {
+            width: 100%;
+        }
+        .admin-row-actions .dropdown-menu {
+            position: static !important;
+            transform: none !important;
+            width: 100%;
+            margin-top: 0.45rem;
+            border-radius: 12px;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .page-hero__actions .btn,
+        .page-hero__actions a {
+            flex-basis: 100%;
+        }
+        .admin-user-table tbody tr {
+            padding: 0.85rem;
+        }
+        .avatar-sm {
+            width: 34px;
+            height: 34px;
+        }
+    }
+    @media (max-width: 991.98px) {
+        [data-bs-theme="light"] .admin-user-table tbody tr {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.93));
+            border-color: rgba(71, 85, 105, 0.22);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+    }
 </style>
 {% endblock %}
 
@@ -209,7 +304,7 @@
             <tbody>
                 {% for u in users %}
                     <tr>
-                        <td>
+                        <td data-label="Perfil">
                             <div class="d-flex align-items-center gap-2">
                                 {% if u.profile_obj and u.profile_obj.avatar %}
                                     <img src="{{ u.profile_obj.avatar.url }}" alt="Avatar" class="avatar-sm">
@@ -224,11 +319,11 @@
                                 </div>
                             </div>
                         </td>
-                        <td>
+                        <td data-label="Contato">
                             <div>{{ u.email|default:"-" }}</div>
                             <div class="small text-secondary">ID {{ u.id }}</div>
                         </td>
-                        <td>
+                        <td data-label="Status">
                             {% if u.approval_status == 'superuser' %}
                                 <span class="badge bg-primary">Superuser</span>
                             {% elif u.approval_status == 'guest' %}
@@ -248,9 +343,9 @@
                                 <div class="small text-danger">Exclus&atilde;o solicitada</div>
                             {% endif %}
                         </td>
-                        <td><span class="badge bg-info-subtle text-info">{{ u.plan_label|default:"-" }}</span></td>
-                        <td class="small text-secondary">{{ u.billing_cycle|default:"-" }}</td>
-                        <td>
+                        <td data-label="Plano"><span class="badge bg-info-subtle text-info">{{ u.plan_label|default:"-" }}</span></td>
+                        <td class="small text-secondary" data-label="Ciclo">{{ u.billing_cycle|default:"-" }}</td>
+                        <td data-label="Pagamento">
                             {% if u.approval_status == 'guest' %}
                                 <span class="badge bg-secondary-subtle text-secondary">N/A</span>
                             {% elif u.payment_confirmed %}
@@ -262,16 +357,16 @@
                                 <span class="badge bg-warning-subtle text-warning">Pendente</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td data-label="Expira">
                             {% if u.subscription_expires %}
                                 {{ u.subscription_expires|date:"d/m/Y" }}
                             {% else %}
                                 -
                             {% endif %}
                         </td>
-                        <td><span class="badge bg-secondary-subtle text-secondary">{{ u.workspace_count }}</span></td>
-                        <td class="small text-secondary">{% if u.last_login_ts %}{{ u.last_login_ts|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
-                        <td class="text-end">
+                        <td data-label="Workspaces"><span class="badge bg-secondary-subtle text-secondary">{{ u.workspace_count }}</span></td>
+                        <td class="small text-secondary" data-label="Último login">{% if u.last_login_ts %}{{ u.last_login_ts|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                        <td class="text-end admin-row-actions" data-label="Ações">
                             <div class="dropdown admin-actions">
                                 <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     A&ccedil;&otilde;es

@@ -1,0 +1,36 @@
+Guia SES (SMTP) para envio de emails no Tracker
+------------------------------------------------
+
+1) Verifique remetente (SES)
+   - Verifique o dominio ou o email "iDevelopSystemsNotify@outlook.com" no SES.
+   - Se estiver em Sandbox, libere para Production (caso queira enviar para qualquer destinatario).
+   - Ative DKIM no dominio, se possivel (melhora deliverability).
+
+2) Gere credenciais SMTP
+   - No SES, crie "SMTP credentials" (nao use Access Key).
+   - Guarde SMTP username e SMTP password.
+
+3) Configure o .env (mesma pasta do manage.py)
+   - Exemplo (porta 587 com TLS):
+     EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+     EMAIL_HOST=email-smtp.us-east-1.amazonaws.com
+     EMAIL_PORT=587
+     EMAIL_USE_TLS=1
+     EMAIL_USE_SSL=0
+     EMAIL_HOST_USER=SEU_SMTP_USERNAME
+     EMAIL_HOST_PASSWORD=SEU_SMTP_PASSWORD
+     DEFAULT_FROM_EMAIL=iDevelopSystemsNotify@outlook.com
+     EMAIL_TIMEOUT=30
+
+   - Exemplo (porta 465 com SSL):
+     EMAIL_HOST=email-smtp.us-east-1.amazonaws.com
+     EMAIL_PORT=465
+     EMAIL_USE_TLS=0
+     EMAIL_USE_SSL=1
+
+4) Teste local
+   - python manage.py send_test_email --to gabrielosantana@outlook.com
+
+5) Observacoes
+   - O remetente precisa estar verificado no SES.
+   - Se estiver em Sandbox, somente emails verificados recebem envio.

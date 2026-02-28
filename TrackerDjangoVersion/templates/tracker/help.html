@@ -108,7 +108,8 @@
         color: var(--text-color);
         font-weight: 600;
         text-decoration: none;
-        white-space: nowrap;
+        white-space: normal;
+        line-height: 1.2;
     }
     .help-chip:hover {
         border-color: var(--primary-soft);
@@ -119,11 +120,24 @@
         gap: .6rem;
         overflow-x: auto;
         padding-bottom: .3rem;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+    }
+    .help-scroll .help-chip {
+        scroll-snap-align: start;
     }
     @media (max-width: 991px) {
         .help-hero { padding: 2rem 0 1.2rem; }
         .help-card { padding: 1rem; }
         .help-nav { position: static; }
+    }
+    @media (max-width: 575.98px) {
+        .help-chip {
+            font-size: 0.8rem;
+            padding: .35rem .65rem;
+            flex-shrink: 0;
+            max-width: 88vw;
+        }
     }
 </style>
 {% endblock %}

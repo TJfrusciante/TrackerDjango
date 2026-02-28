@@ -42,7 +42,7 @@
                 </div>
             {% endif %}
             {% if profile %}
-                <div class="row g-3">
+                <div class="row g-3 whatsapp-profile-grid">
                     <div class="col-md-6">
                         <div class="glass-card p-3 h-100">
                             <p class="text-secondary small mb-1">Telefone conectado</p>
@@ -71,7 +71,7 @@
                 <div class="alert alert-info small mt-3 mb-0">
                     Envie mensagens para o n&uacute;mero oficial do iTracker. Seu n&uacute;mero cadastrado &eacute; o que autoriza o envio e aponta o workspace.
                 </div>
-                <div class="d-flex justify-content-end mt-3">
+                <div class="d-flex justify-content-end mt-3 wa-inline-action">
                     <a class="btn btn-outline-light btn-sm" href="{% url 'whatsapp_finance:config' %}">
                         <i class="fa-solid fa-gear me-1"></i>Editar configuração
                     </a>
@@ -80,7 +80,7 @@
                 <div class="alert alert-warning mb-0">
                     Nenhum WhatsApp cadastrado. Cadastre seu n&uacute;mero no Perfil para ativar o ChatAgent.
                 </div>
-                <div class="d-flex justify-content-end mt-3">
+                <div class="d-flex justify-content-end mt-3 wa-inline-action">
                     <a class="btn btn-primary btn-sm" href="{% url 'whatsapp_finance:config' %}">
                         <i class="fa-solid fa-link me-1"></i>Configurar agora
                     </a>
@@ -117,7 +117,7 @@
         <div class="{% if not whatsapp_feature_enabled %}whatsapp-dev-disabled{% endif %}">
             <div class="glass-card p-4 mb-4">
                 <h5 class="mb-3">Comandos r&aacute;pidos</h5>
-                <div class="d-flex flex-wrap gap-2">
+                <div class="d-flex flex-wrap gap-2 wa-command-list">
                     <span class="badge bg-primary-subtle text-primary">/resumo</span>
                     <span class="badge bg-primary-subtle text-primary">/categorias</span>
                     <span class="badge bg-primary-subtle text-primary">/extrato 01/01/2026 31/01/2026</span>
@@ -149,13 +149,46 @@
 {% endblock %}
 
 {% block extra_css %}
-{% if not whatsapp_feature_enabled %}
 <style>
     .whatsapp-dev-disabled {
-        opacity: 0.45;
-        pointer-events: none;
-        filter: grayscale(0.2);
+        opacity: 0.82;
+        filter: grayscale(0.08);
+    }
+    @media (max-width: 991.98px) {
+        .row.gy-4 > [class*="col-"] .glass-card {
+            border-radius: 14px;
+            padding: 1rem !important;
+        }
+        .page-hero__actions {
+            width: 100%;
+        }
+        .page-hero__actions > * {
+            flex: 1 1 100%;
+            width: 100%;
+            justify-content: center;
+            text-align: center;
+        }
+        .wa-inline-action {
+            justify-content: stretch !important;
+        }
+        .wa-inline-action .btn {
+            width: 100%;
+        }
+        .wa-command-list .badge {
+            padding: 0.5rem 0.65rem;
+            font-size: 0.78rem;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .wa-command-list .badge {
+            width: 100%;
+            text-align: left;
+            white-space: normal;
+        }
+        .whatsapp-profile-grid .glass-card,
+        .row.gy-4 .glass-card {
+            border-radius: 14px;
+        }
     }
 </style>
-{% endif %}
 {% endblock %}

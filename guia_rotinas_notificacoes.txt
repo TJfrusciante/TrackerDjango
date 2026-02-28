@@ -1,0 +1,44 @@
+Guia - Rotinas de Notificacoes e Alertas (AWS Ubuntu)
+=====================================================
+
+Objetivo
+- Configurar rotinas de lembretes, resumos e alertas financeiros em uma instancia AWS (Ubuntu),
+  usando nginx + gunicorn e acesso via Git Bash/SSH.
+
+Comandos Django
+1) python manage.py send_task_reminders
+2) python manage.py send_digest_emails
+3) python manage.py check_finance_alerts
+
+Sugestao de horarios
+- send_task_reminders: diario, 08:00 (horario local do servidor)
+- send_digest_emails (semanal): toda segunda, 07:30
+- send_digest_emails (mensal): dia 1, 07:45
+- check_finance_alerts: a cada 3 horas (ou 2x por dia, se quiser leve)
+
+Passo a passo (AWS Ubuntu)
+1) Acesse a instancia via Git Bash:
+   ssh -i /c/Users/TJfru/SEU_KEY.pem ubuntu@SEU_IP
+
+2) Entre na pasta do projeto e ative o venv:
+   cd /home/ubuntu/TrackerDjangoVersion/TrackerDjangoVersion
+   source ../venv/bin/activate
+
+3) Teste os comandos manualmente:
+   python manage.py send_task_reminders
+   python manage.py send_digest_emails
+   python manage.py check_finance_alerts
+
+4) Configure o cron do usuario ubuntu:
+   crontab -e
+
+5) Exemplo de entradas (ajuste caminhos conforme seu deploy):
+   0 8 * * * /home/ubuntu/TrackerDjangoVersion/venv/bin/python /home/ubuntu/TrackerDjangoVersion/TrackerDjangoVersion/manage.py send_task_reminders
+   30 7 * * 1 /home/ubuntu/TrackerDjangoVersion/venv/bin/python /home/ubuntu/TrackerDjangoVersion/TrackerDjangoVersion/manage.py send_digest_emails
+   45 7 1 * * /home/ubuntu/TrackerDjangoVersion/venv/bin/python /home/ubuntu/TrackerDjangoVersion/TrackerDjangoVersion/manage.py send_digest_emails
+   0 */3 * * * /home/ubuntu/TrackerDjangoVersion/venv/bin/python /home/ubuntu/TrackerDjangoVersion/TrackerDjangoVersion/manage.py check_finance_alerts
+
+Observacoes
+- Se usa .env, garanta que o cron carrega as variaveis (ex.: export no crontab ou arquivo .profile).
+- Para push web, configure VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY e VAPID_SUBJECT no .env.
+- Caso use systemd para gunicorn, cron pode ser mantido separado (recomendado).

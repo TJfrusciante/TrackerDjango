@@ -116,6 +116,52 @@
         background: linear-gradient(145deg, rgba(255, 255, 255, 0.99), rgba(226, 232, 240, 0.95));
         box-shadow: 0 12px 22px rgba(15, 23, 42, 0.13);
     }
+    @media (max-width: 991.98px) {
+        .page-hero__actions {
+            width: 100%;
+        }
+        .page-hero__actions .btn {
+            flex: 1 1 calc(50% - 0.5rem);
+            justify-content: center;
+        }
+        .dashboard-toolbar {
+            justify-content: flex-start;
+        }
+        .dashboard-toolbar .btn {
+            width: 100%;
+        }
+        .latest-tx-shell {
+            padding: 1rem !important;
+        }
+        .latest-tx-shell .table-responsive {
+            overflow-x: auto;
+            overflow-y: visible;
+        }
+        #latestTxTable {
+            min-width: 100%;
+            table-layout: fixed;
+        }
+        #latestTxTable th,
+        #latestTxTable td {
+            padding: 0.5rem 0.45rem;
+            font-size: 0.82rem;
+            word-wrap: break-word;
+        }
+        #latestTxTable .ltx-col-icon,
+        #latestTxTable .ltx-col-category,
+        #latestTxTable .ltx-col-responsible {
+            display: none;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .page-hero__actions .btn {
+            flex-basis: 100%;
+        }
+        #latestTxTable th,
+        #latestTxTable td {
+            font-size: 0.78rem;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -547,31 +593,31 @@
                 <table class="table table-borderless align-middle mb-0" id="latestTxTable">
                     <thead>
                         <tr class="text-secondary">
-                            <th data-sort="icon">Ícone</th>
-                            <th data-sort="description">Descri&#231;&#227;o</th>
-                            <th data-sort="category">Categoria</th>
+                            <th class="ltx-col-icon" data-sort="icon">Ícone</th>
+                            <th class="ltx-col-description" data-sort="description">Descri&#231;&#227;o</th>
+                            <th class="ltx-col-category" data-sort="category">Categoria</th>
                             {% if show_responsible_column %}
-                            <th data-sort="responsible">Respons&aacute;vel</th>
+                            <th class="ltx-col-responsible" data-sort="responsible">Respons&aacute;vel</th>
                             {% endif %}
-                            <th data-sort="date">Data</th>
-                            <th class="text-end" data-sort="value">Valor</th>
-                            <th data-sort="type">Tipo</th>
+                            <th class="ltx-col-date" data-sort="date">Data</th>
+                            <th class="text-end ltx-col-value" data-sort="value">Valor</th>
+                            <th class="ltx-col-type" data-sort="type">Tipo</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for tx in latest_transactions %}
                             <tr>
-                                <td class="text-center">
+                                <td class="text-center ltx-col-icon">
                                     {% if tx.icon %}
                                         <i class="{{ tx.icon }}"></i>
                                     {% else %}
                                         -
                                     {% endif %}
                                 </td>
-                                <td class="fw-semibold">{{ tx.description }}</td>
-                                <td><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
+                                <td class="fw-semibold ltx-col-description">{{ tx.description }}</td>
+                                <td class="ltx-col-category"><span class="badge bg-secondary-subtle text-secondary">{{ tx.category.name }}</span></td>
                                 {% if show_responsible_column %}
-                                <td class="text-secondary">
+                                <td class="text-secondary ltx-col-responsible">
                                     {% if tx.responsible %}
                                         {{ tx.responsible.get_full_name|default:tx.responsible.username }}
                                     {% else %}
@@ -579,9 +625,9 @@
                                     {% endif %}
                                 </td>
                                 {% endif %}
-                                <td class="text-secondary">{{ tx.date|date:"d/m/Y" }}</td>
-                                <td class="text-end {% if tx.type == 'income' %}text-success{% else %}text-danger{% endif %}">R$ {{ tx.value|floatformat:2 }}</td>
-                                <td>
+                                <td class="text-secondary ltx-col-date">{{ tx.date|date:"d/m/Y" }}</td>
+                                <td class="text-end ltx-col-value {% if tx.type == 'income' %}text-success{% else %}text-danger{% endif %}">R$ {{ tx.value|floatformat:2 }}</td>
+                                <td class="ltx-col-type">
                                     <span class="badge {% if tx.type == 'income' %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %}">{{ tx.get_type_display }}</span>
                                 </td>
                             </tr>
@@ -1964,6 +2010,22 @@
         const checklistEl = document.getElementById('onboardingChecklist');
         const checklistToggle = document.querySelector('[data-bs-target="#onboardingChecklist"]');
         const checklistIcon = checklistToggle ? checklistToggle.querySelector('.collapse-icon') : null;
+        const launchTour = () => {
+            if (window.iTrackerTour) {
+                window.iTrackerTour.start(doneKey);
+            }
+        };
+        const cleanupOnboardingModal = () => {
+            if (!modalEl) return;
+            modalEl.classList.remove('show');
+            modalEl.style.display = 'none';
+            modalEl.setAttribute('aria-hidden', 'true');
+            modalEl.removeAttribute('aria-modal');
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+            document.querySelectorAll('.modal-backdrop').forEach((backdrop) => backdrop.remove());
+        };
 
         const setChecklistIcon = (expanded) => {
             if (!checklistIcon) return;
@@ -1992,21 +2054,33 @@
         }
         if (startTourBtn) {
             startTourBtn.addEventListener('click', () => {
-                if (window.iTrackerTour) {
-                    window.iTrackerTour.start(doneKey);
-                }
+                cleanupOnboardingModal();
+                launchTour();
             });
         }
         if (onboardingEnabled && modalEl && !localStorage.getItem(promptedKey) && !localStorage.getItem(doneKey)) {
-            const modal = new bootstrap.Modal(modalEl);
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                const shouldStartTour = modalEl.dataset.startTourAfterHide === '1';
+                delete modalEl.dataset.startTourAfterHide;
+                cleanupOnboardingModal();
+                if (shouldStartTour) {
+                    launchTour();
+                }
+            });
             modal.show();
             localStorage.setItem(promptedKey, '1');
             if (modalStartBtn) {
                 modalStartBtn.addEventListener('click', () => {
+                    modalEl.dataset.startTourAfterHide = '1';
                     modal.hide();
-                    if (window.iTrackerTour) {
-                        window.iTrackerTour.start(doneKey);
-                    }
+                    window.setTimeout(() => {
+                        if (modalEl.dataset.startTourAfterHide === '1') {
+                            delete modalEl.dataset.startTourAfterHide;
+                            cleanupOnboardingModal();
+                            launchTour();
+                        }
+                    }, 400);
                 });
             }
         }

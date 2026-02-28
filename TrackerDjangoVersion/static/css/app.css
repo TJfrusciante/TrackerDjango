@@ -360,6 +360,74 @@
     }
 }
 
+@media (max-width: 991.98px) {
+    .main-shell > .container {
+        max-width: 100%;
+        padding-inline: 0.75rem;
+    }
+
+    .main-shell .glass-card,
+    .main-shell .page-section,
+    .main-shell .page-hero {
+        max-width: 100%;
+    }
+
+    .main-shell .table-responsive {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .page-hero {
+        margin-bottom: 1.25rem;
+        border-radius: 16px;
+        gap: 0.8rem;
+    }
+
+    .page-hero__title {
+        font-size: 1.24rem;
+        line-height: 1.25;
+    }
+
+    .page-hero__subtitle {
+        font-size: 0.92rem;
+        line-height: 1.42;
+    }
+
+    .page-hero__actions {
+        width: 100%;
+    }
+
+    .page-hero__actions .btn,
+    .page-hero__actions .page-action-btn {
+        min-height: 44px;
+        padding-inline: 0.85rem;
+        font-size: 0.92rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .main-shell > .container {
+        padding-inline: 0.6rem;
+    }
+
+    .page-hero {
+        padding: 0.9rem;
+    }
+
+    .page-hero__title {
+        font-size: 1.12rem;
+    }
+
+    .page-hero__subtitle {
+        font-size: 0.88rem;
+    }
+
+    .page-hero__actions .btn,
+    .page-hero__actions .page-action-btn {
+        width: 100%;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .fade-in,
     .auth-feature,

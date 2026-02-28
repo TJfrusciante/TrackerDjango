@@ -10,6 +10,38 @@
         border-radius: 50%;
         object-fit: cover;
     }
+    @media (max-width: 991.98px) {
+        .glass-card {
+            border-radius: 14px;
+            padding: 1rem !important;
+        }
+        .page-hero__title {
+            font-size: 1.18rem;
+        }
+        .page-hero__info {
+            width: 100%;
+            align-items: flex-start !important;
+            flex-wrap: wrap;
+        }
+        .page-hero__actions {
+            width: 100%;
+        }
+        .page-hero__actions .btn,
+        .page-hero__actions a {
+            flex: 1 1 calc(50% - 0.5rem);
+            justify-content: center;
+            text-align: center;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .page-hero__actions .btn,
+        .page-hero__actions a {
+            flex-basis: 100%;
+        }
+        .glass-card {
+            border-radius: 14px;
+        }
+    }
 </style>
 {% endblock %}
 

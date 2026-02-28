@@ -2,7 +2,59 @@
 
 {% block title %}Vis&atilde;o geral | iTracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    .super-filter-form {
+        min-width: 280px;
+    }
+    @media (max-width: 991.98px) {
+        .super-overview .glass-card {
+            padding: 1rem !important;
+            border-radius: 14px;
+        }
+        .super-overview .text-secondary.small {
+            font-size: 0.78rem !important;
+        }
+        .super-overview .page-hero__actions {
+            width: 100%;
+        }
+        .super-overview .page-hero__actions > a {
+            width: 100%;
+            justify-content: center;
+            text-align: center;
+        }
+        .super-overview .super-filter-form {
+            width: 100%;
+            min-width: 0;
+            flex-wrap: wrap;
+        }
+        .super-overview .super-filter-form .form-select,
+        .super-overview .super-filter-form .btn {
+            width: 100%;
+            min-height: 42px;
+        }
+        .super-overview .table-responsive {
+            margin-inline: -0.25rem;
+        }
+        .super-overview canvas {
+            max-height: 220px;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .super-overview .glass-card {
+            border-radius: 14px;
+            padding: 0.95rem !important;
+        }
+        .super-overview h4,
+        .super-overview h5 {
+            font-size: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
+<div class="super-overview">
 <div class="page-hero">
     <div class="page-hero__info">
         <p class="page-hero__eyebrow">Superuser</p>
@@ -13,7 +65,7 @@
         {% endif %}
     </div>
     <div class="page-hero__actions">
-        <form method="get" class="d-flex align-items-center gap-2">
+        <form method="get" class="d-flex align-items-center gap-2 super-filter-form">
             <select name="user" class="form-select form-select-sm">
                 <option value="">Todos os usu&aacute;rios</option>
                 {% for u in users_all %}
@@ -727,6 +779,7 @@
 <script id="aiDailyCosts" type="application/json">{{ ai_daily_costs_json|safe }}</script>
 <script id="aiFeatureLabels" type="application/json">{{ ai_feature_labels_json|safe }}</script>
 <script id="aiFeatureTokens" type="application/json">{{ ai_feature_tokens_json|safe }}</script>
+</div>
 
 {% block extra_js %}
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>

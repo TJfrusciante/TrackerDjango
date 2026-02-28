@@ -1,0 +1,13 @@
+cd /var/www/TrackerDjango/TrackerDjangoVersion
+sudo rm -rf /var/www/TrackerDjango/TrackerDjangoVersion/staticfiles/*
+/var/www/TrackerDjango/venv/bin/python manage.py collectstatic --noinput
+/var/www/TrackerDjango/venv/bin/python manage.py migrate
+sudo systemctl daemon-reload
+sudo systemctl restart gunicorn
+sudo systemctl restart nginx
+sudo systemctl status gunicorn --no-pager
+sudo systemctl status nginx --no-pager
+
+
+Script criado na instância AWS do Tracker, pra rodar o script após puxar o commit do repositório é só digitar:
+sudo refreshSystem
